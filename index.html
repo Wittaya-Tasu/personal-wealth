@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Personal Wealth Dashboard</title>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#064e3b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="header">
+            <h1>Wealth Dashboard</h1>
+            <p class="subtitle">ความมั่งคั่งสุทธิ</p>
+            <h2 class="net-worth" id="netWorth">฿ 0.00</h2>
+        </header>
+
+        <main class="content">
+            <section class="card">
+                <h3>รายการล่าสุด</h3>
+                <ul class="transaction-list" id="transactionList">
+                    <li class="transaction-item">
+                        <div class="tx-details">
+                            <span class="tx-title">เงินเดือน</span>
+                            <span class="tx-date">1 ก.ค. 2026</span>
+                        </div>
+                        <span class="tx-amount positive">+ ฿0.00</span>
+                    </li>
+                </ul>
+            </section>
+        </main>
+
+        <nav class="bottom-nav" aria-label="เมนูหลัก">
+            <button class="nav-btn active" type="button">แดชบอร์ด</button>
+            <button class="nav-btn fab-btn" id="addBtn" type="button" aria-label="เพิ่มรายการ">+</button>
+            <button class="nav-btn" type="button">ตั้งค่า</button>
+        </nav>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

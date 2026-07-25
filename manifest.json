@@ -1,0 +1,22 @@
+{
+  "name": "Personal Wealth Dashboard",
+  "short_name": "Wealth",
+  "lang": "th",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#064e3b",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192/064e3b/d4af37?text=W",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://via.placeholder.com/512/064e3b/d4af37?text=W",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
