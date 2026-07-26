@@ -52,6 +52,90 @@
         </nav>
     </div>
 
+    <!-- ========================================== -->
+    <!-- [เริ่ม] ส่วนที่ต้องแทรกเพิ่ม: โครงสร้าง Bottom Sheet -->
+    <!-- ========================================== -->
+    <div class="modal-overlay" id="overlay"></div>
+    <div class="bottom-sheet" id="bottomSheet">
+        <!-- หน้า 1: เลือกประเภทรายการ -->
+        <div id="typeSelection">
+            <div class="header-flex">
+                <h3>เลือกประเภทที่ต้องการบันทึก</h3>
+                <button class="btn-close" type="button" onclick="closeSheet()">×</button>
+            </div>
+            <div class="menu-option" onclick="openForm('transactionForm')">รายรับ-รายจ่าย ประจำวัน <span>></span></div>
+            <div class="menu-option" onclick="openForm('investmentForm')">บันทึกการลงทุน <span>></span></div>
+            <div class="menu-option" onclick="openForm('assetForm')">บันทึกทรัพย์สินรายการใหม่ <span>></span></div>
+        </div>
+
+        <!-- หน้า 2.1: ฟอร์มรายรับ-รายจ่าย -->
+        <div id="transactionForm" class="form-container" style="display: none;">
+            <div class="header-flex">
+                <h3>รายรับ-รายจ่าย</h3>
+                <button class="btn-close" type="button" onclick="closeSheet()">×</button>
+            </div>
+            <form onsubmit="submitData(event, 'Transactions')">
+                <div class="form-group"><label>วันที่</label><input type="date" name="date" required></div>
+                <div class="form-group">
+                    <label>ประเภท</label>
+                    <select name="type">
+                        <option value="Income">รายรับ</option>
+                        <option value="Expense">รายจ่าย</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>หมวดหมู่</label><input type="text" name="category" placeholder="เช่น อาหาร, เงินเดือน"></div>
+                <div class="form-group"><label>จำนวนเงิน (บาท)</label><input type="number" name="amount" placeholder="0.00" required></div>
+                <div class="form-group"><label>บันทึกช่วยจำ</label><input type="text" name="note" placeholder="รายละเอียดเพิ่มเติม"></div>
+                <button type="submit" class="btn-submit">บันทึกข้อมูล</button>
+            </form>
+        </div>
+
+        <!-- หน้า 2.2: ฟอร์มการลงทุน -->
+        <div id="investmentForm" class="form-container" style="display: none;">
+            <div class="header-flex">
+                <h3>บันทึกการลงทุน</h3>
+                <button class="btn-close" type="button" onclick="closeSheet()">×</button>
+            </div>
+            <form onsubmit="submitData(event, 'Investments')">
+                <div class="form-group"><label>ชื่อสินทรัพย์</label><input type="text" name="asset_name" required></div>
+                <div class="form-group"><label>จำนวนหน่วย</label><input type="number" step="0.01" name="units" required></div>
+                <div class="form-group"><label>ต้นทุนเฉลี่ย</label><input type="number" step="0.01" name="avg_cost" required></div>
+                <div class="form-group">
+                    <label>ลดหย่อนภาษีได้</label>
+                    <select name="tax_deductible"><option value="No">ไม่ใช่</option><option value="Yes">ใช่</option></select>
+                </div>
+                <button type="submit" class="btn-submit">บันทึกข้อมูล</button>
+            </form>
+        </div>
+
+        <!-- หน้า 2.3: ฟอร์มทรัพย์สิน -->
+        <div id="assetForm" class="form-container" style="display: none;">
+            <div class="header-flex">
+                <h3>ทรัพย์สินรายการใหม่</h3>
+                <button class="btn-close" type="button" onclick="closeSheet()">×</button>
+            </div>
+            <form onsubmit="submitData(event, 'Assets')">
+                <div class="form-group"><label>ชื่อทรัพย์สิน</label><input type="text" name="asset_name" required></div>
+                <div class="form-group"><label>หมวดหมู่</label><input type="text" name="category" placeholder="เช่น อสังหาฯ, ยานพาหนะ"></div>
+                <div class="form-group"><label>ราคาที่ซื้อมา</label><input type="number" name="purchase_price" required></div>
+                <div class="form-group"><label>มูลค่าประเมินปัจจุบัน</label><input type="number" name="estimated_value"></div>
+                <button type="submit" class="btn-submit">บันทึกข้อมูล</button>
+            </form>
+        </div>
+    </div>
+    <!-- ========================================== -->
+    <!-- [จบ] ส่วนที่แทรกเพิ่ม -->
+    <!-- ========================================== -->
+
+    <!-- [เพิ่มใหม่] นำเข้าไลบรารี Google API (gapi) และ Identity Services (gsi) -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
+  
+
     <!-- [เพิ่มใหม่] นำเข้าไลบรารี Google API (gapi) และ Identity Services (gsi) -->
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
