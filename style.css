@@ -206,3 +206,76 @@ button {
         padding-top: 28px;
     }
 }
+
+/* =========================================
+   CSS สำหรับ Bottom Sheet (เพิ่มใหม่)
+   ========================================= */
+.modal-overlay {
+    position: fixed; /* ใช้ fixed เพื่อให้อยู่ทับทุกอย่าง */
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 1000;
+}
+
+.bottom-sheet {
+    position: fixed;
+    bottom: -100%;
+    left: 0; right: 0;
+    background-color: #16201b; /* สีพื้นหลังสไตล์เข้ม */
+    border-radius: 24px 24px 0 0;
+    padding: 24px;
+    transition: bottom 0.3s cubic-bezier(0.1, 1, 0.2, 1);
+    z-index: 1001;
+    max-height: 85vh;
+    overflow-y: auto;
+    color: #ffffff;
+}
+
+.modal-overlay.active { display: block; opacity: 1; }
+.bottom-sheet.active { bottom: 0; }
+
+.menu-option {
+    background: rgba(255, 255, 255, 0.08);
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;}
+.header-flex h3 { margin: 0; font-weight: 500;}
+.btn-close { background: none; border: none; color: #84938a; font-size: 28px; cursor: pointer; padding: 0;}
+
+.form-group { margin-bottom: 16px; text-align: left; }
+.form-group label { display: block; margin-bottom: 8px; color: #84938a; font-size: 14px; }
+.form-group input, .form-group select {
+    width: 100%;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 16px;
+    box-sizing: border-box;
+    font-family: 'Sarabun', sans-serif;
+}
+.btn-submit {
+    width: 100%;
+    background-color: #1fca74;
+    color: #0b110e;
+    border: none;
+    padding: 14px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    margin-top: 10px;
+    cursor: pointer;
+    font-family: 'Sarabun', sans-serif;
+}
+.btn-submit:disabled { opacity: 0.7; cursor: not-allowed; }
