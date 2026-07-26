@@ -85,13 +85,20 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("Configuration Loaded:", APP_CONFIG.SPREADSHEET_ID ? "Yes" : "No");
     }
 
-    // จัดการปุ่ม + (ดึงมาจากโค้ดเดิม)
-    const addBtn = document.getElementById("addBtn");
-    if (addBtn) {
-        addBtn.addEventListener("click", () => {
-            alert("ระบบเปิดหน้าต่าง Bottom Sheet สำหรับเพิ่มรายการใหม่");
-        });
-    }
+ // อ้างอิง Elements ใหม่
+const addBtn = document.getElementById('addBtn');
+const overlay = document.getElementById('overlay');
+const bottomSheet = document.getElementById('bottomSheet');
+
+// อันนี้คือโค้ดที่ถูกต้องสำหรับเปิด Bottom Sheet 
+// (ถ้ามีโค้ดเก่าที่สั่ง alert ให้ลบทิ้งแล้วใช้ตัวนี้แทนครับ)
+if (addBtn) {
+    addBtn.addEventListener('click', () => {
+        overlay.classList.add('active');
+        bottomSheet.classList.add('active');
+        resetSheet(); 
+    });
+}
 
     // ผูก Event ให้ปุ่มล็อกอินและออกจากระบบ
     document.getElementById('authorize_button').addEventListener('click', handleAuthClick);
