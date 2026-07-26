@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Personal Wealth Dashboard</title>
+    <title>Personal Wealth</title>
 
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#064e3b">
@@ -22,6 +22,12 @@
             <h1>Wealth Dashboard</h1>
             <p class="subtitle">ความมั่งคั่งสุทธิ</p>
             <h2 class="net-worth" id="netWorth">฿ 0.00</h2>
+            
+            <!-- [เพิ่มใหม่] ปุ่มสำหรับล็อกอินและออกจากระบบ Google -->
+            <div class="auth-container" style="margin-top: 15px;">
+                <button id="authorize_button" class="nav-btn" style="display: none; width: auto; padding: 5px 15px; margin: 0 auto; border-radius: 20px;">ล็อกอินด้วย Google</button>
+                <button id="signout_button" class="nav-btn" style="display: none; width: auto; padding: 5px 15px; margin: 0 auto; border-radius: 20px; background-color: #ef4444; color: white;">ออกจากระบบ</button>
+            </div>
         </header>
 
         <main class="content">
@@ -46,6 +52,11 @@
         </nav>
     </div>
 
+    <!-- [เพิ่มใหม่] นำเข้าไลบรารี Google API (gapi) และ Identity Services (gsi) -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+    <!-- เรียกใช้ไฟล์ JavaScript ของเรา -->
     <script src="config.js"></script>
     <script src="script.js"></script>
 </body>
