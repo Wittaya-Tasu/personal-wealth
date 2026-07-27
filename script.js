@@ -190,6 +190,7 @@ window.submitData = async function(event, sheetName) {
             alert("✅ บันทึกข้อมูลสำเร็จ!");
             closeSheet();
             event.target.reset();
+            loadDashboardData(); // <--- เพิ่มบรรทัดนี้ เพื่อให้อัปเดตยอดเงินทันที!
         } else {
             alert("❌ เกิดข้อผิดพลาด: " + result.message);
         }
@@ -289,4 +290,83 @@ document.addEventListener("DOMContentLoaded", () => {
             renderWealthChart(e.target.value);
         });
     }
+});
+
+// =========================================
+// 7. ระบบดึงข้อมูลจากฐานข้อมูลมาแสดงผล
+// =========================================
+
+// ตั้งค่างบประมาณรายเดือนของคุณที่นี่ (เช่น 30000)
+const MONTHLY_BUDGET = 30000; 
+
+async function loadDashboardData() {
+    try {
+        // ให้หน้าจอแสดงว่ากำลังโหลดระหว่างรอข้อมูล
+        document.getElementById('displayNetWorth').innerText = "กำลังโหลด...";
+
+        // ดึงข้อมูลผ่าน Web App URL เดิมที่เราใช้ส่งข้อมูล
+        const response = await fetch(WEB_APP_URL);
+        const data = await response.json();
+
+        // 1. คำนวณยอดการลงทุน (Investments)
+        let totalInvestments = 0;
+        data.investments.forEach(item => {
+            totalInvestments += Number(item.current_value || 0);
+        });
+
+        // 2. คำนวณยอดทรัพย์สินอื่นๆ (Assets)
+        let totalAssets = 0;
+        data.assets.forEach(item => {
+            totalAssets += Number(item.estimated_value || item.purchase_price || 0);
+        });
+
+        // 3. คำนวณงบประมาณรายเดือน จากตาราง Transactions
+        const today = new Date();
+        const currentMonth = today.getMonth(); // 0-11
+        const currentYear = today.getFullYear();
+        
+        let currentMonthExpenses = 0;
+
+        data.transactions.forEach(tx => {
+            const txDate = new Date(tx.date);
+            // เช็คว่าเป็นรายการของเดือนนี้และปีนี้ไหม
+            if (txDate.getMonth() === currentMonth && txDate.getFullYear() === currentYear) {
+                if (tx.type === 'Expense') {
+                    currentMonthExpenses += Number(tx.amount || 0);
+                }
+            }
+        });
+
+        // 4. สรุปตัวเลข
+        const netWorth = totalInvestments + totalAssets; // ความมั่งคั่งสุทธิ
+        const remainingBudget = MONTHLY_BUDGET - currentMonthExpenses; // งบใช้จ่ายคงเหลือ
+
+        // 5. นำตัวเลขไปแสดงบนหน้า HTML
+        document.getElementById('displayNetWorth').innerText = `฿${netWorth.toLocaleString()}`;
+        document.getElementById('displayInvestments').innerText = `฿${totalInvestments.toLocaleString()}`;
+        document.getElementById('displayRemainingBudget').innerText = `฿${remainingBudget.toLocaleString()}`;
+        document.getElementById('displayExpense').innerText = `฿${currentMonthExpenses.toLocaleString()}`;
+        
+        // จัดสีตัวอักษรของงบคงเหลือ (ถ้าเหลือน้อยกว่า 0 ให้เป็นสีแดง)
+        const budgetElem = document.getElementById('displayRemainingBudget');
+        if (remainingBudget < 0) {
+            budgetElem.style.color = '#ef4444'; // สีแดง
+            budgetElem.classList.remove('positive');
+        } else {
+            budgetElem.style.color = '#1fca74'; // สีเขียว
+            budgetElem.classList.add('positive');
+        }
+
+    } catch (error) {
+        console.error("Error loading data:", error);
+        document.getElementById('displayNetWorth').innerText = "โหลดข้อมูลล้มเหลว";
+    }
+}
+
+// สั่งให้ดึงข้อมูลทันทีที่เว็บโหลดเสร็จ
+document.addEventListener("DOMContentLoaded", () => {
+    // โค้ดเดิมที่มีอยู่แล้ว ... 
+    
+    // เรียกฟังก์ชันโหลดข้อมูล
+    loadDashboardData();
 });
