@@ -31,19 +31,68 @@
         </header>
 
         <main class="content">
-            <section class="card">
-                <h3>รายการล่าสุด</h3>
-                <ul class="transaction-list" id="transactionList">
-                    <li class="transaction-item">
-                        <div class="tx-details">
-                            <span class="tx-title">เงินเดือน</span>
-                            <span class="tx-date">1 ก.ค. 2026</span>
-                        </div>
-                        <span class="tx-amount positive">+ ฿0.00</span>
-                    </li>
-                </ul>
-            </section>
-        </main>
+    <!-- 1. การ์ดความมั่งคั่งสุทธิ -->
+    <section class="card hero-card">
+        <div class="card-header">
+            <span class="title-with-icon">↗ ความมั่งคั่งสุทธิ</span>
+            <span class="icon-info">i</span>
+        </div>
+        <h2 class="wealth-amount">฿4,286,450</h2>
+        <p class="wealth-change positive">+฿68,250 +1.62% เดือนนี้</p>
+        
+        <!-- พื้นที่สำหรับวาดกราฟเส้นในอนาคต (อาจใช้ Chart.js หรือ SVG) -->
+        <div class="chart-container">
+            <svg viewBox="0 0 100 30" class="sparkline">
+                <path d="M0,25 L10,22 L20,24 L30,18 L40,15 L50,16 L60,10 L70,12 L80,5 L90,8 L100,2" fill="none" stroke="#e5c158" stroke-width="1.5" stroke-dasharray="2,2"/>
+            </svg>
+        </div>
+        <div class="chart-labels">
+            <span>12 เดือนล่าสุด</span>
+            <span>อัปเดตวันนี้</span>
+        </div>
+    </section>
+
+    <!-- 2. การ์ดกระแสเงินสด และ การลงทุน (แสดงผลแบบ 2 คอลัมน์) -->
+    <div class="dashboard-grid">
+        <section class="card mini-card">
+            <div class="card-header"><span>💵 กระแสเงินสด</span> <span>></span></div>
+            <h3 class="mini-amount positive">+฿0</h3>
+            <ul class="mini-list">
+                <li><span class="dot income"></span> รายรับ <span class="val">0</span></li>
+                <li><span class="dot expense"></span> รายจ่าย <span class="val">0</span></li>
+            </ul>
+        </section>
+        
+        <section class="card mini-card">
+            <div class="card-header"><span>📈 การลงทุน</span> <span>></span></div>
+            <h3 class="mini-amount">฿1,845,200</h3>
+            <p class="mini-label">ผลตอบแทน YTD</p>
+            <p class="val positive">+8.4%</p>
+        </section>
+    </div>
+
+    <!-- 3. การ์ดภาพรวมสินทรัพย์ (Asset Allocation) -->
+    <section class="card portfolio-card">
+        <div class="card-header">
+            <span class="subtitle">PORTFOLIO</span>
+            <button class="btn-small">ดูทั้งหมด</button>
+        </div>
+        <h3>ภาพรวมสินทรัพย์</h3>
+        
+        <!-- แถบสัดส่วนแบบแนวนอน -->
+        <div class="stacked-bar">
+            <div class="bar-segment cash" style="width: 22%;"></div>
+            <div class="bar-segment invest" style="width: 43%;"></div>
+            <div class="bar-segment realestate" style="width: 35%;"></div>
+        </div>
+
+        <ul class="portfolio-list">
+            <li><span class="dot cash"></span> เงินสด <span class="val">22%</span></li>
+            <li><span class="dot invest"></span> การลงทุน <span class="val">43%</span></li>
+            <li><span class="dot realestate"></span> อสังหาริมทรัพย์ <span class="val">35%</span></li>
+        </ul>
+    </section>
+</main>
 
         <nav class="bottom-nav" aria-label="เมนูหลัก">
             <button class="nav-btn active" type="button">แดชบอร์ด</button>
