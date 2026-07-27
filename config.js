@@ -1,8 +1,33 @@
-// ไฟล์ตั้งค่าฝั่ง Frontend
-// ห้ามใส่ API Key, Client Secret, รหัสผ่าน หรือข้อมูลการเงินจริงในไฟล์นี้
-// OAuth Client ID และ Spreadsheet ID ไม่ใช่รหัสลับ แต่ควรจำกัดสิทธิ์ใช้งานให้ถูกต้อง
-
-const APP_CONFIG = {
-    GOOGLE_CLIENT_ID: "971390460399-u8r8ct3fipkpg1vdjihgbtsbe8h2jgii.apps.googleusercontent.com",
-    SPREADSHEET_ID: "1xNasmNnUzlQQI3saK9mwiBjvWiJJOFj7-qznnfeAC2g"
-};
+/**
+ * Public frontend configuration.
+ *
+ * OAuth Client ID and Spreadsheet ID are identifiers, not passwords.
+ * Restrict the OAuth client to the exact GitHub Pages origin in Google Cloud.
+ * Never place a Client Secret, access token, password, or financial data here.
+ */
+window.APP_CONFIG = Object.freeze({
+  GOOGLE_CLIENT_ID: "971390460399-u8r8ct3fipkpg1vdjihgbtsbe8h2jgii.apps.googleusercontent.com",
+  SPREADSHEET_ID: "1xNasmNnUzlQQI3saK9mwiBjvWiJJOFj7-qznnfeAC2g",
+  APP_NAME: "Personal Wealth",
+  LOCALE: "th-TH",
+  CURRENCY: "THB",
+  TIME_ZONE: "Asia/Bangkok",
+  SCOPES: "https://www.googleapis.com/auth/spreadsheets",
+  SHEETS: Object.freeze({
+    accounts: "Accounts",
+    transactions: "Transactions",
+    investments: "Investments",
+    assets: "Assets",
+    liabilities: "Liabilities",
+    goals: "Goals",
+    categories: "Categories",
+    snapshots: "MonthlySnapshots",
+    settings: "Settings"
+  }),
+  DEFAULTS: Object.freeze({
+    monthly_budget: 30000,
+    emergency_months_target: 6,
+    essential_expense_override: "",
+    include_accounts_in_net_worth: false
+  })
+});

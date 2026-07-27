@@ -1,201 +1,332 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Personal Wealth</title>
-
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#064e3b">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
-    <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#072e27">
+  <meta name="color-scheme" content="dark">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="แดชบอร์ดติดตามกระแสเงินสด ทรัพย์สิน หนี้สิน การลงทุน และเป้าหมายทางการเงินส่วนบุคคล">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://sheets.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; img-src 'self' data:; manifest-src 'self'; worker-src 'self'">
+  <title>Personal Wealth</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/wealth-icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="app-container">
-        <header class="header">
-            <h1>Wealth Dashboard</h1>
-            <p class="subtitle">ความมั่งคั่งสุทธิ</p>
-            <h2 class="net-worth" id="netWorth">฿ 0.00</h2>
-            
-            <!-- ปุ่มสำหรับล็อกอินและออกจากระบบ Google -->
-            <div class="auth-container" style="margin-top: 15px;">
-                <button id="authorize_button" class="nav-btn" style="display: none; width: auto; padding: 5px 15px; margin: 0 auto; border-radius: 20px;">ล็อกอินด้วย Google</button>
-                <button id="signout_button" class="nav-btn" style="display: none; width: auto; padding: 5px 15px; margin: 0 auto; border-radius: 20px; background-color: #ef4444; color: white;">ออกจากระบบ</button>
-            </div>
-        </header>
+  <svg class="svg-sprite" aria-hidden="true">
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.8 12 3l9 7.8v9.7a.5.5 0 0 1-.5.5H15v-7H9v7H3.5a.5.5 0 0 1-.5-.5z"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+    <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M4 5h15a2 2 0 0 1 2 2v12H4a2 2 0 0 1-2-2V5.5A2.5 2.5 0 0 1 4.5 3H18M16 11h5v5h-5a2.5 2.5 0 0 1 0-5z"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="m12 12 8-8M17 4h3v3"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 8.5A7 7 0 0 1 18.8 9M5.2 15A7 7 0 0 0 17.9 15.5"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.96 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15 1.7 1.7 0 0 0 3.08 14H3v-4h.08A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3.08V3h4v.08A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9 1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15z"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M5 5l14 14M19 5 5 19"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2.5 20h19zM12 9v5M12 17.5h.01"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6"/></symbol>
+  </svg>
 
-        <main class="content">
-            <!-- 1. การ์ดความมั่งคั่งสุทธิ และ กราฟแท่ง -->
-            <section class="card hero-card">
-                <div class="card-header">
-                    <span class="title-with-icon">↗ ความมั่งคั่งสุทธิ</span>
-                    <span class="icon-info">i</span>
-                </div>
-                <h2 class="wealth-amount" id="displayNetWorth">฿0</h2>
-                <p class="wealth-change positive" id="displayChange">+฿0 (0.00%) เดือนนี้</p>
-                
-                <!-- พื้นที่สำหรับกราฟแท่ง Chart.js -->
-                <div class="chart-container" style="position: relative; height: 180px; width: 100%; margin-top: 15px;">
-                    <canvas id="wealthChart"></canvas>
-                </div>
-                <div class="chart-labels" style="display: flex; justify-content: space-between; font-size: 12px; color: #84938a; margin-top: 10px;">
-                    <select id="chartPeriod" style="background: transparent; color: #84938a; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 2px 5px; font-family: inherit;">
-                        <option value="monthly">รายเดือน (6 เดือนล่าสุด)</option>
-                        <option value="yearly">รายปี</option>
-                    </select>
-                    <span>อัปเดตวันนี้</span>
-                </div>
-            </section>
+  <div id="app" class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">W</span>
+        <div>
+          <p class="eyebrow">PERSONAL WEALTH</p>
+          <h1 id="pageTitle">ภาพรวม</h1>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button id="syncButton" class="icon-button" type="button" aria-label="ซิงก์ข้อมูล" title="ซิงก์ข้อมูล">
+          <svg><use href="#i-refresh"/></svg>
+        </button>
+        <button id="settingsButton" class="icon-button" type="button" aria-label="ตั้งค่า" title="ตั้งค่า">
+          <svg><use href="#i-settings"/></svg>
+        </button>
+      </div>
+    </header>
 
-            <!-- 2. การ์ดงบใช้จ่าย และ การลงทุน (แก้ไขใหม่) -->
-            <div class="dashboard-grid">
-                <section class="card mini-card">
-                    <div class="card-header"><span>💵 งบใช้จ่ายเดือนนี้</span></div>
-                    <h3 class="mini-amount" id="displayRemainingBudget">฿0</h3>
-                    <ul class="mini-list">
-                        <li><span class="dot income"></span> งบตั้งต้น <span class="val" id="displayBudget">฿30,000</span></li>
-                        <li><span class="dot expense"></span> ใช้ไปแล้ว <span class="val" id="displayExpense">฿0</span></li>
-                    </ul>
-                </section>
-                
-                <section class="card mini-card">
-                    <div class="card-header"><span>📈 การลงทุน</span> <span>></span></div>
-                    <h3 class="mini-amount" id="displayInvestments">฿0</h3>
-                    <p class="mini-label">พอร์ตปัจจุบัน</p>
-                </section>
-            </div>
-
-            <!-- 3. การ์ดเป้าหมายทางการเงิน -->
-            <section class="card goal-card" style="display: flex; align-items: center; justify-content: space-between;">
-                <div>
-                    <div class="card-header" style="margin-bottom: 5px;"><span class="subtitle" style="color: #e5c158; font-size: 12px;">NEXT GOAL</span></div>
-                    <h3 style="margin: 0 0 5px 0; font-size: 18px;">เงินสำรองฉุกเฉิน</h3>
-                    <p style="margin: 0; font-size: 13px; color: #84938a;">มีแล้ว ฿0 จากเป้าหมาย ฿1,000,000</p>
-                </div>
-                <!-- วงแหวนจำลองความคืบหน้า -->
-                <div style="width: 50px; height: 50px; border-radius: 50%; border: 4px solid #1fca74; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: #fff;">
-                    0%
-                </div>
-            </section>
-            
-            <!-- 4. การ์ดภาพรวมสินทรัพย์ (Asset Allocation) -->
-            <section class="card portfolio-card">
-                <div class="card-header">
-                    <span class="subtitle">PORTFOLIO</span>
-                    <button class="btn-small">ดูทั้งหมด</button>
-                </div>
-                <h3>ภาพรวมสินทรัพย์</h3>
-                
-                <!-- แถบสัดส่วนแบบแนวนอน -->
-                <div class="stacked-bar">
-                    <div class="bar-segment cash" style="width: 22%;"></div>
-                    <div class="bar-segment invest" style="width: 43%;"></div>
-                    <div class="bar-segment realestate" style="width: 35%;"></div>
-                </div>
-
-                <ul class="portfolio-list">
-                    <li><span class="dot cash"></span> เงินสด <span class="val">22%</span></li>
-                    <li><span class="dot invest"></span> การลงทุน <span class="val">43%</span></li>
-                    <li><span class="dot realestate"></span> อสังหาริมทรัพย์ <span class="val">35%</span></li>
-                </ul>
-            </section>
-        </main>
-
-        <nav class="bottom-nav" aria-label="เมนูหลัก">
-            <button class="nav-btn active" type="button">แดชบอร์ด</button>
-            <button class="nav-btn fab-btn" id="addBtn" type="button" aria-label="เพิ่มรายการ">+</button>
-            <button class="nav-btn" type="button">ตั้งค่า</button>
-        </nav>
+    <div id="connectionBar" class="connection-bar is-loading" role="status">
+      <span class="status-dot"></span>
+      <span id="connectionText">กำลังเตรียมระบบ…</span>
+      <button id="loginButton" class="text-button" type="button" hidden>เชื่อมต่อ Google</button>
     </div>
 
-    <!-- ========================================== -->
-    <!-- [เริ่ม] ส่วนของ Bottom Sheet -->
-    <!-- ========================================== -->
-    <div class="modal-overlay" id="overlay"></div>
-    <div class="bottom-sheet" id="bottomSheet">
-        <!-- หน้า 1: เลือกประเภทรายการ -->
-        <div id="typeSelection">
-            <div class="header-flex">
-                <h3>เลือกประเภทที่ต้องการบันทึก</h3>
-                <button class="btn-close" type="button" onclick="closeSheet()">×</button>
+    <main class="main-content">
+      <section id="dashboardView" class="view is-active" data-view="dashboard">
+        <section class="hero-panel">
+          <div class="hero-topline">
+            <div>
+              <p class="metric-label">ความมั่งคั่งสุทธิ</p>
+              <p class="as-of" id="asOfLabel">ข้อมูลล่าสุด —</p>
             </div>
-            <div class="menu-option" onclick="openForm('transactionForm')">รายรับ-รายจ่าย ประจำวัน <span>></span></div>
-            <div class="menu-option" onclick="openForm('investmentForm')">บันทึกการลงทุน <span>></span></div>
-            <div class="menu-option" onclick="openForm('assetForm')">บันทึกทรัพย์สินรายการใหม่ <span>></span></div>
-        </div>
+            <span id="netWorthStatus" class="status-pill neutral">รอข้อมูล</span>
+          </div>
+          <div class="hero-value-row">
+            <h2 id="netWorthValue" class="hero-value">฿—</h2>
+            <p id="netWorthChange" class="hero-change neutral">ยังไม่มีประวัติเปรียบเทียบ</p>
+          </div>
+          <div class="hero-chart-wrap">
+            <canvas id="netWorthChart" aria-label="กราฟความมั่งคั่งสุทธิ"></canvas>
+            <div id="netWorthEmpty" class="chart-empty">บันทึก MonthlySnapshots เพื่อดูแนวโน้มความมั่งคั่ง</div>
+          </div>
+        </section>
 
-        <!-- หน้า 2.1: ฟอร์มรายรับ-รายจ่าย -->
-        <div id="transactionForm" class="form-container" style="display: none;">
-            <div class="header-flex">
-                <h3>รายรับ-รายจ่าย</h3>
-                <button class="btn-close" type="button" onclick="closeSheet()">×</button>
-            </div>
-            <form onsubmit="submitData(event, 'Transactions')">
-                <div class="form-group"><label>วันที่</label><input type="date" name="date" required></div>
-                <div class="form-group">
-                    <label>ประเภท</label>
-                    <select name="type">
-                        <option value="Income">รายรับ</option>
-                        <option value="Expense">รายจ่าย</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>หมวดหมู่</label>
-                    <input type="text" name="category" id="categoryInput" list="categoryList" placeholder="เลือกหรือพิมพ์ใหม่ (เช่น อาหาร, เงินเดือน)" autocomplete="off">
-                    <datalist id="categoryList"></datalist>
-                </div>
-                <div class="form-group"><label>จำนวนเงิน (บาท)</label><input type="number" name="amount" placeholder="0.00" required></div>
-                <div class="form-group"><label>บันทึกช่วยจำ</label><input type="text" name="note" placeholder="รายละเอียดเพิ่มเติม"></div>
-                <button type="submit" class="btn-submit">บันทึกข้อมูล</button>
-            </form>
-        </div>
+        <section class="kpi-grid" aria-label="ตัวชี้วัดสำคัญ">
+          <article class="kpi-card">
+            <p class="metric-label">กระแสเงินสดเดือนนี้</p>
+            <strong id="cashFlowValue">฿—</strong>
+            <p id="cashFlowDetail" class="metric-note">รายรับ — · รายจ่าย —</p>
+          </article>
+          <article class="kpi-card">
+            <p class="metric-label">อัตราการออม</p>
+            <strong id="savingsRateValue">—</strong>
+            <div class="progress-track"><span id="savingsRateBar"></span></div>
+          </article>
+          <article class="kpi-card">
+            <p class="metric-label">เงินสำรองฉุกเฉิน</p>
+            <strong id="emergencyMonthsValue">— เดือน</strong>
+            <p id="emergencyDetail" class="metric-note">เป้าหมาย — เดือน</p>
+          </article>
+          <article class="kpi-card">
+            <p class="metric-label">ภาระหนี้ต่อรายได้</p>
+            <strong id="debtServiceValue">—</strong>
+            <p id="debtServiceDetail" class="metric-note">ค่างวดรวม —</p>
+          </article>
+        </section>
 
-        <!-- หน้า 2.2: ฟอร์มการลงทุน (แก้ไขใหม่) -->
-        <div id="investmentForm" class="form-container" style="display: none;">
-            <div class="header-flex">
-                <h3>บันทึกการลงทุน</h3>
-                <button class="btn-close" type="button" onclick="closeSheet()">×</button>
-            </div>
-            <form onsubmit="submitData(event, 'Investments')">
-                <div class="form-group"><label>ชื่อสินทรัพย์</label><input type="text" name="asset_name" required></div>
-                <div class="form-group"><label>หมวดหมู่</label><input type="text" name="category" placeholder="เช่น หุ้น, กองทุนรวม"></div>
-                <div class="form-group"><label>จำนวนเงิน (บาท)</label><input type="number" step="0.01" name="current_value" placeholder="ยอดเงินที่ลงทุน" required></div>
-                <div class="form-group">
-                    <label>ลดหย่อนภาษีได้</label>
-                    <select name="tax_deductible"><option value="No">ไม่ใช่</option><option value="Yes">ใช่</option></select>
-                </div>
-                <button type="submit" class="btn-submit">บันทึกข้อมูล</button>
-            </form>
-        </div>
+        <section id="dataWarnings" class="warning-list" hidden></section>
 
-        <!-- หน้า 2.3: ฟอร์มทรัพย์สิน (แก้ไขใหม่) -->
-        <div id="assetForm" class="form-container" style="display: none;">
-            <div class="header-flex">
-                <h3>ทรัพย์สินรายการใหม่</h3>
-                <button class="btn-close" type="button" onclick="closeSheet()">×</button>
+        <section class="section-grid">
+          <article class="panel cashflow-panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">CASH FLOW</p>
+                <h2>รายรับและรายจ่าย</h2>
+              </div>
+              <select id="cashflowPeriod" class="compact-select" aria-label="ช่วงเวลาของกราฟกระแสเงินสด">
+                <option value="6">6 เดือน</option>
+                <option value="12">12 เดือน</option>
+              </select>
             </div>
-            <form onsubmit="submitData(event, 'Assets')">
-                <div class="form-group"><label>ชื่อทรัพย์สิน</label><input type="text" name="asset_name" required></div>
-                <div class="form-group"><label>หมวดหมู่</label><input type="text" name="category" placeholder="เช่น เงินฝาก, อสังหาฯ"></div>
-                <div class="form-group"><label>มูลค่าปัจจุบัน (บาท)</label><input type="number" name="estimated_value" placeholder="ยอดเงิน / มูลค่าประเมิน" required></div>
-                <button type="submit" class="btn-submit">บันทึกข้อมูล</button>
-            </form>
+            <div class="chart-medium"><canvas id="cashflowChart" aria-label="กราฟรายรับและรายจ่าย"></canvas></div>
+          </article>
+
+          <article class="panel allocation-panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">ALLOCATION</p>
+                <h2>ทรัพย์สินอยู่ที่ไหน</h2>
+              </div>
+            </div>
+            <div class="allocation-content">
+              <div class="donut-wrap">
+                <canvas id="allocationChart" aria-label="กราฟสัดส่วนทรัพย์สิน"></canvas>
+                <div class="donut-center"><span>สินทรัพย์รวม</span><strong id="totalAssetsCenter">฿—</strong></div>
+              </div>
+              <div id="allocationLegend" class="legend-list"></div>
+            </div>
+          </article>
+        </section>
+
+        <section class="section-grid">
+          <article class="panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">GOALS</p>
+                <h2>เป้าหมายทางการเงิน</h2>
+              </div>
+              <button class="text-button nav-shortcut" data-target="goals" type="button">ดูทั้งหมด</button>
+            </div>
+            <div id="goalPreview" class="goal-list compact"></div>
+          </article>
+
+          <article class="panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">RECENT</p>
+                <h2>รายการล่าสุด</h2>
+              </div>
+              <button class="text-button nav-shortcut" data-target="transactions" type="button">ดูทั้งหมด</button>
+            </div>
+            <div id="recentTransactions" class="transaction-list compact"></div>
+          </article>
+        </section>
+      </section>
+
+      <section id="transactionsView" class="view" data-view="transactions">
+        <div class="view-header">
+          <div>
+            <p class="eyebrow">CASH FLOW</p>
+            <h2>รายรับ–รายจ่าย</h2>
+          </div>
+          <button class="primary-button open-add" data-form="transaction" type="button">
+            <svg><use href="#i-plus"/></svg> เพิ่มรายการ
+          </button>
         </div>
+        <section class="summary-strip">
+          <div><span>รายรับเดือนนี้</span><strong id="txIncomeSummary" class="positive">฿—</strong></div>
+          <div><span>รายจ่ายเดือนนี้</span><strong id="txExpenseSummary" class="negative">฿—</strong></div>
+          <div><span>งบใช้จ่ายคงเหลือ</span><strong id="txBalanceSummary">฿—</strong></div>
+        </section>
+        <section class="panel">
+          <div class="filter-row">
+            <label class="search-field">
+              <span class="sr-only">ค้นหารายการ</span>
+              <input id="transactionSearch" type="search" placeholder="ค้นหาหมวดหมู่หรือหมายเหตุ">
+            </label>
+            <select id="transactionTypeFilter" class="compact-select" aria-label="กรองประเภทรายการ">
+              <option value="all">ทั้งหมด</option>
+              <option value="income">รายรับ</option>
+              <option value="expense">รายจ่าย</option>
+              <option value="transfer">โอนเงิน</option>
+            </select>
+          </div>
+          <div id="transactionList" class="transaction-list"></div>
+        </section>
+      </section>
+
+      <section id="wealthView" class="view" data-view="wealth">
+        <div class="view-header">
+          <div>
+            <p class="eyebrow">BALANCE SHEET</p>
+            <h2>ทรัพย์สินและหนี้สิน</h2>
+          </div>
+          <button class="primary-button" id="wealthAddButton" type="button">
+            <svg><use href="#i-plus"/></svg> เพิ่มข้อมูล
+          </button>
+        </div>
+        <section class="summary-strip">
+          <div><span>สินทรัพย์รวม</span><strong id="wealthAssetsSummary">฿—</strong></div>
+          <div><span>หนี้สินรวม</span><strong id="wealthLiabilitiesSummary" class="negative">฿—</strong></div>
+          <div><span>สุทธิ</span><strong id="wealthNetSummary">฿—</strong></div>
+        </section>
+        <div class="segmented-control wealth-tabs" role="tablist">
+          <button class="is-active" type="button" data-wealth-tab="investments">การลงทุน</button>
+          <button type="button" data-wealth-tab="accounts">บัญชีเงิน</button>
+          <button type="button" data-wealth-tab="assets">ทรัพย์สิน</button>
+          <button type="button" data-wealth-tab="liabilities">หนี้สิน</button>
+        </div>
+        <section class="panel">
+          <div id="wealthList" class="wealth-list"></div>
+        </section>
+      </section>
+
+      <section id="goalsView" class="view" data-view="goals">
+        <div class="view-header">
+          <div>
+            <p class="eyebrow">FINANCIAL PLAN</p>
+            <h2>เป้าหมายทางการเงิน</h2>
+          </div>
+          <button class="primary-button open-add" data-form="goal" type="button">
+            <svg><use href="#i-plus"/></svg> เพิ่มเป้าหมาย
+          </button>
+        </div>
+        <section class="panel">
+          <div id="goalList" class="goal-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="เมนูหลัก">
+      <button class="nav-item is-active" type="button" data-target="dashboard">
+        <svg><use href="#i-home"/></svg><span>ภาพรวม</span>
+      </button>
+      <button class="nav-item" type="button" data-target="transactions">
+        <svg><use href="#i-list"/></svg><span>รายการ</span>
+      </button>
+      <button id="quickAddButton" class="quick-add" type="button" aria-label="เพิ่มข้อมูล">
+        <svg><use href="#i-plus"/></svg>
+      </button>
+      <button class="nav-item" type="button" data-target="wealth">
+        <svg><use href="#i-wallet"/></svg><span>ความมั่งคั่ง</span>
+      </button>
+      <button class="nav-item" type="button" data-target="goals">
+        <svg><use href="#i-target"/></svg><span>เป้าหมาย</span>
+      </button>
+    </nav>
+  </div>
+
+  <div id="modalOverlay" class="modal-overlay" hidden></div>
+
+  <aside id="quickAddSheet" class="bottom-sheet" aria-hidden="true" aria-labelledby="quickAddTitle">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div><p class="eyebrow">QUICK ADD</p><h2 id="quickAddTitle">บันทึกข้อมูล</h2></div>
+      <button class="icon-button close-sheet" type="button" aria-label="ปิด"><svg><use href="#i-close"/></svg></button>
     </div>
+    <div class="action-grid">
+      <button type="button" data-form="transaction"><span class="action-icon income">＋</span><strong>รายรับ–รายจ่าย</strong><small>บันทึกรายการประจำวัน</small></button>
+      <button type="button" data-form="investment"><span class="action-icon invest">↗</span><strong>การลงทุน</strong><small>เพิ่มหรือปรับมูลค่าพอร์ต</small></button>
+      <button type="button" data-form="account"><span class="action-icon cash">฿</span><strong>บัญชีเงิน</strong><small>เงินสดและเงินฝาก</small></button>
+      <button type="button" data-form="asset"><span class="action-icon asset">◆</span><strong>ทรัพย์สิน</strong><small>บ้าน รถ และทรัพย์สินอื่น</small></button>
+      <button type="button" data-form="liability"><span class="action-icon debt">−</span><strong>หนี้สิน</strong><small>ยอดหนี้และค่างวด</small></button>
+      <button type="button" data-form="goal"><span class="action-icon goal">◎</span><strong>เป้าหมาย</strong><small>ติดตามเงินที่ต้องการสะสม</small></button>
+    </div>
+  </aside>
 
-    <!-- นำเข้าไลบรารี Chart.js และ Google API -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://apis.google.com/js/api.js"></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <aside id="formSheet" class="bottom-sheet form-sheet" aria-hidden="true" aria-labelledby="formTitle">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button id="formBackButton" class="icon-button" type="button" aria-label="ย้อนกลับ"><span aria-hidden="true">‹</span></button>
+      <div class="sheet-title"><p id="formEyebrow" class="eyebrow">ADD</p><h2 id="formTitle">เพิ่มข้อมูล</h2></div>
+      <button class="icon-button close-sheet" type="button" aria-label="ปิด"><svg><use href="#i-close"/></svg></button>
+    </div>
+    <form id="dynamicForm" class="data-form" novalidate></form>
+  </aside>
 
-    <!-- เรียกใช้ไฟล์ JavaScript ของเรา -->
-    <script src="config.js"></script>
-    <script src="script.js"></script>
+  <aside id="settingsSheet" class="bottom-sheet form-sheet" aria-hidden="true" aria-labelledby="settingsTitle">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div><p class="eyebrow">SETTINGS</p><h2 id="settingsTitle">ตั้งค่าการวิเคราะห์</h2></div>
+      <button class="icon-button close-sheet" type="button" aria-label="ปิด"><svg><use href="#i-close"/></svg></button>
+    </div>
+    <form id="settingsForm" class="data-form">
+      <label class="field">
+        <span>งบใช้จ่ายต่อเดือน (บาท)</span>
+        <input name="monthly_budget" type="number" min="0" step="100" inputmode="decimal">
+      </label>
+      <label class="field">
+        <span>เป้าหมายเงินสำรองฉุกเฉิน (เดือน)</span>
+        <input name="emergency_months_target" type="number" min="1" max="24" step="1" inputmode="numeric">
+      </label>
+      <label class="field">
+        <span>ค่าใช้จ่ายจำเป็นต่อเดือน (บาท)</span>
+        <input name="essential_expense_override" type="number" min="0" step="100" inputmode="decimal">
+        <small>เว้นว่างเพื่อใช้ค่าใช้จ่ายเฉลี่ย 3 เดือน</small>
+      </label>
+      <label class="field toggle-field">
+        <span><strong>นับยอดบัญชีใน Net Worth</strong><small>ปิดไว้หากบันทึกเงินสดซ้ำใน Investments</small></span>
+        <input name="include_accounts_in_net_worth" type="checkbox">
+      </label>
+      <button class="primary-button full-width" type="submit">บันทึกการตั้งค่า</button>
+      <button id="snapshotButton" class="secondary-button full-width" type="button">บันทึก Snapshot เดือนนี้</button>
+      <button id="logoutButton" class="secondary-button full-width" type="button">ออกจากระบบ Google</button>
+      <p class="security-note"><svg><use href="#i-alert"/></svg>ข้อมูลการเงินอ่านจาก Google Sheet หลังจากคุณอนุญาตเท่านั้น และไม่ถูกบันทึกไว้ใน Repository</p>
+    </form>
+  </aside>
+
+  <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+  <template id="emptyStateTemplate">
+    <div class="empty-state">
+      <span>◇</span>
+      <strong>ยังไม่มีข้อมูล</strong>
+      <p>กดปุ่ม + เพื่อเพิ่มรายการแรก</p>
+    </div>
+  </template>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="config.js"></script>
+  <script src="analytics.js"></script>
+  <script src="api.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
