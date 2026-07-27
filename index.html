@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Personal Wealth</title>
+    <title>.Personal Wealth</title>
 
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#064e3b">
@@ -23,7 +23,7 @@
             <p class="subtitle">ความมั่งคั่งสุทธิ</p>
             <h2 class="net-worth" id="netWorth">฿ 0.00</h2>
             
-            <!-- [เพิ่มใหม่] ปุ่มสำหรับล็อกอินและออกจากระบบ Google -->
+            <!-- ปุ่มสำหรับล็อกอินและออกจากระบบ Google -->
             <div class="auth-container" style="margin-top: 15px;">
                 <button id="authorize_button" class="nav-btn" style="display: none; width: auto; padding: 5px 15px; margin: 0 auto; border-radius: 20px;">ล็อกอินด้วย Google</button>
                 <button id="signout_button" class="nav-btn" style="display: none; width: auto; padding: 5px 15px; margin: 0 auto; border-radius: 20px; background-color: #ef4444; color: white;">ออกจากระบบ</button>
@@ -31,68 +31,81 @@
         </header>
 
         <main class="content">
-    <!-- 1. การ์ดความมั่งคั่งสุทธิ -->
-    <section class="card hero-card">
-        <div class="card-header">
-            <span class="title-with-icon">↗ ความมั่งคั่งสุทธิ</span>
-            <span class="icon-info">i</span>
-        </div>
-        <h2 class="wealth-amount">฿4,286,450</h2>
-        <p class="wealth-change positive">+฿68,250 +1.62% เดือนนี้</p>
-        
-        <!-- พื้นที่สำหรับวาดกราฟเส้นในอนาคต (อาจใช้ Chart.js หรือ SVG) -->
-        <div class="chart-container">
-            <svg viewBox="0 0 100 30" class="sparkline">
-                <path d="M0,25 L10,22 L20,24 L30,18 L40,15 L50,16 L60,10 L70,12 L80,5 L90,8 L100,2" fill="none" stroke="#e5c158" stroke-width="1.5" stroke-dasharray="2,2"/>
-            </svg>
-        </div>
-        <div class="chart-labels">
-            <span>12 เดือนล่าสุด</span>
-            <span>อัปเดตวันนี้</span>
-        </div>
-    </section>
+            <!-- 1. การ์ดความมั่งคั่งสุทธิ และ กราฟแท่ง -->
+            <section class="card hero-card">
+                <div class="card-header">
+                    <span class="title-with-icon">↗ ความมั่งคั่งสุทธิ</span>
+                    <span class="icon-info">i</span>
+                </div>
+                <h2 class="wealth-amount" id="displayNetWorth">฿0</h2>
+                <p class="wealth-change positive" id="displayChange">+฿0 (0.00%) เดือนนี้</p>
+                
+                <!-- พื้นที่สำหรับกราฟแท่ง Chart.js -->
+                <div class="chart-container" style="position: relative; height: 180px; width: 100%; margin-top: 15px;">
+                    <canvas id="wealthChart"></canvas>
+                </div>
+                <div class="chart-labels" style="display: flex; justify-content: space-between; font-size: 12px; color: #84938a; margin-top: 10px;">
+                    <select id="chartPeriod" style="background: transparent; color: #84938a; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 2px 5px; font-family: inherit;">
+                        <option value="monthly">รายเดือน (6 เดือนล่าสุด)</option>
+                        <option value="yearly">รายปี</option>
+                    </select>
+                    <span>อัปเดตวันนี้</span>
+                </div>
+            </section>
 
-    <!-- 2. การ์ดกระแสเงินสด และ การลงทุน (แสดงผลแบบ 2 คอลัมน์) -->
-    <div class="dashboard-grid">
-        <section class="card mini-card">
-            <div class="card-header"><span>💵 กระแสเงินสด</span> <span>></span></div>
-            <h3 class="mini-amount positive">+฿0</h3>
-            <ul class="mini-list">
-                <li><span class="dot income"></span> รายรับ <span class="val">0</span></li>
-                <li><span class="dot expense"></span> รายจ่าย <span class="val">0</span></li>
-            </ul>
-        </section>
-        
-        <section class="card mini-card">
-            <div class="card-header"><span>📈 การลงทุน</span> <span>></span></div>
-            <h3 class="mini-amount">฿1,845,200</h3>
-            <p class="mini-label">ผลตอบแทน YTD</p>
-            <p class="val positive">+8.4%</p>
-        </section>
-    </div>
+            <!-- 2. การ์ดกระแสเงินสด และ การลงทุน (แสดงผลแบบ 2 คอลัมน์) -->
+            <div class="dashboard-grid">
+                <section class="card mini-card">
+                    <div class="card-header"><span>💵 กระแสเงินสด</span> <span>></span></div>
+                    <h3 class="mini-amount positive">+฿0</h3>
+                    <ul class="mini-list">
+                        <li><span class="dot income"></span> รายรับ <span class="val">0</span></li>
+                        <li><span class="dot expense"></span> รายจ่าย <span class="val">0</span></li>
+                    </ul>
+                </section>
+                
+                <section class="card mini-card">
+                    <div class="card-header"><span>📈 การลงทุน</span> <span>></span></div>
+                    <h3 class="mini-amount">฿0</h3>
+                    <p class="mini-label">พอร์ตปัจจุบัน</p>
+                </section>
+            </div>
 
-    <!-- 3. การ์ดภาพรวมสินทรัพย์ (Asset Allocation) -->
-    <section class="card portfolio-card">
-        <div class="card-header">
-            <span class="subtitle">PORTFOLIO</span>
-            <button class="btn-small">ดูทั้งหมด</button>
-        </div>
-        <h3>ภาพรวมสินทรัพย์</h3>
-        
-        <!-- แถบสัดส่วนแบบแนวนอน -->
-        <div class="stacked-bar">
-            <div class="bar-segment cash" style="width: 22%;"></div>
-            <div class="bar-segment invest" style="width: 43%;"></div>
-            <div class="bar-segment realestate" style="width: 35%;"></div>
-        </div>
+            <!-- 3. การ์ดเป้าหมายทางการเงิน -->
+            <section class="card goal-card" style="display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                    <div class="card-header" style="margin-bottom: 5px;"><span class="subtitle" style="color: #e5c158; font-size: 12px;">NEXT GOAL</span></div>
+                    <h3 style="margin: 0 0 5px 0; font-size: 18px;">เงินสำรองฉุกเฉิน</h3>
+                    <p style="margin: 0; font-size: 13px; color: #84938a;">มีแล้ว ฿0 จากเป้าหมาย ฿1,000,000</p>
+                </div>
+                <!-- วงแหวนจำลองความคืบหน้า -->
+                <div style="width: 50px; height: 50px; border-radius: 50%; border: 4px solid #1fca74; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: #fff;">
+                    0%
+                </div>
+            </section>
+            
+            <!-- 4. การ์ดภาพรวมสินทรัพย์ (Asset Allocation) -->
+            <section class="card portfolio-card">
+                <div class="card-header">
+                    <span class="subtitle">PORTFOLIO</span>
+                    <button class="btn-small">ดูทั้งหมด</button>
+                </div>
+                <h3>ภาพรวมสินทรัพย์</h3>
+                
+                <!-- แถบสัดส่วนแบบแนวนอน -->
+                <div class="stacked-bar">
+                    <div class="bar-segment cash" style="width: 22%;"></div>
+                    <div class="bar-segment invest" style="width: 43%;"></div>
+                    <div class="bar-segment realestate" style="width: 35%;"></div>
+                </div>
 
-        <ul class="portfolio-list">
-            <li><span class="dot cash"></span> เงินสด <span class="val">22%</span></li>
-            <li><span class="dot invest"></span> การลงทุน <span class="val">43%</span></li>
-            <li><span class="dot realestate"></span> อสังหาริมทรัพย์ <span class="val">35%</span></li>
-        </ul>
-    </section>
-</main>
+                <ul class="portfolio-list">
+                    <li><span class="dot cash"></span> เงินสด <span class="val">22%</span></li>
+                    <li><span class="dot invest"></span> การลงทุน <span class="val">43%</span></li>
+                    <li><span class="dot realestate"></span> อสังหาริมทรัพย์ <span class="val">35%</span></li>
+                </ul>
+            </section>
+        </main>
 
         <nav class="bottom-nav" aria-label="เมนูหลัก">
             <button class="nav-btn active" type="button">แดชบอร์ด</button>
@@ -102,7 +115,7 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- [เริ่ม] ส่วนที่ต้องแทรกเพิ่ม: โครงสร้าง Bottom Sheet -->
+    <!-- [เริ่ม] ส่วนของ Bottom Sheet -->
     <!-- ========================================== -->
     <div class="modal-overlay" id="overlay"></div>
     <div class="bottom-sheet" id="bottomSheet">
@@ -133,19 +146,17 @@
                     </select>
                 </div>
                 <div class="form-group">
-    <label>หมวดหมู่</label>
-    <input type="text" name="category" id="categoryInput" list="categoryList" placeholder="เลือกหรือพิมพ์ใหม่ (เช่น อาหาร, เงินเดือน)" autocomplete="off">
-    <datalist id="categoryList">
-        <!-- ตัวเลือกจะถูกดึงมาใส่ตรงนี้อัตโนมัติด้วย JavaScript -->
-    </datalist>
-</div>
+                    <label>หมวดหมู่</label>
+                    <input type="text" name="category" id="categoryInput" list="categoryList" placeholder="เลือกหรือพิมพ์ใหม่ (เช่น อาหาร, เงินเดือน)" autocomplete="off">
+                    <datalist id="categoryList"></datalist>
+                </div>
                 <div class="form-group"><label>จำนวนเงิน (บาท)</label><input type="number" name="amount" placeholder="0.00" required></div>
                 <div class="form-group"><label>บันทึกช่วยจำ</label><input type="text" name="note" placeholder="รายละเอียดเพิ่มเติม"></div>
                 <button type="submit" class="btn-submit">บันทึกข้อมูล</button>
             </form>
         </div>
 
-        <!-- หน้า 2.2: ฟอร์มการลงทุน -->
+        <!-- หน้า 2.2: ฟอร์มการลงทุน (แก้ไขใหม่) -->
         <div id="investmentForm" class="form-container" style="display: none;">
             <div class="header-flex">
                 <h3>บันทึกการลงทุน</h3>
@@ -153,8 +164,8 @@
             </div>
             <form onsubmit="submitData(event, 'Investments')">
                 <div class="form-group"><label>ชื่อสินทรัพย์</label><input type="text" name="asset_name" required></div>
-                <div class="form-group"><label>จำนวนหน่วย</label><input type="number" step="0.01" name="units" required></div>
-                <div class="form-group"><label>ต้นทุนเฉลี่ย</label><input type="number" step="0.01" name="avg_cost" required></div>
+                <div class="form-group"><label>หมวดหมู่</label><input type="text" name="category" placeholder="เช่น หุ้น, กองทุนรวม"></div>
+                <div class="form-group"><label>จำนวนเงิน (บาท)</label><input type="number" step="0.01" name="current_value" placeholder="ยอดเงินที่ลงทุน" required></div>
                 <div class="form-group">
                     <label>ลดหย่อนภาษีได้</label>
                     <select name="tax_deductible"><option value="No">ไม่ใช่</option><option value="Yes">ใช่</option></select>
@@ -163,7 +174,7 @@
             </form>
         </div>
 
-        <!-- หน้า 2.3: ฟอร์มทรัพย์สิน -->
+        <!-- หน้า 2.3: ฟอร์มทรัพย์สิน (แก้ไขใหม่) -->
         <div id="assetForm" class="form-container" style="display: none;">
             <div class="header-flex">
                 <h3>ทรัพย์สินรายการใหม่</h3>
@@ -171,19 +182,15 @@
             </div>
             <form onsubmit="submitData(event, 'Assets')">
                 <div class="form-group"><label>ชื่อทรัพย์สิน</label><input type="text" name="asset_name" required></div>
-                <div class="form-group"><label>หมวดหมู่</label><input type="text" name="category" placeholder="เช่น อสังหาฯ, ยานพาหนะ"></div>
-                <div class="form-group"><label>ราคาที่ซื้อมา</label><input type="number" name="purchase_price" required></div>
-                <div class="form-group"><label>มูลค่าประเมินปัจจุบัน</label><input type="number" name="estimated_value"></div>
+                <div class="form-group"><label>หมวดหมู่</label><input type="text" name="category" placeholder="เช่น เงินฝาก, อสังหาฯ"></div>
+                <div class="form-group"><label>มูลค่าปัจจุบัน (บาท)</label><input type="number" name="estimated_value" placeholder="ยอดเงิน / มูลค่าประเมิน" required></div>
                 <button type="submit" class="btn-submit">บันทึกข้อมูล</button>
             </form>
         </div>
     </div>
-    <!-- ========================================== -->
-    <!-- [จบ] ส่วนที่แทรกเพิ่ม -->
-    <!-- ========================================== -->
-    
 
-    <!-- [เพิ่มใหม่] นำเข้าไลบรารี Google API (gapi) และ Identity Services (gsi) -->
+    <!-- นำเข้าไลบรารี Chart.js และ Google API -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
