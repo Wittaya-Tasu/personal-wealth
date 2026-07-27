@@ -1,3 +1,44 @@
+// =========================================
+// ระบบจดจำหมวดหมู่ที่ใช้บ่อย (Auto-Suggest)
+// =========================================
+
+// 1. กำหนดหมวดหมู่พื้นฐาน (Default)
+const defaultCategories = ["อาหารและเครื่องดื่ม", "เดินทาง/น้ำมัน", "ช้อปปิ้ง", "บิล/ค่าใช้จ่าย", "เงินเดือน", "รายได้พิเศษ"];
+
+// 2. โหลดหมวดหมู่ผสมกันระหว่าง Default และที่เคยพิมพ์ไว้
+function loadCategories() {
+    const savedCategories = JSON.parse(localStorage.getItem('myCategories')) || [];
+    // รวมหมวดหมู่พื้นฐานกับที่เซฟไว้ และตัดตัวซ้ำออก
+    const allCategories = [...new Set([...defaultCategories, ...savedCategories])];
+    
+    const dataList = document.getElementById('categoryList');
+    if (dataList) {
+        dataList.innerHTML = ''; // ล้างของเก่า
+        allCategories.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat;
+            dataList.appendChild(option);
+        });
+    }
+}
+
+// 3. ฟังก์ชันบันทึกหมวดหมู่ใหม่ลง LocalStorage
+function saveNewCategory(newCategory) {
+    if (!newCategory || newCategory.trim() === '') return;
+    
+    let savedCategories = JSON.parse(localStorage.getItem('myCategories')) || [];
+    
+    // ถ้ายังไม่มีคำนี้ในระบบ ให้บันทึกเพิ่มเข้าไป
+    if (!defaultCategories.includes(newCategory) && !savedCategories.includes(newCategory)) {
+        savedCategories.push(newCategory);
+        localStorage.setItem('myCategories', JSON.stringify(savedCategories));
+        loadCategories(); // อัปเดตลิสต์ทันที
+    }
+}
+
+// เรียกใช้งานตอนโหลดหน้าเว็บ
+document.addEventListener('DOMContentLoaded', loadCategories);
+
 // กำหนด Scope สำหรับการอ่าน/เขียน Google Sheets
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
 const DISCOVERY_DOC = 'https://sheets.googleapis.com/$discovery/rest?version=v4';
