@@ -209,6 +209,13 @@ window.submitData = async function(event, sheetName) {
 
     const formData = new FormData(event.target);
     const dataObj = Object.fromEntries(formData.entries());
+
+// ==========================================
+    // [เพิ่มตรงนี้] บันทึกหมวดหมู่ใหม่ลง LocalStorage
+    if (dataObj.category) {
+        saveNewCategory(dataObj.category);
+    }
+    // ==========================================
     
     const payload = {
         sheet: sheetName,
