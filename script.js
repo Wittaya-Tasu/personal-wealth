@@ -201,3 +201,92 @@ window.submitData = async function(event, sheetName) {
         submitBtn.disabled = false;
     }
 };
+
+// =========================================
+// 6. ระบบกราฟแท่ง (Chart.js)
+// =========================================
+let wealthChartInstance = null;
+
+function renderWealthChart(period = 'monthly') {
+    const ctx = document.getElementById('wealthChart');
+    if (!ctx) return;
+
+    // ข้อมูลจำลอง (Mock Data) สำหรับดูความสวยงามก่อน
+    const dataMonthly = {
+        labels: ['ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.'],
+        data: [3800000, 3950000, 4010000, 4150000, 4218200, 4286450]
+    };
+    
+    const dataYearly = {
+        labels: ['2565', '2566', '2567', '2568', '2569'],
+        data: [1500000, 2200000, 2900000, 3500000, 4286450]
+    };
+
+    const currentData = period === 'monthly' ? dataMonthly : dataYearly;
+
+    // ถ้ามีกราฟเก่าอยู่แล้วให้ทำลายทิ้งก่อนวาดใหม่
+    if (wealthChartInstance) {
+        wealthChartInstance.destroy();
+    }
+
+    wealthChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: currentData.labels,
+            datasets: [{
+                label: 'ความมั่งคั่งสุทธิ (บาท)',
+                data: currentData.data,
+                backgroundColor: '#1fca74', // สีเขียวตรงตาม Mockup
+                borderRadius: 6, // ทำขอบแท่งให้โค้งมน
+                barThickness: 'flex',
+                maxBarThickness: 30
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }, // ซ่อนป้ายกำกับด้านบน
+                tooltip: {
+                    backgroundColor: '#16201b',
+                    titleColor: '#84938a',
+                    bodyColor: '#e5c158', // สีทอง
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    callbacks: {
+                        label: function(context) {
+                            // จัดฟอร์แมตตัวเลขให้มีลูกน้ำ (Comma)
+                            return ' ฿' + context.raw.toLocaleString();
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false, drawBorder: false },
+                    ticks: { color: '#84938a', font: { family: 'Sarabun' } }
+                },
+                y: {
+                    display: false, // ซ่อนตัวเลขแกน Y เพื่อให้ดูสะอาดตา
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+}
+
+// ผูก Event ให้ดรอปดาวน์เปลี่ยนกราฟ และวาดกราฟทันทีที่โหลดหน้าเสร็จ
+document.addEventListener("DOMContentLoaded", () => {
+    // ... (โค้ดโหลดหน้าเดิม) ...
+    
+    setTimeout(() => {
+        renderWealthChart('monthly');
+    }, 500); // ดีเลย์เล็กน้อยรอให้ UI โหลดเสร็จ
+
+    const chartPeriodSelect = document.getElementById('chartPeriod');
+    if (chartPeriodSelect) {
+        chartPeriodSelect.addEventListener('change', (e) => {
+            renderWealthChart(e.target.value);
+        });
+    }
+});
