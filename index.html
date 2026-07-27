@@ -53,20 +53,20 @@
                 </div>
             </section>
 
-            <!-- 2. การ์ดกระแสเงินสด และ การลงทุน (แสดงผลแบบ 2 คอลัมน์) -->
+            <!-- 2. การ์ดงบใช้จ่าย และ การลงทุน (แก้ไขใหม่) -->
             <div class="dashboard-grid">
                 <section class="card mini-card">
-                    <div class="card-header"><span>💵 กระแสเงินสด</span> <span>></span></div>
-                    <h3 class="mini-amount positive">+฿0</h3>
+                    <div class="card-header"><span>💵 งบใช้จ่ายเดือนนี้</span></div>
+                    <h3 class="mini-amount" id="displayRemainingBudget">฿0</h3>
                     <ul class="mini-list">
-                        <li><span class="dot income"></span> รายรับ <span class="val">0</span></li>
-                        <li><span class="dot expense"></span> รายจ่าย <span class="val">0</span></li>
+                        <li><span class="dot income"></span> งบตั้งต้น <span class="val" id="displayBudget">฿30,000</span></li>
+                        <li><span class="dot expense"></span> ใช้ไปแล้ว <span class="val" id="displayExpense">฿0</span></li>
                     </ul>
                 </section>
                 
                 <section class="card mini-card">
                     <div class="card-header"><span>📈 การลงทุน</span> <span>></span></div>
-                    <h3 class="mini-amount">฿0</h3>
+                    <h3 class="mini-amount" id="displayInvestments">฿0</h3>
                     <p class="mini-label">พอร์ตปัจจุบัน</p>
                 </section>
             </div>
