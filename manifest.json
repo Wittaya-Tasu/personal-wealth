@@ -1,22 +1,29 @@
 {
-  "name": "Personal Wealth Dashboard",
+  "id": "./",
+  "name": "Personal Wealth",
   "short_name": "Wealth",
+  "description": "ติดตามกระแสเงินสด ทรัพย์สิน หนี้สิน การลงทุน และเป้าหมายทางการเงิน",
   "lang": "th",
+  "dir": "ltr",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#064e3b",
+  "orientation": "portrait-primary",
+  "background_color": "#071410",
+  "theme_color": "#072e27",
+  "categories": ["finance", "productivity"],
   "icons": [
     {
-      "src": "https://via.placeholder.com/192/064e3b/d4af37?text=W",
+      "src": "icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "https://via.placeholder.com/512/064e3b/d4af37?text=W",
+      "src": "icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
