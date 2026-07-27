@@ -6,7 +6,7 @@
  * Never place a Client Secret, access token, password, or financial data here.
  */
 window.APP_CONFIG = Object.freeze({
-  GOOGLE_CLIENT_ID: "971390460399-u8r8ct3fipkpg1vdjihgbtsbe8h2jgii.apps.googleusercontent.com",
+  GOOGLE_CLIENT_ID: "602356132719-j3heqe92lnmlhqdq0p4urfqhoda5krki.apps.googleusercontent.com",
   SPREADSHEET_ID: "1xNasmNnUzlQQI3saK9mwiBjvWiJJOFj7-qznnfeAC2g",
   APP_NAME: "Personal Wealth",
   LOCALE: "th-TH",
