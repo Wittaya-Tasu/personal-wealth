@@ -159,7 +159,7 @@ if (addBtn) {
 // =========================================
 
 // 1. นำ URL ที่ได้จากการ Deploy Google Apps Script มาใส่ตรงนี้
-const WEB_APP_URL = "ใส่_WEB_APP_URL_ที่ได้จาก_Apps_Script_ตรงนี้"; 
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxGMz28UgS1EclYWA4C7vj65k6AD0fKLbqY9X53a5Kz_Hw1Lo4opIKh58hvH4qFNUzR/exec"; 
 
 // 2. อ้างอิง Elements ต่างๆ
 const addBtn = document.getElementById('addBtn'); // ปุ่ม + ตรงกลางล่าง
