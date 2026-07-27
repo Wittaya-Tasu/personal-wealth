@@ -1378,6 +1378,23 @@ svg {
   }
 }
 
+/*
+ * iOS can report a zero safe-area inset when a previously installed PWA is
+ * opened in standalone mode. Keep the sticky header below the status bar and
+ * Dynamic Island even in that case.
+ */
+@supports (-webkit-touch-callout: none) {
+  @media (display-mode: standalone) and (max-width: 600px) {
+    .app-shell {
+      padding-top: max(env(safe-area-inset-top), 54px);
+    }
+
+    .topbar {
+      top: max(env(safe-area-inset-top), 54px);
+    }
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
