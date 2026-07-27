@@ -175,8 +175,12 @@ window.submitData = async function(event, sheetName) {
     };
 
     try {
+        // ในไฟล์ script.js ตรงฟังก์ชัน submitData
         const response = await fetch(WEB_APP_URL, {
             method: "POST",
+            headers: {
+                "Content-Type": "text/plain;charset=utf-8", // เพิ่มบรรทัดนี้เพื่อแก้ปัญหา CORS
+            },
             body: JSON.stringify(payload)
         });
 
