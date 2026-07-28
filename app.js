@@ -88,7 +88,9 @@
     const bar = qs("#connectionBar");
     bar.className = `connection-bar ${status ? `is-${status}` : ""}`;
     setText("connectionText", text);
-    qs("#loginButton").hidden = !showLogin;
+    const loginButton = qs("#loginButton");
+    loginButton.textContent = "แตะเพื่อเชื่อมต่อ Google";
+    loginButton.hidden = !showLogin;
   }
 
   function showToast(message, type = "success") {
@@ -135,9 +137,13 @@
     qs("#loginButton").addEventListener("click", signIn);
     qs("#logoutButton").addEventListener("click", signOut);
     qs("#snapshotButton").addEventListener("click", saveCurrentSnapshot);
-    qs("#syncButton").addEventListener("click", () => {
-      if (store.isAuthorized()) refreshData();
-      else signIn();
+    qs("#syncButton").addEventListener("click", async () => {
+      try {
+        if (store.isAuthorized()) await refreshData();
+        else await signIn();
+      } catch (error) {
+        handleError(error);
+      }
     });
     qs("#settingsButton").addEventListener("click", openSettings);
     qs("#quickAddButton").addEventListener("click", openQuickAdd);
@@ -177,8 +183,13 @@
     qs("#wealthList").addEventListener("click", handleListAction);
     qs("#goalList").addEventListener("click", handleListAction);
 
-    global.addEventListener("online", () => {
-      if (store.isAuthorized()) refreshData();
+    global.addEventListener("online", async () => {
+      if (!store.isAuthorized()) return;
+      try {
+        await refreshData();
+      } catch (error) {
+        handleError(error);
+      }
     });
     global.addEventListener("offline", () => setConnection("offline", "ออฟไลน์ — แสดงข้อมูลล่าสุดที่โหลดไว้"));
     document.addEventListener("keydown", (event) => {
@@ -190,7 +201,7 @@
     try {
       setLoading(true);
       setConnection("loading", "กำลังรอการอนุญาตจาก Google…");
-      await store.signIn("consent");
+      await store.signIn("");
       await refreshData();
     } catch (error) {
       handleError(error);
@@ -224,7 +235,7 @@
       setConnection("", `เชื่อมต่อแล้ว · อัปเดต ${new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}`);
     } catch (error) {
       if (error?.status === 401 || error?.result?.error?.code === 401) {
-        await store.signOut();
+        store.clearSessionToken();
         setConnection("offline", "สิทธิ์หมดอายุ กรุณาเชื่อมต่อ Google ใหม่", true);
       }
       throw error;
@@ -697,10 +708,29 @@
     const button = event.target.closest("[data-delete-sheet]");
     if (!button) return;
     const label = button.dataset.deleteLabel || "รายการนี้";
-    if (!global.confirm(`ยืนยันลบ “${label}”?\nการลบนี้จะนำแถวออกจาก Google Sheet`)) return;
+    const sheetName = button.dataset.deleteSheet;
+    const rowNumber = Number(button.dataset.deleteRow);
+    const transaction = sheetName === config.SHEETS.transactions
+      ? (state.data?.transactions || []).find((row) => row._rowNumber === rowNumber)
+      : null;
+    const account = sheetName === config.SHEETS.accounts
+      ? (state.data?.accounts || []).find((row) => row._rowNumber === rowNumber)
+      : null;
+    const accountEffectText = transaction
+      ? store.isAccountLinkedTransaction(transaction)
+        ? "\nระบบจะย้อนผลของรายการนี้ในยอด Accounts ก่อนลบ"
+        : "\nรายการเดิมก่อน v2.1.0 จะถูกลบโดยไม่ปรับ Opening Balance"
+      : "";
+    if (!global.confirm(`ยืนยันลบ “${label}”?\nการลบนี้จะนำแถวออกจาก Google Sheet${accountEffectText}`)) return;
     try {
       setLoading(true);
-      await store.delete(button.dataset.deleteSheet, Number(button.dataset.deleteRow));
+      if (transaction) {
+        await store.deleteTransactionWithAccountEffects(transaction);
+      } else if (account) {
+        await store.deleteAccount(rowNumber);
+      } else {
+        await store.delete(sheetName, rowNumber);
+      }
       await refreshData();
       showToast(`ลบ ${label} แล้ว`);
     } catch (error) {
@@ -807,6 +837,20 @@
     return parsed ? localIsoDate(parsed) : fallback;
   }
 
+  function accountOptions(selectedValue = "") {
+    const selected = String(selectedValue || "").trim().toLocaleLowerCase("th-TH");
+    const options = ['<option value="">เลือกบัญชี</option>'];
+    (state.data?.accounts || []).forEach((account) => {
+      const name = String(account.account_name || "").trim();
+      if (!name) return;
+      const isSelected = name.toLocaleLowerCase("th-TH") === selected;
+      const value = inputValue({ value: name }, "value");
+      const label = inputValue({ value: `${name} — ${formatCurrency(account.balance)}` }, "value");
+      options.push(`<option value="${value}" ${isSelected ? "selected" : ""}>${label}</option>`);
+    });
+    return options.join("");
+  }
+
   function formTemplate(type, record) {
     const saveLabel = record ? "บันทึกการแก้ไข" : "บันทึกข้อมูล";
     const note = (placeholder = "รายละเอียดเพิ่มเติม") => `
@@ -817,6 +861,13 @@
 
     if (type === "transaction") {
       const currentType = analytics.normalizeType(record?.type || "Expense");
+      const defaultExpenseAccount = record
+        ? record.account_from
+        : (state.data?.accounts || []).find((account) => {
+          return String(account.account_name || "").trim() === "บัญชีใช้จ่ายรายเดือน";
+        })?.account_name || "";
+      const selectedFrom = currentType === "expense" ? defaultExpenseAccount : record?.account_from || "";
+      const selectedTo = record?.account_to || "";
       return `
         <div class="form-segments" role="radiogroup" aria-label="ประเภทรายการ">
           <label><input type="radio" name="type" value="Expense" ${currentType === "expense" ? "checked" : ""}><span>รายจ่าย</span></label>
@@ -825,14 +876,13 @@
         </div>
         <div class="field-row">
           <label class="field"><span>วันที่</span><input name="date" type="date" value="${inputDate(record, "date", localIsoDate())}" required></label>
-          <label class="field"><span>จำนวนเงิน (บาท)</span><input name="amount" type="number" min="0" step="0.01" inputmode="decimal" value="${inputValue(record, "amount")}" placeholder="0" required></label>
+          <label class="field"><span>จำนวนเงิน (บาท)</span><input name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="${inputValue(record, "amount")}" placeholder="0" required></label>
         </div>
         <label class="field"><span>หมวดหมู่</span><input name="category" list="categoryOptions" value="${inputValue(record, "category")}" placeholder="เช่น อาหาร เงินเดือน น้ำมัน" required><datalist id="categoryOptions"></datalist></label>
         <div class="field-row account-fields">
-          <label class="field"><span>จากบัญชี</span><input name="account_from" list="accountOptions" value="${inputValue(record, "account_from")}" placeholder="เลือกหรือพิมพ์ชื่อบัญชี"></label>
-          <label class="field"><span>เข้าบัญชี</span><input name="account_to" list="accountOptions" value="${inputValue(record, "account_to")}" placeholder="ใช้เมื่อรับ/โอนเงิน"></label>
+          <label class="field" data-account-from-field><span data-account-from-label>จ่ายจากบัญชี</span><select name="account_from">${accountOptions(selectedFrom)}</select></label>
+          <label class="field" data-account-to-field><span data-account-to-label>เงินเข้าบัญชี</span><select name="account_to">${accountOptions(selectedTo)}</select></label>
         </div>
-        <datalist id="accountOptions"></datalist>
         ${note()}
         ${submit}`;
     }
@@ -920,25 +970,29 @@
       });
     }
 
-    const accountList = qs("#accountOptions");
-    if (accountList) {
-      (state.data?.accounts || []).forEach((row) => {
-        if (!row.account_name) return;
-        const option = document.createElement("option");
-        option.value = row.account_name;
-        accountList.appendChild(option);
-      });
-    }
   }
 
   function bindFormBehavior(type) {
     if (type !== "transaction") return;
     const update = () => {
-      const selected = qs("#dynamicForm input[name='type']:checked")?.value;
-      const toField = qs("#dynamicForm input[name='account_to']")?.closest(".field");
-      const fromField = qs("#dynamicForm input[name='account_from']")?.closest(".field");
-      if (toField) toField.hidden = selected === "Expense";
-      if (fromField) fromField.hidden = selected === "Income";
+      const selected = analytics.normalizeType(qs("#dynamicForm input[name='type']:checked")?.value);
+      const accountFields = qs("#dynamicForm .account-fields");
+      const fromField = qs("#dynamicForm [data-account-from-field]");
+      const toField = qs("#dynamicForm [data-account-to-field]");
+      const fromSelect = qs("#dynamicForm select[name='account_from']");
+      const toSelect = qs("#dynamicForm select[name='account_to']");
+      const showFrom = selected === "expense" || selected === "transfer";
+      const showTo = selected === "income" || selected === "transfer";
+
+      fromField.hidden = !showFrom;
+      toField.hidden = !showTo;
+      fromSelect.disabled = !showFrom;
+      toSelect.disabled = !showTo;
+      fromSelect.required = showFrom;
+      toSelect.required = showTo;
+      qs("#dynamicForm [data-account-from-label]").textContent = selected === "expense" ? "จ่ายจากบัญชี" : "จากบัญชี";
+      qs("#dynamicForm [data-account-to-label]").textContent = selected === "income" ? "เงินเข้าบัญชี" : "เข้าบัญชี";
+      accountFields.style.gridTemplateColumns = selected === "transfer" ? "repeat(2, minmax(0, 1fr))" : "1fr";
     };
     qsa("#dynamicForm input[name='type']").forEach((input) => input.addEventListener("change", update));
     update();
@@ -959,13 +1013,37 @@
     }
     if (type === "transaction") {
       const normalized = analytics.normalizeType(values.type);
+      if (!(analytics.toNumber(values.amount) > 0)) {
+        showToast("จำนวนเงินต้องมากกว่า 0 บาท", "error");
+        return;
+      }
       if (normalized === "income") values.account_from = "";
       if (normalized === "expense") values.account_to = "";
+      if (normalized === "transfer" && values.account_from === values.account_to) {
+        showToast("บัญชีต้นทางและปลายทางต้องเป็นคนละบัญชี", "error");
+        return;
+      }
     }
 
     try {
       setLoading(true);
-      if (state.activeRecord?._rowNumber) {
+      if (type === "transaction" && state.activeRecord?._rowNumber) {
+        await store.updateTransactionWithAccountEffects(
+          state.activeRecord._rowNumber,
+          state.activeRecord,
+          values
+        );
+      } else if (type === "transaction") {
+        await store.appendTransactionWithAccountEffects(values);
+      } else if (type === "account" && state.activeRecord?._rowNumber) {
+        await store.updateAccountRecord(
+          state.activeRecord._rowNumber,
+          state.activeRecord,
+          { ...state.activeRecord, ...values }
+        );
+      } else if (type === "account") {
+        await store.appendAccount(values);
+      } else if (state.activeRecord?._rowNumber) {
         await store.update(meta.sheet, state.activeRecord._rowNumber, { ...state.activeRecord, ...values });
       } else {
         await store.append(meta.sheet, values);
@@ -1041,7 +1119,7 @@
   }
 
   function handleError(error) {
-    console.error(error);
+    console.error("Personal Wealth error:", error?.code || error?.status || "UNKNOWN");
     const apiMessage = error?.result?.error?.message;
     let message = apiMessage || error?.message || "เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ";
     if (/API has not been used|accessNotConfigured/i.test(message)) {

@@ -3,6 +3,8 @@
 
   const SESSION_TOKEN_KEY = "personalWealthGoogleToken";
   const SHEETS_API_BASE = "https://sheets.googleapis.com/v4/spreadsheets";
+  const LINKED_TRANSACTION_PREFIX = "v21-";
+  const MONEY_PRECISION = 100;
 
   function waitFor(predicate, timeoutMs = 15000) {
     return new Promise((resolve, reject) => {
@@ -39,6 +41,37 @@
   function createShortId() {
     if (global.crypto?.randomUUID) return global.crypto.randomUUID().split("-")[0];
     return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  }
+
+  function normalizeName(value) {
+    return String(value ?? "").trim();
+  }
+
+  function accountKey(value) {
+    return normalizeName(value).toLocaleLowerCase("th-TH");
+  }
+
+  function toMoney(value) {
+    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+    const parsed = Number(String(value ?? "").replace(/[฿,\s]/g, ""));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function roundMoney(value) {
+    return Math.round((toMoney(value) + Number.EPSILON) * MONEY_PRECISION) / MONEY_PRECISION;
+  }
+
+  function normalizeTransactionType(value) {
+    const type = String(value ?? "").trim().toLowerCase();
+    if (["income", "รายรับ"].includes(type)) return "income";
+    if (["expense", "รายจ่าย"].includes(type)) return "expense";
+    if (["transfer", "โอน", "โอนเงิน"].includes(type)) return "transfer";
+    return "";
+  }
+
+  function parseUpdatedRow(range) {
+    const match = String(range || "").match(/![A-Z]+(\d+)(?::[A-Z]+\d+)?$/i);
+    return match ? Number(match[1]) : null;
   }
 
   function normalizeCell(value) {
@@ -92,12 +125,14 @@
       );
     }
 
-    signIn(prompt = "consent") {
+    signIn(prompt = "") {
       if (!this.tokenClient) return Promise.reject(new Error("ระบบ Google ยังไม่พร้อม"));
       return new Promise((resolve, reject) => {
         this.tokenClient.callback = (response) => {
           if (response.error) {
-            reject(new Error(response.error_description || response.error));
+            const error = new Error(response.error_description || response.error);
+            error.code = response.error;
+            reject(error);
             return;
           }
           this.token = {
@@ -111,6 +146,11 @@
       });
     }
 
+    clearSessionToken() {
+      this.token = null;
+      sessionStorage.removeItem(SESSION_TOKEN_KEY);
+    }
+
     async signOut() {
       const accessToken = this.token?.access_token;
       if (accessToken) {
@@ -118,8 +158,7 @@
           global.google.accounts.oauth2.revoke(accessToken, resolve);
         });
       }
-      this.token = null;
-      sessionStorage.removeItem(SESSION_TOKEN_KEY);
+      this.clearSessionToken();
       this.currentData = null;
     }
 
@@ -158,8 +197,7 @@
       }
       if (!response.ok) {
         if (response.status === 401) {
-          this.token = null;
-          sessionStorage.removeItem(SESSION_TOKEN_KEY);
+          this.clearSessionToken();
         }
         const error = new Error(payload?.error?.message || `Google Sheets API error ${response.status}`);
         error.status = response.status;
@@ -221,7 +259,7 @@
     async append(sheetName, record) {
       const row = this.buildRow(sheetName, record);
       const range = `${quoteSheet(sheetName)}!A1`;
-      await this.request(`/values/${encodeURIComponent(range)}:append`, {
+      const result = await this.request(`/values/${encodeURIComponent(range)}:append`, {
         method: "POST",
         query: {
           valueInputOption: "USER_ENTERED",
@@ -229,6 +267,10 @@
         },
         body: { majorDimension: "ROWS", values: [row] }
       });
+      return {
+        ...result,
+        rowNumber: parseUpdatedRow(result?.updates?.updatedRange)
+      };
     }
 
     async update(sheetName, rowNumber, record) {
@@ -236,7 +278,7 @@
       const row = this.buildRow(sheetName, record);
       const endColumn = columnLetter(headers.length);
       const range = `${quoteSheet(sheetName)}!A${rowNumber}:${endColumn}${rowNumber}`;
-      await this.request(`/values/${encodeURIComponent(range)}`, {
+      return this.request(`/values/${encodeURIComponent(range)}`, {
         method: "PUT",
         query: { valueInputOption: "USER_ENTERED" },
         body: { majorDimension: "ROWS", values: [row] }
@@ -259,7 +301,7 @@
       if (sheetId === undefined) throw new Error(`ไม่พบชีต ${sheetName}`);
       if (!Number.isInteger(rowNumber) || rowNumber < 2) throw new Error("ตำแหน่งแถวไม่ถูกต้อง");
 
-      await this.request(":batchUpdate", {
+      return this.request(":batchUpdate", {
         method: "POST",
         body: {
           requests: [{
@@ -274,6 +316,303 @@
           }]
         }
       });
+    }
+
+    getAccountRows() {
+      if (!this.currentData) throw new Error("ยังไม่ได้โหลดข้อมูลล่าสุดจาก Google Sheet");
+      return this.currentData.accounts || [];
+    }
+
+    buildAccountIndex() {
+      const index = new Map();
+      this.getAccountRows().forEach((account) => {
+        const name = normalizeName(account.account_name);
+        if (!name) return;
+        const key = accountKey(name);
+        if (index.has(key)) {
+          const error = new Error(`พบชื่อบัญชีซ้ำ “${name}” กรุณาแก้ชื่อในชีต Accounts ให้ไม่ซ้ำก่อนทำรายการ`);
+          error.code = "DUPLICATE_ACCOUNT_NAME";
+          throw error;
+        }
+        index.set(key, account);
+      });
+      return index;
+    }
+
+    findAccountByName(name) {
+      const normalized = normalizeName(name);
+      const account = this.buildAccountIndex().get(accountKey(normalized));
+      if (!account) {
+        const error = new Error(`ไม่พบบัญชี “${normalized || "ไม่ระบุชื่อ"}” ในชีต Accounts`);
+        error.code = "ACCOUNT_NOT_FOUND";
+        throw error;
+      }
+      return account;
+    }
+
+    isAccountReferenced(name) {
+      const key = accountKey(name);
+      return (this.currentData?.transactions || []).some((transaction) => {
+        return accountKey(transaction.account_from) === key || accountKey(transaction.account_to) === key;
+      });
+    }
+
+    validateAccountRecord(record, existingRecord = null) {
+      const name = normalizeName(record?.account_name);
+      if (!name) throw new Error("กรุณาระบุชื่อบัญชี");
+
+      const rows = this.getAccountRows();
+      this.buildAccountIndex();
+      const duplicate = rows.find((account) => {
+        return account._rowNumber !== existingRecord?._rowNumber
+          && accountKey(account.account_name) === accountKey(name);
+      });
+      if (duplicate) {
+        const error = new Error(`มีบัญชีชื่อ “${name}” อยู่แล้ว ชื่อบัญชีต้องไม่ซ้ำกัน`);
+        error.code = "DUPLICATE_ACCOUNT_NAME";
+        throw error;
+      }
+
+      const oldName = normalizeName(existingRecord?.account_name);
+      if (oldName && accountKey(oldName) !== accountKey(name) && this.isAccountReferenced(oldName)) {
+        const error = new Error(`เปลี่ยนชื่อบัญชี “${oldName}” ไม่ได้ เพราะมี Transaction อ้างถึงชื่อนี้อยู่`);
+        error.code = "ACCOUNT_NAME_REFERENCED";
+        throw error;
+      }
+      return { ...record, account_name: name };
+    }
+
+    async appendAccount(record) {
+      const validated = this.validateAccountRecord(record);
+      return this.append(this.config.SHEETS.accounts, validated);
+    }
+
+    async updateAccountRecord(rowNumber, existingRecord, record) {
+      const validated = this.validateAccountRecord(record, existingRecord);
+      return this.update(this.config.SHEETS.accounts, rowNumber, {
+        ...existingRecord,
+        ...validated
+      });
+    }
+
+    async deleteAccount(rowNumber) {
+      this.buildAccountIndex();
+      const account = this.getAccountRows().find((row) => row._rowNumber === rowNumber);
+      if (!account) throw new Error("ไม่พบบัญชีที่ต้องการลบ");
+      if (this.isAccountReferenced(account.account_name)) {
+        const error = new Error(`ลบบัญชี “${account.account_name}” ไม่ได้ เพราะยังมี Transaction อ้างถึงบัญชีนี้`);
+        error.code = "ACCOUNT_REFERENCED";
+        throw error;
+      }
+      return this.delete(this.config.SHEETS.accounts, rowNumber);
+    }
+
+    validateTransactionAccounts(record) {
+      const amount = roundMoney(record?.amount);
+      if (!(amount > 0)) {
+        const error = new Error("จำนวนเงินต้องมากกว่า 0 บาท");
+        error.code = "INVALID_AMOUNT";
+        throw error;
+      }
+
+      const type = normalizeTransactionType(record?.type);
+      if (!type) {
+        const error = new Error("ประเภทรายการต้องเป็น Income, Expense หรือ Transfer");
+        error.code = "INVALID_TRANSACTION_TYPE";
+        throw error;
+      }
+
+      const validated = { ...record, amount };
+      if (type === "income") {
+        const accountTo = this.findAccountByName(record.account_to);
+        validated.type = "Income";
+        validated.account_from = "";
+        validated.account_to = normalizeName(accountTo.account_name);
+      } else if (type === "expense") {
+        const accountFrom = this.findAccountByName(record.account_from);
+        validated.type = "Expense";
+        validated.account_from = normalizeName(accountFrom.account_name);
+        validated.account_to = "";
+      } else {
+        const accountFrom = this.findAccountByName(record.account_from);
+        const accountTo = this.findAccountByName(record.account_to);
+        if (accountKey(accountFrom.account_name) === accountKey(accountTo.account_name)) {
+          const error = new Error("บัญชีต้นทางและปลายทางของ Transfer ต้องเป็นคนละบัญชี");
+          error.code = "SAME_TRANSFER_ACCOUNT";
+          throw error;
+        }
+        validated.type = "Transfer";
+        validated.account_from = normalizeName(accountFrom.account_name);
+        validated.account_to = normalizeName(accountTo.account_name);
+      }
+      return validated;
+    }
+
+    getTransactionEffects(record, multiplier = 1) {
+      const transaction = this.validateTransactionAccounts(record);
+      const amount = roundMoney(transaction.amount * multiplier);
+      const type = normalizeTransactionType(transaction.type);
+      if (type === "income") {
+        return [{ accountName: transaction.account_to, delta: amount }];
+      }
+      if (type === "expense") {
+        return [{ accountName: transaction.account_from, delta: -amount }];
+      }
+      return [
+        { accountName: transaction.account_from, delta: -amount },
+        { accountName: transaction.account_to, delta: amount }
+      ];
+    }
+
+    prepareAccountBalanceChanges(effects) {
+      const accountIndex = this.buildAccountIndex();
+      const totals = new Map();
+      (effects || []).forEach((effect) => {
+        const key = accountKey(effect.accountName);
+        totals.set(key, roundMoney((totals.get(key) || 0) + toMoney(effect.delta)));
+      });
+
+      const changes = [];
+      totals.forEach((delta, key) => {
+        if (!delta) return;
+        const account = accountIndex.get(key);
+        if (!account) throw new Error(`ไม่พบบัญชี “${key}” ในชีต Accounts`);
+        const before = roundMoney(account.balance);
+        const after = roundMoney(before + delta);
+        if (after < 0) {
+          const error = new Error(
+            `ยอดเงินในบัญชี “${account.account_name}” ไม่เพียงพอ `
+            + `(คงเหลือ ${before.toLocaleString("th-TH")} บาท)`
+          );
+          error.code = "INSUFFICIENT_ACCOUNT_BALANCE";
+          throw error;
+        }
+        changes.push({ account, before, after });
+      });
+      return changes;
+    }
+
+    async writeAccountBalances(changes, targetKey = "after") {
+      if (!changes?.length) return;
+      const sheetName = this.config.SHEETS.accounts;
+      const headers = this.getHeaders(sheetName);
+      const balanceColumn = headers.indexOf("balance") + 1;
+      if (!balanceColumn) throw new Error("ไม่พบ Header balance ในชีต Accounts");
+      const column = columnLetter(balanceColumn);
+      const data = changes.map((change) => ({
+        range: `${quoteSheet(sheetName)}!${column}${change.account._rowNumber}`,
+        majorDimension: "ROWS",
+        values: [[roundMoney(change[targetKey])]]
+      }));
+      await this.request("/values:batchUpdate", {
+        method: "POST",
+        body: {
+          valueInputOption: "USER_ENTERED",
+          data
+        }
+      });
+      changes.forEach((change) => {
+        change.account.balance = roundMoney(change[targetKey]);
+      });
+    }
+
+    async updateAccountBalance(accountName, balance) {
+      const account = this.findAccountByName(accountName);
+      const before = roundMoney(account.balance);
+      const after = roundMoney(balance);
+      if (after < 0) throw new Error(`ยอดบัญชี “${account.account_name}” ติดลบไม่ได้`);
+      const changes = [{ account, before, after }];
+      await this.writeAccountBalances(changes);
+      return changes[0];
+    }
+
+    async applyAccountEffects(effects) {
+      const changes = this.prepareAccountBalanceChanges(effects);
+      await this.writeAccountBalances(changes);
+      return changes;
+    }
+
+    async applyTransactionEffects(record) {
+      return this.applyAccountEffects(this.getTransactionEffects(record));
+    }
+
+    async reverseTransactionEffects(record) {
+      return this.applyAccountEffects(this.getTransactionEffects(record, -1));
+    }
+
+    async rollbackAccountChanges(changes, primaryError, actionLabel) {
+      try {
+        await this.writeAccountBalances(changes, "before");
+      } catch (rollbackError) {
+        const error = new Error(
+          `${actionLabel}ไม่สำเร็จ และย้อนยอด Accounts ไม่สำเร็จ `
+          + "ข้อมูลอาจไม่ตรงกัน กรุณาหยุดทำรายการและ Reconcile ยอดบัญชีกับธนาคารก่อน"
+        );
+        error.code = "ROLLBACK_FAILED";
+        error.primaryError = primaryError;
+        error.rollbackError = rollbackError;
+        throw error;
+      }
+      throw primaryError;
+    }
+
+    isAccountLinkedTransaction(record) {
+      return String(record?.tx_id || "").startsWith(LINKED_TRANSACTION_PREFIX);
+    }
+
+    async appendTransactionWithAccountEffects(record) {
+      const transaction = this.validateTransactionAccounts({
+        ...record,
+        tx_id: `${LINKED_TRANSACTION_PREFIX}${createShortId()}`
+      });
+      const changes = await this.applyTransactionEffects(transaction);
+      try {
+        const result = await this.append(this.config.SHEETS.transactions, transaction);
+        return { ...result, transaction };
+      } catch (error) {
+        return this.rollbackAccountChanges(changes, error, "การเพิ่ม Transaction");
+      }
+    }
+
+    async updateTransactionWithAccountEffects(rowNumber, existingRecord, record) {
+      const transaction = this.validateTransactionAccounts({
+        ...existingRecord,
+        ...record,
+        tx_id: existingRecord.tx_id
+      });
+
+      // Legacy transactions are record-only. Their historical effects are already
+      // included in the opening balances and must never be replayed automatically.
+      if (!this.isAccountLinkedTransaction(existingRecord)) {
+        return this.update(this.config.SHEETS.transactions, rowNumber, transaction);
+      }
+
+      const effects = [
+        ...this.getTransactionEffects(existingRecord, -1),
+        ...this.getTransactionEffects(transaction)
+      ];
+      const changes = await this.applyAccountEffects(effects);
+      try {
+        return await this.update(this.config.SHEETS.transactions, rowNumber, transaction);
+      } catch (error) {
+        return this.rollbackAccountChanges(changes, error, "การแก้ไข Transaction");
+      }
+    }
+
+    async deleteTransactionWithAccountEffects(record) {
+      if (!record?._rowNumber) throw new Error("ไม่พบตำแหน่ง Transaction ที่ต้องการลบ");
+
+      // Deleting a legacy row must not change opening balances.
+      if (!this.isAccountLinkedTransaction(record)) {
+        return this.delete(this.config.SHEETS.transactions, record._rowNumber);
+      }
+
+      const changes = await this.reverseTransactionEffects(record);
+      try {
+        return await this.delete(this.config.SHEETS.transactions, record._rowNumber);
+      } catch (error) {
+        return this.rollbackAccountChanges(changes, error, "การลบ Transaction");
+      }
     }
 
     async saveSettings(values) {

@@ -1,4 +1,4 @@
-const CACHE_NAME = "personal-wealth-shell-v2.0.2";
+const CACHE_NAME = "personal-wealth-shell-v2.1.0";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
@@ -12,6 +12,9 @@ const STATIC_ASSETS = [
   "./icons/icon-192.png",
   "./icons/icon-512.png"
 ];
+const STATIC_ASSET_URLS = new Set(
+  STATIC_ASSETS.map((asset) => new URL(asset, self.registration.scope).href)
+);
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -35,16 +38,23 @@ self.addEventListener("fetch", (event) => {
 
   // Never cache Google API or financial-data responses.
   if (!isSameOrigin || event.request.method !== "GET") return;
+  const isStaticAsset = STATIC_ASSET_URLS.has(requestUrl.href);
+  const isNavigation = event.request.mode === "navigate";
 
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        if (response.ok && STATIC_ASSETS.some((asset) => requestUrl.pathname.endsWith(asset.replace("./", "/")))) {
+        if (response.ok && isStaticAsset) {
           const copy = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
         }
         return response;
       })
-      .catch(() => caches.match(event.request).then((cached) => cached || caches.match("./index.html")))
+      .catch(async () => {
+        const cached = await caches.match(event.request);
+        if (cached) return cached;
+        if (isNavigation) return caches.match(new URL("./index.html", self.registration.scope));
+        throw new Error("Offline asset is not cached");
+      })
   );
 });
