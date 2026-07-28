@@ -1,9 +1,12 @@
-# Personal Wealth v2.1.0
+# Personal Wealth v2.1.1
 
-**Account-linked Transactions** — WebApp/PWA ส่วนตัวสำหรับบันทึกรายรับ รายจ่าย การโอนเงิน ทรัพย์สิน หนี้สิน การลงทุน และเป้าหมายทางการเงิน โดยใช้ GitHub Pages เป็น Frontend และอ่าน–เขียน Google Sheet แบบ Private ผ่าน Google OAuth และ Google Sheets API v4 โดยตรง
+**Monthly Spending Balance** — WebApp/PWA ส่วนตัวสำหรับบันทึกรายรับ รายจ่าย การโอนเงิน ทรัพย์สิน หนี้สิน การลงทุน และเป้าหมายทางการเงิน โดยใช้ GitHub Pages เป็น Frontend และอ่าน–เขียน Google Sheet แบบ Private ผ่าน Google OAuth และ Google Sheets API v4 โดยตรง
 
-## ความสามารถหลักของ v2.1.0
+## ความสามารถหลักของ v2.1.1
 
+- การ์ดแรกบน Dashboard แสดงยอดคงเหลือจริงของ Account ชื่อ `บัญชีใช้จ่ายรายเดือน`
+- ข้อความใต้ยอดแสดง Expense เดือนปัจจุบันที่จ่ายจากบัญชีนี้
+- สรุป `งบใช้จ่ายคงเหลือ` ในหน้ารายการใช้ยอด Account เดียวกัน แทนสูตรงบประมาณลบรายจ่าย
 - Transaction ใหม่ปรับยอด `Accounts.balance` อัตโนมัติ
 - แก้ไขหรือลบ Transaction ที่สร้างโดย v2.1.0 แล้วย้อนผลเดิมก่อนใช้ผลใหม่
 - ป้องกันยอดบัญชีติดลบ ชื่อบัญชีซ้ำ และ Transfer เข้าบัญชีเดิม
@@ -55,7 +58,7 @@ iPhone / Browser
 
 ## โครงสร้าง Google Sheet
 
-v2.1.0 ไม่เปลี่ยนชื่อ Sheet หรือ Header
+v2.1.1 ไม่เปลี่ยนชื่อ Sheet หรือ Header
 
 | Sheet | Headers ตามลำดับ |
 |---|---|
@@ -110,6 +113,28 @@ Type: Transfer
 ผลคือบัญชีหลักลด 1,000 บาทและบัญชีใช้จ่ายรายเดือนเพิ่ม 1,000 บาท โดย Cash Flow ไม่ถือเป็นรายรับหรือรายจ่าย
 
 เมื่อบันทึก Expense ใหม่ แอปจะเลือก `บัญชีใช้จ่ายรายเดือน` เป็นค่าเริ่มต้นถ้ามีชื่อนี้ แต่ผู้ใช้เปลี่ยนเป็นบัญชีอื่นได้
+
+## เงินใช้จ่ายคงเหลือบน Dashboard
+
+ยอด `เงินใช้จ่ายคงเหลือ` คือ `Accounts.balance` ปัจจุบันของ Account ที่มีชื่อดังนี้:
+
+```text
+บัญชีใช้จ่ายรายเดือน
+```
+
+ตัวอย่าง:
+
+| รายการ | ผลต่อยอด |
+|---|---:|
+| Transfer งบเข้าบัญชีใช้จ่ายรายเดือน 1,000 บาท | +1,000 |
+| Expense จากบัญชีนี้ 600 บาท | -600 |
+| เงินใช้จ่ายคงเหลือที่แสดง | 400 |
+
+ยอดนี้เป็นเงินที่ใช้ได้จริงใน Account จึงรวมเงินคงเหลือยกมาจากเดือนก่อนด้วย และไม่รีเซ็ตอัตโนมัติเมื่อขึ้นเดือนใหม่ การเติมงบเดือนใหม่ให้ใช้ `Transfer` จากบัญชีหลักเข้าบัญชีนี้
+
+ข้อความใต้ยอดนับเฉพาะ Expense ของเดือนปัจจุบันที่มี `account_from` เป็น `บัญชีใช้จ่ายรายเดือน` เท่านั้น Expense จาก Account อื่นยังอยู่ใน Cash Flow แต่ไม่ถูกรวมในข้อความนี้
+
+ถ้าไม่พบ Account นี้หรือพบชื่อซ้ำ แอปจะแสดง `฿—` พร้อมคำเตือน โดยไม่เดาเลือก Account ให้เอง
 
 ## การแก้ไขและลบ Transaction
 
@@ -171,7 +196,7 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 
 - Google Sheet ต้องเป็น Private/Restricted
 - ห้ามใส่ Client Secret, Access Token, Password หรือข้อมูลการเงินจริงใน Repository
-- `GOOGLE_CLIENT_ID` และ `SPREADSHEET_ID` เป็น Identifier และคงค่าเดิมใน v2.1.0
+- `GOOGLE_CLIENT_ID` และ `SPREADSHEET_ID` เป็น Identifier และคงค่าเดิมใน v2.1.1
 - Service Worker ไม่ Cache Google Sheets API
 - GAS deployments เดิมต้องคงสถานะ Archived
 - การลบข้อมูลมีหน้าต่างยืนยัน
@@ -179,13 +204,13 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 ## วิธี Deploy
 
 1. สำรอง Google Sheet และ Repository รุ่นปัจจุบัน
-2. ดาวน์โหลด `personal-wealth-v2.1.0.zip`
+2. ดาวน์โหลด `personal-wealth-v2.1.1.zip`
 3. แตก ZIP และอัปโหลดไฟล์ภายในไปที่ Root ของ Repository
 4. Replace ไฟล์ชื่อเดิม และเพิ่ม `CHANGELOG.md`
 5. Commit ด้วยข้อความ:
 
 ```text
-feat: link transactions to account balances
+feat: show monthly spending balance
 ```
 
 6. รอ GitHub Actions `pages build and deployment` เป็นสีเขียว
@@ -196,12 +221,12 @@ feat: link transactions to account balances
 ## วิธี Rollback
 
 1. หยุดเพิ่ม แก้ หรือลบ Transaction
-2. Revert Commit v2.1.0 หรือ Replace `app.js`, `api.js`, `sw.js`, `README.md` และ `PROJECT_STATE.md` ด้วยไฟล์ v2.0.2 ที่สำรองไว้
+2. Revert Commit v2.1.1 หรือ Replace ไฟล์ที่แก้ด้วยไฟล์ v2.1.0 ที่สำรองไว้
 3. Deploy และรอ GitHub Pages เป็นสีเขียว
 4. ตรวจยอด Accounts กับธนาคารจริงและ Reconcile ด้วยตนเอง
-5. ระวัง: v2.0.2 จะไม่ย้อนยอด Account เมื่อแก้หรือลบ Transaction ที่ v2.1.0 เคยสร้าง
+5. ตรวจว่าการ์ดกลับไปแสดง Cash Flow ของ v2.1.0 และระบบ Transaction ยังทำงานตามเดิม
 
-การ Rollback Code ไม่ได้ย้อนยอด Accounts หรือ Transactions ที่เกิดขึ้นระหว่างใช้ v2.1.0 โดยอัตโนมัติ
+การ Rollback v2.1.1 ไม่เปลี่ยนยอด Accounts หรือ Transactions เพราะรุ่นนี้เปลี่ยนเฉพาะการอ่านและแสดงผล
 
 ## การแก้ปัญหา
 
@@ -216,6 +241,7 @@ feat: link transactions to account balances
 | Login ได้แต่อ่านชีตไม่ได้ | บัญชี Google ต้องมีสิทธิ์แก้ไข Spreadsheet |
 | หน้าเว็บยังเป็นรุ่นเก่า | รอ Deploy แล้ว Refresh หรือเปิด PWA ใหม่ |
 | แจ้ง rollback ไม่สำเร็จ | หยุดทำรายการและ Reconcile ทุก Account ที่เกี่ยวข้อง |
+| เงินใช้จ่ายคงเหลือเป็น `฿—` | ตรวจว่ามี Account ชื่อ `บัญชีใช้จ่ายรายเดือน` เพียงรายการเดียว |
 
 ## ข้อจำกัดที่ยังเหลือ
 
@@ -225,6 +251,7 @@ feat: link transactions to account balances
 - Investments ต้องอัปเดตมูลค่าด้วยตนเอง
 - ไม่มีระบบซื้อขายหุ้น RMF/PVD หรือราคาตลาด
 - ไม่มี Refresh Token หรือการเชื่อมต่อแบบถาวร
+- เงินใช้จ่ายคงเหลืออ้างอิงชื่อ Account แบบตายตัว `บัญชีใช้จ่ายรายเดือน`
 
 ## เอกสารอ้างอิง
 

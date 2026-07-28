@@ -5,6 +5,7 @@
   const EXPENSE_TYPES = new Set(["expense", "รายจ่าย"]);
   const TRANSFER_TYPES = new Set(["transfer", "โอน", "โอนเงิน"]);
   const COLORS = ["#45d18b", "#e2c46d", "#68a7ff", "#b594f6", "#f4a65a", "#ff746f", "#91a49b"];
+  const MONTHLY_SPENDING_ACCOUNT_NAME = "บัญชีใช้จ่ายรายเดือน";
 
   function toNumber(value) {
     if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -50,6 +51,10 @@
     if (EXPENSE_TYPES.has(normalized)) return "expense";
     if (TRANSFER_TYPES.has(normalized)) return "transfer";
     return normalized || "other";
+  }
+
+  function normalizeAccountName(value) {
+    return String(value || "").trim().toLocaleLowerCase("th-TH");
   }
 
   function sum(rows, selector) {
@@ -271,6 +276,33 @@
     const netWorth = totalAssets - liabilities;
     const monthly = buildMonthlyCashflow(safeData.transactions, 12, anchor);
     const currentMonth = monthly.at(-1) || { income: 0, expense: 0, cashflow: 0 };
+    const currentMonthKey = monthKey(anchor);
+    const monthlySpendingAccountKey = normalizeAccountName(MONTHLY_SPENDING_ACCOUNT_NAME);
+    const monthlySpendingAccountMatches = safeData.accounts.filter((account) => {
+      return normalizeAccountName(account.account_name) === monthlySpendingAccountKey;
+    });
+    const monthlySpendingAccount = monthlySpendingAccountMatches.length === 1
+      ? monthlySpendingAccountMatches[0]
+      : null;
+    const monthlySpendingExpense = safeData.transactions.reduce((total, transaction) => {
+      const isCurrentMonth = monthKey(parseDate(transaction.date)) === currentMonthKey;
+      const isExpense = normalizeType(transaction.type) === "expense";
+      const isMonthlySpendingAccount = normalizeAccountName(transaction.account_from) === monthlySpendingAccountKey;
+      return isCurrentMonth && isExpense && isMonthlySpendingAccount
+        ? total + Math.abs(toNumber(transaction.amount))
+        : total;
+    }, 0);
+    const monthlySpending = {
+      accountName: MONTHLY_SPENDING_ACCOUNT_NAME,
+      account: monthlySpendingAccount,
+      balance: monthlySpendingAccount ? toNumber(monthlySpendingAccount.balance) : null,
+      expense: monthlySpendingExpense,
+      status: monthlySpendingAccountMatches.length === 0
+        ? "missing"
+        : monthlySpendingAccountMatches.length > 1
+          ? "duplicate"
+          : "available"
+    };
     const savingsRate = currentMonth.income > 0 ? currentMonth.cashflow / currentMonth.income : null;
     const debtPayments = sum(safeData.liabilities, (row) => row.monthly_payment);
     const debtServiceRatio = currentMonth.income > 0 ? debtPayments / currentMonth.income : null;
@@ -298,6 +330,13 @@
       ? netWorthChange / Math.abs(previousSnapshot.netWorth)
       : null;
     const allocation = buildAllocation(safeData, settings.include_accounts_in_net_worth);
+    const warnings = buildWarnings(safeData, settings, snapshots, monthly);
+    if (monthlySpending.status === "missing") {
+      warnings.push(`ไม่พบบัญชี “${MONTHLY_SPENDING_ACCOUNT_NAME}” จึงยังแสดงเงินใช้จ่ายคงเหลือไม่ได้`);
+    }
+    if (monthlySpending.status === "duplicate") {
+      warnings.push(`พบบัญชีชื่อ “${MONTHLY_SPENDING_ACCOUNT_NAME}” ซ้ำ จึงไม่สามารถระบุยอดเงินใช้จ่ายคงเหลือได้อย่างแน่นอน`);
+    }
 
     const transactions = [...safeData.transactions]
       .map((row) => ({
@@ -328,6 +367,7 @@
         liquidCash
       },
       currentMonth,
+      monthlySpending,
       monthly,
       savingsRate,
       debtServiceRatio,
@@ -339,7 +379,7 @@
       allocation,
       goals: buildGoalRows(safeData.goals),
       transactions,
-      warnings: buildWarnings(safeData, settings, snapshots, monthly)
+      warnings
     };
   }
 

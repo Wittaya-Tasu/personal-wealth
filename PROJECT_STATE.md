@@ -2,8 +2,8 @@
 
 > สถานะสำหรับส่งต่องานให้ AI Agent  
 > อัปเดต: 28 กรกฎาคม 2569 (2026-07-28), Asia/Bangkok  
-> รุ่น: **v2.1.0 — Account-linked Transactions**  
-> สถานะ: Code candidate ผ่าน Static/Mock tests; รอผู้ใช้ Deploy และทดสอบกับ Google Sheet จริง
+> รุ่น: **v2.1.1 — Monthly Spending Balance**  
+> สถานะ: Code candidate ผ่าน Static/Mock tests; รอผู้ใช้ Deploy และทดสอบการแสดงผลกับ Google Sheet จริง
 
 ## 1. สรุปโครงการ
 
@@ -41,7 +41,34 @@ iPhone / Browser
 - Service Worker Cache เฉพาะ Static Assets
 - ห้าม Cache Google API response หรือข้อมูลการเงิน
 
-## 3. การเปลี่ยนแปลง v2.1.0
+## 3. การเปลี่ยนแปลง v2.1.1
+
+### เงินใช้จ่ายคงเหลือ
+
+| จุดแสดงผล | ค่าใหม่ |
+|---|---|
+| การ์ดแรกบน Dashboard | `Accounts.balance` ของบัญชีชื่อ `บัญชีใช้จ่ายรายเดือน` |
+| ข้อความใต้การ์ด | Expense เดือนปัจจุบันที่จ่ายจากบัญชีนี้ |
+| หน้ารายการ > งบใช้จ่ายคงเหลือ | Balance ของบัญชีเดียวกัน |
+| กราฟ Cash Flow | คงเดิม; แสดง Income และ Expense ทุก Account |
+
+กติกา:
+
+- ต้องมี Account ชื่อ `บัญชีใช้จ่ายรายเดือน` เพียงรายการเดียว
+- หากไม่พบหรือพบชื่อซ้ำ ให้แสดง `฿—` และ Warning
+- ยอดคงเหลือเป็นยอด Account จริง จึงรวมเงินยกมาจากเดือนก่อน
+- ยอดไม่รีเซ็ตเมื่อเปลี่ยนเดือน; ให้เติมงบด้วย Transfer
+- Expense จาก Account อื่นยังนับใน Cash Flow แต่ไม่อยู่ในข้อความ `ใช้จากบัญชีนี้เดือนนี้`
+- ไม่มีการเขียนข้อมูลเพิ่มจากฟังก์ชันนี้ เป็นการอ่านและแสดงผลเท่านั้น
+
+### ผลทดสอบจริงของฐาน v2.1.0
+
+- ผู้ใช้ Deploy v2.1.0 สำเร็จ
+- ผู้ใช้ยืนยันว่าเพิ่ม Expense 1 บาทแล้ว Account/Cash Flow เปลี่ยน
+- ผู้ใช้ลบ Expense ทดสอบ 1 บาทสำเร็จและรายการหาย
+- ผู้ใช้ยืนยันว่าบันทึก Expense หลายรายการแล้ว Cash Flow รวมยอดถูกต้อง
+
+## 4. ระบบ Account-linked Transactions จาก v2.1.0
 
 ### Account-linked Transactions
 
@@ -90,7 +117,7 @@ Transaction ที่สร้างโดย v2.1.0:
 - แก้ `balance` โดยตรงได้เพื่อ Reconcile
 - การแก้ Account โดยตรงไม่เรียก Transaction automation
 
-## 4. Opening Balance และ Cutover
+## 5. Opening Balance และ Cutover
 
 สถานะข้อมูลที่ผู้ใช้จัดเตรียมแล้ว:
 
@@ -109,9 +136,9 @@ Transaction ที่สร้างโดย v2.1.0:
 - หากแก้ Legacy transaction ให้ Reconcile กับยอดธนาคารจริง
 - ไม่มีการเพิ่ม Header หรือ Sheet สำหรับ Cutover
 
-## 5. โครงสร้าง Google Sheet
+## 6. โครงสร้าง Google Sheet
 
-**ไม่มีการเปลี่ยนชื่อ Sheet หรือ Header ใน v2.1.0**
+**ไม่มีการเปลี่ยนชื่อ Sheet หรือ Header ใน v2.1.1**
 
 | Sheet | Headers ตามลำดับ |
 |---|---|
@@ -125,31 +152,31 @@ Transaction ที่สร้างโดย v2.1.0:
 | `MonthlySnapshots` | `snapshot_month`, `total_assets`, `total_liabilities`, `net_worth`, `monthly_cashflow`, `savings_rate`, `note` |
 | `Settings` | `key`, `value`, `description` |
 
-## 6. ไฟล์ที่เปลี่ยน
+## 7. ไฟล์ที่เปลี่ยนใน v2.1.1
 
 | ไฟล์ | การเปลี่ยนแปลง |
 |---|---|
-| `app.js` | Transaction select, ค่าเริ่มต้นบัญชีใช้จ่าย, เรียก Account effects, ป้องกัน Account rename/delete, Quick Reconnect |
-| `api.js` | Validation, Account balance batch update, reverse/apply effects, rollback, Legacy cutover |
-| `sw.js` | Cache v2.1.0 และ URL matching ภายใต้ GitHub Pages scope |
-| `README.md` | คู่มือใช้งาน, Opening Balance, Reconcile, OAuth, Deploy และ Rollback |
-| `PROJECT_STATE.md` | อัปเดตสถานะ v2.1.0 |
-| `CHANGELOG.md` | สร้างใหม่ตาม Keep a Changelog |
+| `index.html` | เปลี่ยนชื่อและ ID ของ KPI แรกเป็นเงินใช้จ่ายคงเหลือ |
+| `analytics.js` | หา Account เป้าหมาย คำนวณ Balance และ Expense เดือนปัจจุบันจากบัญชีนี้ |
+| `app.js` | แสดงยอดจริงบน Dashboard และหน้ารายการ พร้อมสถานะ missing/duplicate |
+| `sw.js` | Cache เปลี่ยนเป็น `personal-wealth-shell-v2.1.1` |
+| `README.md` | เพิ่มคู่มือความหมายของเงินใช้จ่ายคงเหลือ Deploy และ Rollback |
+| `PROJECT_STATE.md` | อัปเดตสถานะ v2.1.1 และผลทดสอบจริงที่ผู้ใช้ยืนยัน |
+| `CHANGELOG.md` | เพิ่มประวัติ v2.1.1 |
 
-## 7. ไฟล์ที่ตรวจแล้วแต่ไม่เปลี่ยน
+## 8. ไฟล์ที่ตรวจแล้วแต่ไม่เปลี่ยนใน v2.1.1
 
 | ไฟล์ | เหตุผล |
 |---|---|
-| `index.html` | Form ถูกสร้างจาก `app.js`; IDs และ CSP เดิมเพียงพอ |
 | `style.css` | ใช้ Style ของ select เดิมได้; ไม่ต้องเปลี่ยน Theme/Safe Area |
-| `analytics.js` | Cash Flow แยก Income/Expense/Transfer ถูกต้องอยู่แล้ว |
 | `config.js` | ห้ามเปลี่ยน IDs และไม่ต้องเพิ่ม Config |
+| `api.js` | Account-linked Transactions ทำงานอยู่แล้ว; รุ่นนี้อ่าน Balance เพื่อแสดงผลเท่านั้น |
 | `manifest.json` | PWA configuration เดิมถูกต้อง |
 | `PERSONAL_WEALTH_AGENT_MASTER_PROMPT.md` | เป็นเอกสารอ้างอิง ไม่ใช่ไฟล์เป้าหมายของรุ่นนี้ |
 
 Hash ของไฟล์ข้างต้นตรงกับไฟล์อัปโหลดล่าสุดก่อนเริ่มงาน
 
-## 8. OAuth และ Quick Reconnect
+## 9. OAuth และ Quick Reconnect
 
 - การเชื่อมต่อทั่วไปใช้ `store.signIn("")`
 - ไม่บังคับ `consent` ทุกครั้ง
@@ -161,7 +188,7 @@ Hash ของไฟล์ข้างต้นตรงกับไฟล์อ
 - ไม่ใช้ `localStorage`, PIN, Backend หรือ Refresh Token
 - ไม่เปลี่ยน Google Cloud configuration หรือ OAuth Scope
 
-## 9. ความปลอดภัย
+## 10. ความปลอดภัย
 
 | รายการ | ผล |
 |---|---|
@@ -176,7 +203,7 @@ Hash ของไฟล์ข้างต้นตรงกับไฟล์อ
 | Delete confirmation | คงไว้และเพิ่มคำอธิบายผลต่อ Accounts |
 | Console error | จำกัดเหลือรหัส/ข้อความสั้น ไม่เขียน payload |
 
-## 10. ผลการทดสอบ
+## 11. ผลการทดสอบ
 
 ### ผ่านจาก Static/Mock tests
 
@@ -199,6 +226,19 @@ Hash ของไฟล์ข้างต้นตรงกับไฟล์อ
 | 15 | Cash Flow ยังแยก Income/Expense/Transfer | ผ่าน Analytics Mock |
 | 20 | Cache version เป็น v2.1.0 และไม่ Cache Google API | ผ่าน Static |
 
+### ผ่านสำหรับ v2.1.1
+
+| ลำดับ | การทดสอบ | ผล |
+|---:|---|---|
+| 21 | มี Account เป้าหมาย Balance 4,999 → การ์ดแสดง 4,999 | ผ่าน Mock |
+| 22 | Expense เดือนนี้ 20,001 จาก Account เป้าหมาย → Detail 20,001 | ผ่าน Mock |
+| 23 | Expense จาก Account อื่นไม่รวมใน Detail | ผ่าน Mock |
+| 24 | ไม่พบ Account เป้าหมาย → สถานะ missing และ Balance เป็น null | ผ่าน Mock |
+| 25 | Account เป้าหมายชื่อซ้ำ → สถานะ duplicate และไม่เดายอด | ผ่าน Mock |
+| 26 | หน้ารายการใช้ Balance Account เดียวกับ Dashboard | ผ่าน Static |
+| 27 | Cash Flow และกราฟ Income/Expense ไม่เปลี่ยนสูตร | ผ่าน Regression Mock |
+| 28 | Cache version เป็น v2.1.1 และไม่ Cache Google API | ผ่าน Static |
+
 Static checks อื่นที่ผ่าน:
 
 - JavaScript syntax: `app.js`, `api.js`, `sw.js`
@@ -207,24 +247,24 @@ Static checks อื่นที่ผ่าน:
 - Static selectors อ้างถึง Element ที่มีอยู่; Dynamic selector ถูกสร้างจาก Form
 - ไม่พบ `localStorage` หรือการบังคับ `signIn("consent")`
 - `GOOGLE_CLIENT_ID` และ `SPREADSHEET_ID` ไม่เปลี่ยน
-- `index.html`, `style.css`, `analytics.js`, `config.js`, `manifest.json` มี Hash ตรงกับไฟล์ล่าสุด
+- `style.css`, `config.js`, `api.js`, `manifest.json` มี Hash ตรงกับ v2.1.0
 - Mock rollback ผ่านสำหรับ Append, Update และ Delete failure
 - ป้องกัน Account rename/delete เมื่อมี Transaction อ้างถึงผ่าน Mock
 
-### ต้องให้ผู้ใช้ทดสอบกับ Google Sheet จริง
+### ต้องให้ผู้ใช้ทดสอบ v2.1.1 กับ Google Sheet จริง
 
 | ลำดับ | การทดสอบ | สถานะ |
 |---:|---|---|
-| 1–14 | REST API กับข้อมูลทดสอบ 1 บาท | ยังไม่ได้ทดสอบจริง |
-| 16 | Login ครั้งแรก | รอทดสอบหลัง Deploy |
-| 17 | Quick Reconnect หลัง Token หมดอายุ | Static ผ่าน; รอทดสอบจริง |
-| 18 | PWA บน iPhone และ Safe Area | CSS ไม่เปลี่ยน; รอ Regression test |
-| 19 | Desktop responsive | UI files ไม่เปลี่ยน; รอ Regression test |
-| 20 | Service Worker เปลี่ยน Cache หลัง Deploy | Static ผ่าน; รอตรวจ Browser |
+| 21 | Dashboard แสดง Balance ของ `บัญชีใช้จ่ายรายเดือน` ตรงกับ Google Sheet | รอทดสอบ |
+| 22 | Detail แสดงยอด Expense จากบัญชีนี้ของเดือนปัจจุบันถูกต้อง | รอทดสอบ |
+| 23 | หน้ารายการแสดงยอดคงเหลือเดียวกับ Dashboard | รอทดสอบ |
+| 24 | PWA บน iPhone และ Safe Area | CSS ไม่เปลี่ยน; รอ Regression test |
+| 25 | Desktop responsive | Style ไม่เปลี่ยน; รอ Regression test |
+| 26 | Service Worker เปลี่ยน Cache หลัง Deploy | Static ผ่าน; รอตรวจ Browser |
 
 ห้ามอ้างว่า REST API จริงผ่านแล้วจนกว่าผู้ใช้จะ Deploy และทดสอบ
 
-## 11. ข้อจำกัดที่เหลือ
+## 12. ข้อจำกัดที่เหลือ
 
 - Google Sheets API ไม่มี Atomic database transaction ระหว่าง Accounts และ Transactions
 - หาก request สำเร็จที่ Server แต่ Browser ไม่ได้รับ response อาจต้อง Reconcile
@@ -234,34 +274,35 @@ Static checks อื่นที่ผ่าน:
 - ไม่มี `InvestmentTransactions`, ระบบซื้อขายหลักทรัพย์ หรือราคาตลาด
 - สูตร Emergency Fund ไม่เปลี่ยน
 - OAuth ไม่มี Refresh Token และต้องให้ผู้ใช้กดเชื่อมต่อใหม่เมื่อจำเป็น
+- เงินใช้จ่ายคงเหลือผูกกับชื่อ Account `บัญชีใช้จ่ายรายเดือน`
+- Balance รวมเงินยกมาจากเดือนก่อนและไม่ใช่สูตร Budget reset รายเดือน
 
-## 12. วิธี Deploy
+## 13. วิธี Deploy
 
-1. สำรอง Google Sheet และ Repository v2.0.2
-2. อัปโหลดไฟล์จาก `personal-wealth-v2.1.0.zip` ไปที่ Root ของ Repository
-3. Replace 5 ไฟล์เดิมและเพิ่ม `CHANGELOG.md`
+1. สำรอง Repository v2.1.0
+2. อัปโหลดไฟล์จาก `personal-wealth-v2.1.1.zip` ไปที่ Root ของ Repository
+3. Replace 7 ไฟล์เดิม
 4. Commit:
 
 ```text
-feat: link transactions to account balances
+feat: show monthly spending balance
 ```
 
 5. รอ GitHub Actions `pages build and deployment` เป็นสีเขียว
 6. เปิด WebApp และกด Refresh
 7. บน iPhone ให้ปิดและเปิด PWA ใหม่ถ้า Cache ยังไม่เปลี่ยน
-8. ทดสอบตาม Checklist ด้วยจำนวน 1 บาทและลบข้อมูลทดสอบเมื่อเสร็จ
+8. เทียบยอดบนการ์ดกับ Balance ของ `บัญชีใช้จ่ายรายเดือน` ใน Google Sheet
 
-## 13. Rollback Plan
+## 14. Rollback Plan
 
-1. หยุดเพิ่ม แก้ และลบ Transaction
-2. Revert Commit v2.1.0 หรือ Replace ไฟล์ด้วย Backup v2.0.2
+1. Revert Commit v2.1.1 หรือ Replace 7 ไฟล์ที่แก้ด้วย Backup v2.1.0
 3. Deploy และรอ GitHub Pages เป็นสีเขียว
-4. ตรวจและ Reconcile ทุก Account กับยอดธนาคารจริง
-5. ระวังว่า v2.0.2 จะไม่ย้อนยอด Account เมื่อลบหรือแก้ Transaction ที่ v2.1.0 สร้าง
+4. ตรวจว่าการ์ดกลับไปแสดง Cash Flow เดือนนี้
+5. ระบบ Transaction และยอด Accounts ไม่ต้อง Reconcile จากการ Rollback รุ่นนี้ เพราะ v2.1.1 ไม่เขียนข้อมูลเพิ่ม
 
-การ Rollback Code ไม่ย้อนข้อมูลที่เขียนใน Google Sheet ระหว่างใช้ v2.1.0
+การ Rollback v2.1.1 ไม่มีผลต่อข้อมูลใน Google Sheet
 
-## 14. Checklist หลัง Deploy
+## 15. Checklist หลัง Deploy
 
 - [ ] GitHub Pages workflow สีเขียว
 - [ ] ปุ่ม Login ครั้งแรกทำงาน
@@ -276,5 +317,9 @@ feat: link transactions to account balances
 - [ ] Quick Reconnect ไม่ขอ consent ซ้ำโดยไม่จำเป็น
 - [ ] iPhone Safe Area และ Bottom Navigation ปกติ
 - [ ] Desktop layout ปกติ
-- [ ] Cache เปลี่ยนเป็น v2.1.0
+- [ ] Dashboard แสดง Balance ของ `บัญชีใช้จ่ายรายเดือน` ถูกต้อง
+- [ ] ข้อความใต้ยอดแสดง Expense จากบัญชีนี้ของเดือนปัจจุบันถูกต้อง
+- [ ] หน้ารายการแสดงยอดคงเหลือเท่ากับ Dashboard
+- [ ] กราฟ Cash Flow ยังแสดง Income/Expense ถูกต้อง
+- [ ] Cache เปลี่ยนเป็น v2.1.1
 - [ ] ลบข้อมูลทดสอบและตรวจยอด Account สุดท้าย

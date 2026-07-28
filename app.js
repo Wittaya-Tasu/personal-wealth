@@ -246,7 +246,7 @@
 
   function renderSignedOutState() {
     [
-      "netWorthValue", "cashFlowValue", "savingsRateValue", "emergencyMonthsValue",
+      "netWorthValue", "monthlySpendingBalanceValue", "savingsRateValue", "emergencyMonthsValue",
       "debtServiceValue", "totalAssetsCenter", "txIncomeSummary", "txExpenseSummary",
       "txBalanceSummary", "wealthAssetsSummary", "wealthLiabilitiesSummary", "wealthNetSummary"
     ].forEach((id) => setText(id, id === "emergencyMonthsValue" ? "— เดือน" : "฿—"));
@@ -284,9 +284,25 @@
     }
     qs("#netWorthChange").className = `hero-change ${changeClass}`;
 
-    setText("cashFlowValue", formatCurrency(vm.currentMonth.cashflow));
-    qs("#cashFlowValue").className = vm.currentMonth.cashflow < 0 ? "negative" : vm.currentMonth.cashflow > 0 ? "positive" : "";
-    setText("cashFlowDetail", `รายรับ ${formatCurrency(vm.currentMonth.income, true)} · รายจ่าย ${formatCurrency(vm.currentMonth.expense, true)}`);
+    const monthlySpending = vm.monthlySpending;
+    if (monthlySpending.status === "available") {
+      setText("monthlySpendingBalanceValue", formatCurrency(monthlySpending.balance));
+      qs("#monthlySpendingBalanceValue").className = monthlySpending.balance < 0
+        ? "negative"
+        : monthlySpending.balance > 0
+          ? "positive"
+          : "";
+      setText("monthlySpendingBalanceDetail", `ใช้จากบัญชีนี้เดือนนี้ ${formatCurrency(monthlySpending.expense, true)}`);
+    } else {
+      setText("monthlySpendingBalanceValue", "฿—");
+      qs("#monthlySpendingBalanceValue").className = "";
+      setText(
+        "monthlySpendingBalanceDetail",
+        monthlySpending.status === "duplicate"
+          ? "พบบัญชีใช้จ่ายรายเดือนซ้ำ"
+          : "ไม่พบบัญชีใช้จ่ายรายเดือน"
+      );
+    }
     setText("savingsRateValue", formatPercent(vm.savingsRate, 0));
     qs("#savingsRateBar").style.width = `${Math.max(0, Math.min((vm.savingsRate || 0) * 100, 100))}%`;
     setText("emergencyMonthsValue", vm.emergencyMonths === null ? "— เดือน" : `${vm.emergencyMonths.toFixed(1)} เดือน`);
@@ -488,9 +504,17 @@
     if (!vm) return;
     setText("txIncomeSummary", formatCurrency(vm.currentMonth.income));
     setText("txExpenseSummary", formatCurrency(vm.currentMonth.expense));
-    const budgetRemaining = vm.settings.monthly_budget - vm.currentMonth.expense;
-    setText("txBalanceSummary", vm.settings.monthly_budget > 0 ? formatCurrency(budgetRemaining) : "—");
-    qs("#txBalanceSummary").className = budgetRemaining < 0 ? "negative" : budgetRemaining > 0 ? "positive" : "";
+    const spendingBalance = vm.monthlySpending.status === "available"
+      ? vm.monthlySpending.balance
+      : null;
+    setText("txBalanceSummary", spendingBalance === null ? "—" : formatCurrency(spendingBalance));
+    qs("#txBalanceSummary").className = spendingBalance === null
+      ? ""
+      : spendingBalance < 0
+        ? "negative"
+        : spendingBalance > 0
+          ? "positive"
+          : "";
 
     const query = qs("#transactionSearch").value.trim().toLowerCase();
     const filter = qs("#transactionTypeFilter").value;
