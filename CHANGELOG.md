@@ -6,6 +6,44 @@
 
 - ยังไม่มีรายการ
 
+## [2.2.0] - 2026-07-28
+
+### Added
+
+- Goal แบบ `Financial` เลือกติดตามยอดแบบ Manual หรืออ่านจาก `Accounts.balance`
+- Goal แบบ `Milestone` สำหรับเป้าหมายที่ไม่วัดด้วยจำนวนเงิน พร้อมสถานะ Not Started, In Progress และ Completed
+- Header `goal_type`, `progress_source`, `linked_account`, `status` ต่อท้ายชีต Goals
+- คำเตือนเมื่อ Goals ยังไม่ได้ Migration หรือบัญชีที่ Goal อ้างถึงหาย/ชื่อซ้ำ
+- คู่มือ `GOALS_MIGRATION.md`
+
+### Changed
+
+- การ์ดภาระหนี้ต่อรายได้แสดง `0%` และ `ไม่มีภาระหนี้` เมื่อไม่มีหนี้ โดยไม่ต้องสร้างรายการหนี้ยอด 0
+- Account ที่ Goal แบบ Account อ้างถึงจะเปลี่ยนชื่อหรือลบไม่ได้จนกว่าจะย้าย/ยกเลิกการอ้างอิง
+- หัวข้อ Goals เปลี่ยนเป็น `เป้าหมายการเงินและชีวิต`
+- Static Assets ใช้ Version URL `v=2.2.0`
+- Service Worker cache เปลี่ยนเป็น `personal-wealth-shell-v2.2.0`
+
+### Fixed
+
+- แยกกรณี “ไม่มีหนี้” ออกจากกรณี “มีค่างวดแต่ยังไม่มีรายรับเดือนนี้”
+- Goal เดิมที่ไม่มี Metadata ใหม่ยังคำนวณเป็น Financial + Manual ตามเดิม
+- ป้องกัน PWA โหลด `index.html` และ JavaScript คนละรุ่นหลัง Deploy
+- การกำหนด class ของ KPI ใช้ Null-safe helper ลดความเสียหายเมื่อไฟล์ Static คนละรุ่น
+
+### Security
+
+- ไม่มี Client Secret, Access Token, Password หรือข้อมูลการเงินจริงเพิ่มใน Repository
+- Goal ที่ผูกบัญชีอ่านเฉพาะข้อมูลจาก Google Sheet ภายใต้ OAuth Scope เดิม
+- Service Worker ยังคงไม่ Cache Google Sheets API response
+
+### Known limitations
+
+- Goal หนึ่งรายการผูกได้หนึ่ง Account
+- Goal อ้างอิง Account ด้วย `account_name` ตามโครงสร้างปัจจุบัน
+- Milestone ยังไม่มี Checklist ย่อยหรือเปอร์เซ็นต์งาน
+- Google Sheets API ไม่มี Transaction แบบฐานข้อมูลระหว่างหลายชีต
+
 ## [2.1.1] - 2026-07-28
 
 ### Added

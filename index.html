@@ -7,16 +7,16 @@
   <meta name="color-scheme" content="dark">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="แดชบอร์ดติดตามกระแสเงินสด ทรัพย์สิน หนี้สิน การลงทุน และเป้าหมายทางการเงินส่วนบุคคล">
+  <meta name="description" content="แดชบอร์ดติดตามกระแสเงินสด ทรัพย์สิน หนี้สิน การลงทุน และเป้าหมายการเงินกับเป้าหมายชีวิต">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://sheets.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; img-src 'self' data:; manifest-src 'self'; worker-src 'self'">
   <title>Personal Wealth</title>
-  <link rel="manifest" href="manifest.json">
+  <link rel="manifest" href="manifest.json?v=2.2.0">
   <link rel="icon" href="icons/wealth-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=2.2.0">
 </head>
 <body>
   <svg class="svg-sprite" aria-hidden="true">
@@ -140,7 +140,7 @@
             <div class="section-heading">
               <div>
                 <p class="eyebrow">GOALS</p>
-                <h2>เป้าหมายทางการเงิน</h2>
+                <h2>เป้าหมายการเงินและชีวิต</h2>
               </div>
               <button class="text-button nav-shortcut" data-target="goals" type="button">ดูทั้งหมด</button>
             </div>
@@ -222,7 +222,7 @@
         <div class="view-header">
           <div>
             <p class="eyebrow">FINANCIAL PLAN</p>
-            <h2>เป้าหมายทางการเงิน</h2>
+            <h2>เป้าหมายการเงินและชีวิต</h2>
           </div>
           <button class="primary-button open-add" data-form="goal" type="button">
             <svg><use href="#i-plus"/></svg> เพิ่มเป้าหมาย
@@ -267,7 +267,7 @@
       <button type="button" data-form="account"><span class="action-icon cash">฿</span><strong>บัญชีเงิน</strong><small>เงินสดและเงินฝาก</small></button>
       <button type="button" data-form="asset"><span class="action-icon asset">◆</span><strong>ทรัพย์สิน</strong><small>บ้าน รถ และทรัพย์สินอื่น</small></button>
       <button type="button" data-form="liability"><span class="action-icon debt">−</span><strong>หนี้สิน</strong><small>ยอดหนี้และค่างวด</small></button>
-      <button type="button" data-form="goal"><span class="action-icon goal">◎</span><strong>เป้าหมาย</strong><small>ติดตามเงินที่ต้องการสะสม</small></button>
+      <button type="button" data-form="goal"><span class="action-icon goal">◎</span><strong>เป้าหมาย</strong><small>ติดตามเงิน บัญชี หรือ Milestone</small></button>
     </div>
   </aside>
 
@@ -324,9 +324,9 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="config.js"></script>
-  <script src="analytics.js"></script>
-  <script src="api.js"></script>
-  <script src="app.js"></script>
+  <script src="config.js?v=2.2.0"></script>
+  <script src="analytics.js?v=2.2.0"></script>
+  <script src="api.js?v=2.2.0"></script>
+  <script src="app.js?v=2.2.0"></script>
 </body>
 </html>

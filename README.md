@@ -1,20 +1,19 @@
-# Personal Wealth v2.1.1
+# Personal Wealth v2.2.0
 
-**Monthly Spending Balance** — WebApp/PWA ส่วนตัวสำหรับบันทึกรายรับ รายจ่าย การโอนเงิน ทรัพย์สิน หนี้สิน การลงทุน และเป้าหมายทางการเงิน โดยใช้ GitHub Pages เป็น Frontend และอ่าน–เขียน Google Sheet แบบ Private ผ่าน Google OAuth และ Google Sheets API v4 โดยตรง
+**Account-linked Goals** — WebApp/PWA ส่วนตัวสำหรับบันทึกรายรับ รายจ่าย การโอนเงิน ทรัพย์สิน หนี้สิน การลงทุน และเป้าหมายการเงินกับเป้าหมายชีวิต โดยใช้ GitHub Pages เป็น Frontend และอ่าน–เขียน Google Sheet แบบ Private ผ่าน Google OAuth และ Google Sheets API v4 โดยตรง
 
-## ความสามารถหลักของ v2.1.1
+## ความสามารถหลัก
 
-- การ์ดแรกบน Dashboard แสดงยอดคงเหลือจริงของ Account ชื่อ `บัญชีใช้จ่ายรายเดือน`
-- ข้อความใต้ยอดแสดง Expense เดือนปัจจุบันที่จ่ายจากบัญชีนี้
-- สรุป `งบใช้จ่ายคงเหลือ` ในหน้ารายการใช้ยอด Account เดียวกัน แทนสูตรงบประมาณลบรายจ่าย
-- Transaction ใหม่ปรับยอด `Accounts.balance` อัตโนมัติ
-- แก้ไขหรือลบ Transaction ที่สร้างโดย v2.1.0 แล้วย้อนผลเดิมก่อนใช้ผลใหม่
-- ป้องกันยอดบัญชีติดลบ ชื่อบัญชีซ้ำ และ Transfer เข้าบัญชีเดิม
-- ป้องกันการลบหรือเปลี่ยนชื่อ Account ที่ยังถูก Transaction อ้างถึง
-- เลือกบัญชีจากรายการ Accounts พร้อมแสดงยอดปัจจุบัน
-- Expense ใหม่เลือก `บัญชีใช้จ่ายรายเดือน` เป็นค่าเริ่มต้นเมื่อพบบัญชีชื่อนี้
-- Quick Reconnect ไม่บังคับขอ consent ทุกครั้ง
-- รักษา Cash Flow, Dashboard, PWA และ Safe Area เดิม
+- Income, Expense และ Transfer ปรับ `Accounts.balance` อัตโนมัติ
+- การแก้หรือลบ Transaction ที่สร้างตั้งแต่ v2.1.0 ย้อนผลเดิมก่อนใช้ผลใหม่
+- การ์ด `เงินใช้จ่ายคงเหลือ` อ่านยอดจริงจาก Account ชื่อ `บัญชีใช้จ่ายรายเดือน`
+- เมื่อไม่มีหนี้ การ์ด `ภาระหนี้ต่อรายได้` แสดง `0%` และ `ไม่มีภาระหนี้`
+- Goal เดิมยังใช้ยอด `current_amount` แบบกรอกเอง
+- Goal การเงินเลือกติดตามจาก `Accounts.balance` ได้ เช่น เลือก DIME สำหรับเงินสำรองฉุกเฉิน
+- Goal แบบ Milestone ใช้สถานะ `ยังไม่เริ่ม`, `กำลังดำเนินการ`, `สำเร็จแล้ว` โดยไม่สร้างเปอร์เซ็นต์เงินสมมติ
+- ป้องกันการเปลี่ยนชื่อหรือลบ Account ที่ Transaction หรือ Goal ยังอ้างถึง
+- Static Asset ใช้ Version URL `v=2.2.0` ลดปัญหา PWA โหลด HTML และ JavaScript คนละรุ่น
+- รักษา Quick Reconnect, PWA, iPhone Safe Area และ Theme เดิม
 
 ## สถาปัตยกรรม
 
@@ -27,8 +26,7 @@ iPhone / Browser
       +-- Google Sheet แบบ Private/Restricted
 ```
 
-- ไม่มี Backend ของแอป
-- ไม่ใช้ Google Apps Script
+- ไม่มี Backend ของแอปและไม่ใช้ Google Apps Script
 - ไม่มี Client Secret หรือ Refresh Token
 - Access Token เก็บใน `sessionStorage` เท่านั้น
 - Service Worker Cache เฉพาะ Static Assets และไม่ Cache Google API response
@@ -48,17 +46,15 @@ iPhone / Browser
 ├── README.md
 ├── PROJECT_STATE.md
 ├── CHANGELOG.md
+├── GOALS_MIGRATION.md
 └── icons/
-    ├── wealth-icon.svg
-    ├── icon-192.png
-    └── icon-512.png
 ```
 
 `script.js` แบบเดิมไม่ถูกใช้งาน
 
 ## โครงสร้าง Google Sheet
 
-v2.1.1 ไม่เปลี่ยนชื่อ Sheet หรือ Header
+v2.2.0 เปลี่ยนเฉพาะ Header ของ `Goals` โดยเพิ่ม 4 ช่องต่อท้าย ข้อมูลและ Header เดิมไม่ถูกลบหรือเปลี่ยนชื่อ
 
 | Sheet | Headers ตามลำดับ |
 |---|---|
@@ -67,109 +63,114 @@ v2.1.1 ไม่เปลี่ยนชื่อ Sheet หรือ Header
 | `Investments` | `investment_id`, `asset_name`, `category`, `units`, `avg_cost`, `current_price`, `current_value`, `tax_deductible`, `note` |
 | `Assets` | `asset_id`, `asset_name`, `category`, `purchase_price`, `estimated_value`, `note` |
 | `Liabilities` | `liability_id`, `liability_name`, `total_amount`, `monthly_payment`, `note` |
-| `Goals` | `goal_id`, `goal_name`, `target_amount`, `current_amount`, `deadline`, `note` |
+| `Goals` | `goal_id`, `goal_name`, `target_amount`, `current_amount`, `deadline`, `note`, `goal_type`, `progress_source`, `linked_account`, `status` |
 | `Categories` | `category_id`, `category_name`, `type`, `note` |
 | `MonthlySnapshots` | `snapshot_month`, `total_assets`, `total_liabilities`, `net_worth`, `monthly_cashflow`, `savings_rate`, `note` |
 | `Settings` | `key`, `value`, `description` |
 
-ชื่อ `account_name` ต้องไม่ซ้ำ เพราะ Transactions ยังเก็บชื่อบัญชีตามโครงสร้างเดิม
+ก่อน Deploy ให้ทำตาม [GOALS_MIGRATION.md](GOALS_MIGRATION.md) หากยังไม่เพิ่ม Header ระบบยังอ่าน Goal เดิมได้ แต่จะเตือนและไม่บันทึก Goal จนกว่า Header จะครบ
 
-## Opening Balance และจุดเริ่มใช้ v2.1.0
+ชื่อ `account_name` ต้องไม่ซ้ำ เพราะ Transactions และ Goals ยังเก็บชื่อบัญชีตามโครงสร้างเดิม
 
-ยอดในชีต `Accounts` ขณะ Deploy v2.1.0 ถือเป็น **Opening Balance**
-
-- ระบบไม่อ่าน Transactions เก่าเพื่อคำนวณยอด Accounts ย้อนหลัง
-- Transaction ที่สร้างจาก v2.1.0 จะมีตัวระบุใน `tx_id` เพื่อบอกว่าเป็นรายการที่เชื่อมกับ Accounts
-- Transaction เก่าก่อน v2.1.0 เป็น Legacy transaction และไม่ปรับยอด Accounts เมื่อแก้หรือลบ เพื่อป้องกันการนับอดีตซ้ำใน Opening Balance
-- หากต้องการเปลี่ยนข้อมูล Legacy transaction ให้ตรวจยอดธนาคารและ Reconcile Account หลังแก้ไข
-
-## วิธีใช้ Income / Expense / Transfer
-
-| Type | ช่องบัญชีที่ต้องเลือก | ผลต่อ Account | ผลต่อ Cash Flow |
-|---|---|---|---|
-| `Income` | เงินเข้าบัญชี (`account_to`) | เพิ่มยอดบัญชีปลายทาง | รายรับ |
-| `Expense` | จ่ายจากบัญชี (`account_from`) | ลดยอดบัญชีต้นทาง | รายจ่าย |
-| `Transfer` | จากบัญชีและเข้าบัญชี | ลดต้นทางและเพิ่มปลายทาง | ไม่นับเป็นรายรับ/รายจ่าย |
-
-กติกา:
-
-- จำนวนเงินต้องมากกว่า 0
-- เลือกได้เฉพาะชื่อที่มีจริงใน Accounts
-- Transfer ห้ามใช้บัญชีเดียวกันทั้งต้นทางและปลายทาง
-- ถ้ายอดต้นทางไม่พอ ระบบจะไม่บันทึก
-- การซื้อ RMF, ETF หรือย้ายเงินไปบัญชีลงทุนไม่ควรเป็น Expense หากเป็นการเปลี่ยนรูปสินทรัพย์
-
-### ตัวอย่างการแบ่งงบใช้จ่ายรายเดือน
-
-ตัวอย่างการแบ่งงบ 1,000 บาทจากบัญชีหลักไปใช้ประจำเดือน:
+## ภาระหนี้ต่อรายได้
 
 ```text
-Type: Transfer
-จากบัญชี: บัญชีหลัก
-เข้าบัญชี: บัญชีใช้จ่ายรายเดือน
-จำนวน: 1,000
+Debt Service Ratio = ค่างวดหนี้รวมต่อเดือน ÷ รายรับเดือนปัจจุบัน
 ```
 
-ผลคือบัญชีหลักลด 1,000 บาทและบัญชีใช้จ่ายรายเดือนเพิ่ม 1,000 บาท โดย Cash Flow ไม่ถือเป็นรายรับหรือรายจ่าย
+- ถ้า `Liabilities` ไม่มีรายการ หรือยอดหนี้และค่างวดรวมเป็น 0 จะแสดง `0%` และ `ไม่มีภาระหนี้`
+- ไม่ต้องสร้างรายการหนี้ชื่อ “ไม่มีหนี้” หรือรายการยอด 0
+- ถ้ามีหนี้และค่างวด แต่เดือนปัจจุบันยังไม่มี Income จะแสดง `—` เพราะยังไม่มีตัวหาร พร้อมแสดงค่างวดจริง
+- ถ้ามียอดหนี้แต่ค่างวดเป็น 0 อัตราภาระหนี้จะแสดง `0%` แต่รายการหนี้ยังคงอยู่ในหน้าความมั่งคั่ง
 
-เมื่อบันทึก Expense ใหม่ แอปจะเลือก `บัญชีใช้จ่ายรายเดือน` เป็นค่าเริ่มต้นถ้ามีชื่อนี้ แต่ผู้ใช้เปลี่ยนเป็นบัญชีอื่นได้
+## เป้าหมายการเงินและเป้าหมายชีวิต
 
-## เงินใช้จ่ายคงเหลือบน Dashboard
+แนวทางวางแผนการเงินไม่ได้มีเพียงการสะสมเงิน เป้าหมายในระบบแบ่งเป็น 2 รูปแบบ:
 
-ยอด `เงินใช้จ่ายคงเหลือ` คือ `Accounts.balance` ปัจจุบันของ Account ที่มีชื่อดังนี้:
+| รูปแบบ | เหมาะกับ | วิธีติดตาม |
+|---|---|---|
+| เป้าหมายการเงิน | เงินสำรองฉุกเฉิน เกษียณ บ้าน การศึกษา ท่องเที่ยว ลดหนี้ | กรอกยอดสะสมเอง หรืออ่านยอดจาก Account |
+| เป้าหมายชีวิต / Milestone | จัดทำพินัยกรรม ทบทวนประกัน พัฒนาทักษะ ตรวจสุขภาพ วางแผนภาษี | สถานะ ยังไม่เริ่ม / กำลังดำเนินการ / สำเร็จแล้ว |
 
-```text
-บัญชีใช้จ่ายรายเดือน
-```
+หมวดเป้าหมายที่ใช้ในการวางแผนสากลมักครอบคลุม:
+
+- สภาพคล่องและเงินสำรองฉุกเฉิน
+- เกษียณและอิสรภาพทางการเงิน
+- การลดหนี้
+- บ้านและทรัพย์สินสำคัญ
+- การศึกษาและพัฒนาทักษะ
+- สุขภาพและความคุ้มครอง
+- ครอบครัวและผู้พึ่งพิง
+- ภาษี เอกสารสำคัญ และมรดก
+- ประสบการณ์และคุณภาพชีวิต
+
+### Goal แบบกรอกยอดเอง
+
+1. เลือก `เป้าหมายการเงิน`
+2. ใส่เงินเป้าหมาย
+3. เลือก `กรอกยอดสะสมเอง`
+4. อัปเดตช่อง `สะสมแล้ว` ตามต้องการ
+
+### Goal ที่ผูกกับ Account
+
+1. เลือก `เป้าหมายการเงิน`
+2. ใส่เงินเป้าหมาย
+3. เลือก `ยอดคงเหลือในบัญชี`
+4. เลือก Account เช่น `DIME`
+
+ระบบใช้ `Accounts.balance` ปัจจุบันของ DIME เป็นยอดสะสมในการแสดงผล โดยไม่เขียนทับยอด Account และไม่ใช้ `current_amount` ในการคำนวณขณะยังผูกบัญชีอยู่
 
 ตัวอย่าง:
 
-| รายการ | ผลต่อยอด |
-|---|---:|
-| Transfer งบเข้าบัญชีใช้จ่ายรายเดือน 1,000 บาท | +1,000 |
-| Expense จากบัญชีนี้ 600 บาท | -600 |
-| เงินใช้จ่ายคงเหลือที่แสดง | 400 |
+```text
+ชื่อ: เงินสำรองฉุกเฉิน
+เงินเป้าหมาย: 600,000
+ติดตามจาก: ยอดคงเหลือในบัญชี
+บัญชีอ้างอิง: DIME
+```
 
-ยอดนี้เป็นเงินที่ใช้ได้จริงใน Account จึงรวมเงินคงเหลือยกมาจากเดือนก่อนด้วย และไม่รีเซ็ตอัตโนมัติเมื่อขึ้นเดือนใหม่ การเติมงบเดือนใหม่ให้ใช้ `Transfer` จากบัญชีหลักเข้าบัญชีนี้
+ถ้า DIME มี 150,000 บาท ระบบแสดงความคืบหน้า 25%
 
-ข้อความใต้ยอดนับเฉพาะ Expense ของเดือนปัจจุบันที่มี `account_from` เป็น `บัญชีใช้จ่ายรายเดือน` เท่านั้น Expense จาก Account อื่นยังอยู่ใน Cash Flow แต่ไม่ถูกรวมในข้อความนี้
+### Goal แบบ Milestone
 
-ถ้าไม่พบ Account นี้หรือพบชื่อซ้ำ แอปจะแสดง `฿—` พร้อมคำเตือน โดยไม่เดาเลือก Account ให้เอง
+เลือก `เป้าหมายชีวิต / Milestone` แล้วระบุสถานะและกำหนดวัน เช่น:
 
-## การแก้ไขและลบ Transaction
+- จัดทำพินัยกรรม — กำลังดำเนินการ
+- ทบทวนความคุ้มครองประกันประจำปี — ยังไม่เริ่ม
+- เรียนหลักสูตรการลงทุนให้จบ — สำเร็จแล้ว
 
-สำหรับ Transaction ที่สร้างโดย v2.1.0:
+ระบบไม่แปลง Milestone เป็นจำนวนเงินหรือเปอร์เซ็นต์สมมติ
 
-1. ระบบคำนวณผลย้อนกลับของรายการเดิม
-2. ตรวจว่าผลลัพธ์สุดท้ายไม่ทำให้ Account ใดติดลบ
-3. อัปเดตยอด Accounts แบบ batch
-4. แก้ไขหรือลบแถว Transaction
-5. หากขั้นตอน Transaction ล้มเหลว ระบบพยายามคืนยอด Accounts เดิม
+## Opening Balance และ Account-linked Transactions
 
-หาก rollback ล้มเหลว แอปจะแจ้งชัดเจนว่าข้อมูลอาจไม่ตรงกัน ให้หยุดทำรายการและ Reconcile ก่อน
+ยอดใน `Accounts` ขณะเริ่มใช้ v2.1.0 ถือเป็น Opening Balance
 
-Google Sheets API ไม่ใช่ฐานข้อมูล Transactional จึงไม่สามารถรับประกัน atomic transaction ระหว่างการแก้ยอด Accounts กับการเพิ่ม/แก้/ลบแถว Transactions ได้ 100%
+- ระบบไม่อ่าน Transactions เก่าเพื่อคำนวณยอด Accounts ย้อนหลัง
+- Transaction ใหม่ตั้งแต่ v2.1.0 มี `tx_id` ขึ้นต้น `v21-`
+- Legacy transaction ไม่ปรับ Opening Balance เมื่อแก้หรือลบ
+- Income เพิ่ม `account_to`
+- Expense ลด `account_from`
+- Transfer ลดต้นทางและเพิ่มปลายทาง โดยไม่นับเป็น Income/Expense
+- ถ้ายอดต้นทางไม่พอ ระบบไม่บันทึก
+
+การเติมงบรายเดือนให้ใช้ Transfer จากบัญชีหลักไป `บัญชีใช้จ่ายรายเดือน`
 
 ## การเพิ่ม แก้ไข และลบ Account
 
-- เพิ่ม Account ได้เมื่อชื่อไม่ซ้ำ
-- เปลี่ยน `account_name` ไม่ได้ถ้ามี Transaction อ้างถึงชื่อเดิม
-- ลบ Account ไม่ได้ถ้ามี Transaction อ้างถึง
-- แก้ `balance` โดยตรงได้เพื่อ Reconcile
-- การแก้ balance โดยตรงไม่เรียก Transaction automation
+- ชื่อ Account ต้องไม่ซ้ำ
+- เปลี่ยนชื่อหรือลบ Account ไม่ได้เมื่อ Transaction หรือ Goal แบบ Account ยังอ้างถึง
+- หากต้องการเปลี่ยนชื่อ ให้แก้ Goal ไปใช้บัญชีอื่นหรือเปลี่ยนเป็น Manual ก่อน
+- แก้ `balance` โดยตรงได้เพื่อ Reconcile และไม่กระตุ้น Transaction automation
 
 ## Reconcile กับยอดธนาคารจริง
 
-ควรตรวจเป็นประจำหรือเมื่อแอปแจ้ง rollback failure:
-
 1. เปิดยอดจริงจากธนาคาร
 2. ไปที่ `ความมั่งคั่ง > บัญชีเงิน`
-3. เลือกแก้ Account
-4. ใส่ `ยอดคงเหลือ` ให้ตรงกับยอดจริง
+3. แก้ `ยอดคงเหลือ` ให้ตรงกับยอดจริง
+4. ระบุเหตุผลใน `note`
 5. บันทึกและกด Refresh
-6. หากมีความต่าง ให้ตรวจ Transaction ล่าสุดก่อนสร้างรายการชดเชย
 
-อย่าสร้าง Income/Expense ปลอมเพื่อให้ยอดตรง หากเป็นเพียงการแก้ Opening Balance หรือแก้ความคลาดเคลื่อน ให้แก้ balance โดยตรงและใส่เหตุผลใน `note`
+อย่าสร้าง Income/Expense ปลอมเพื่อแก้ Opening Balance หรือความคลาดเคลื่อน
 
 ## Net Worth และ Investments
 
@@ -178,80 +179,75 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 ```
 
 - ผู้ใช้ย้ายเงินสดออกจาก Investments ไป Account แล้ว
-- ตั้งค่า `include_accounts_in_net_worth = true` ในชีต Settings แล้ว
+- ตั้งค่า `include_accounts_in_net_worth = true` แล้ว
 - Investments ยังคงเป็นมูลค่าที่ผู้ใช้อัปเดตเอง
-- v2.1.0 ไม่สร้าง `InvestmentTransactions` และไม่แก้มูลค่า Investments อัตโนมัติ
-- สูตร Emergency Fund ไม่เปลี่ยน
+- ไม่มี `InvestmentTransactions` และไม่แก้มูลค่า Investments อัตโนมัติ
+- สูตร Emergency Fund เดิมไม่เปลี่ยน
 
 ## OAuth และ Quick Reconnect
 
-- การเชื่อมต่อเกิดจากการกดปุ่มของผู้ใช้เท่านั้น
-- แอปใช้ `prompt` ว่างในการเชื่อมต่อทั่วไป เพื่อลดการขอ consent ซ้ำ
-- Google ยังอาจแสดงหน้าบัญชีหรือ consent เมื่อเป็นครั้งแรก สิทธิ์ถูกถอน หรือนโยบาย Google กำหนด
-- เมื่อ Token หมดอายุ แอปจะแสดงปุ่ม `แตะเพื่อเชื่อมต่อ Google`
-- ไม่มี Refresh Token และไม่มี PIN ที่ใช้แทน Google OAuth
-- Logout จะ revoke Token; การหมดอายุทั่วไปเพียงล้าง Token ใน session
+- การเชื่อมต่อเกิดจากการกดปุ่มของผู้ใช้
+- ใช้ `prompt` ว่างในการเชื่อมต่อทั่วไปเพื่อลด consent ซ้ำ
+- เมื่อ Token หมดอายุจะแสดง `แตะเพื่อเชื่อมต่อ Google`
+- ไม่มี Refresh Token และไม่มี PIN แทน Google OAuth
+- ไม่ต้องเปลี่ยน Google Cloud configuration สำหรับ v2.2.0
 
-## การรักษาความปลอดภัย
+## ความปลอดภัย
 
 - Google Sheet ต้องเป็น Private/Restricted
 - ห้ามใส่ Client Secret, Access Token, Password หรือข้อมูลการเงินจริงใน Repository
-- `GOOGLE_CLIENT_ID` และ `SPREADSHEET_ID` เป็น Identifier และคงค่าเดิมใน v2.1.1
+- `GOOGLE_CLIENT_ID` และ `SPREADSHEET_ID` ไม่เปลี่ยน
 - Service Worker ไม่ Cache Google Sheets API
-- GAS deployments เดิมต้องคงสถานะ Archived
-- การลบข้อมูลมีหน้าต่างยืนยัน
+- GAS deployments เดิมต้องคง Archived
+- Goal ที่ผูกบัญชีเป็นเพียงการอ่านยอดจากข้อมูลที่ OAuth อนุญาตอยู่แล้ว
 
 ## วิธี Deploy
 
 1. สำรอง Google Sheet และ Repository รุ่นปัจจุบัน
-2. ดาวน์โหลด `personal-wealth-v2.1.1.zip`
-3. แตก ZIP และอัปโหลดไฟล์ภายในไปที่ Root ของ Repository
-4. Replace ไฟล์ชื่อเดิม และเพิ่ม `CHANGELOG.md`
-5. Commit ด้วยข้อความ:
+2. ทำ Migration ชีต Goals ตาม `GOALS_MIGRATION.md`
+3. ดาวน์โหลด `personal-wealth-v2.2.0.zip`
+4. แตก ZIP แล้ว Replace ไฟล์ใน Root ของ Repository
+5. Commit:
 
 ```text
-feat: show monthly spending balance
+feat: add account-linked goals and debt clarity
 ```
 
 6. รอ GitHub Actions `pages build and deployment` เป็นสีเขียว
-7. เปิด WebApp แล้วกด Refresh
-8. บน iPhone ให้ปิดแล้วเปิด PWA ใหม่หากยังเห็น Cache เดิม
-9. ทดสอบด้วยข้อมูลทดสอบ 1 บาทตาม Checklist ใน `PROJECT_STATE.md`
+7. ปิด WebApp/PWA ทุกหน้าต่าง แล้วเปิดใหม่
+8. กด Refresh และทดสอบตาม `PROJECT_STATE.md`
 
 ## วิธี Rollback
 
-1. หยุดเพิ่ม แก้ หรือลบ Transaction
-2. Revert Commit v2.1.1 หรือ Replace ไฟล์ที่แก้ด้วยไฟล์ v2.1.0 ที่สำรองไว้
-3. Deploy และรอ GitHub Pages เป็นสีเขียว
-4. ตรวจยอด Accounts กับธนาคารจริงและ Reconcile ด้วยตนเอง
-5. ตรวจว่าการ์ดกลับไปแสดง Cash Flow ของ v2.1.0 และระบบ Transaction ยังทำงานตามเดิม
+1. หยุดแก้ Goal ชั่วคราว
+2. Revert Commit v2.2.0 หรือ Replace Code ด้วย Backup v2.1.1
+3. Header ใหม่ 4 ช่องใน Goals สามารถคงไว้ได้ เพราะ v2.1.1 จะเพิกเฉย
+4. รอ Deploy และเปิดแอปใหม่
 
-การ Rollback v2.1.1 ไม่เปลี่ยนยอด Accounts หรือ Transactions เพราะรุ่นนี้เปลี่ยนเฉพาะการอ่านและแสดงผล
+Rollback Code ไม่เปลี่ยนยอด Accounts, Transactions หรือ Investments และไม่ต้องลบ Header ใหม่
 
 ## การแก้ปัญหา
 
 | อาการ | สิ่งที่ต้องตรวจ |
 |---|---|
-| พบชื่อบัญชีซ้ำ | แก้ `account_name` ใน Accounts ให้ไม่ซ้ำ |
-| ไม่พบบัญชีในฟอร์ม | เพิ่มบัญชีใน Accounts แล้วกด Refresh |
-| ยอดเงินไม่พอ | ตรวจยอด Account หรือ Reconcile กับธนาคาร |
-| เปลี่ยนชื่อ/ลบบัญชีไม่ได้ | มี Transaction อ้างถึงชื่อบัญชี |
+| Goal รุ่นใหม่บันทึกไม่ได้ | เพิ่ม Header `goal_type`, `progress_source`, `linked_account`, `status` ต่อท้าย Goals |
+| Goal ผูกบัญชีแสดงตรวจสอบบัญชี | ตรวจ `linked_account` และชื่อ Account; ชื่อต้องไม่ซ้ำ |
+| เปลี่ยนชื่อ/ลบ Account ไม่ได้ | มี Transaction หรือ Goal อ้างถึงบัญชี |
+| ภาระหนี้แสดง `—` | มีค่างวดแต่ยังไม่มี Income เดือนปัจจุบัน |
+| หน้าเว็บยังเป็นรุ่นเก่า | รอ Deploy, ปิด PWA แล้วเปิดใหม่ หรือ Clear site data |
 | สิทธิ์หมดอายุ | กด `แตะเพื่อเชื่อมต่อ Google` |
-| Google แจ้ง `origin_mismatch` | Origin ต้องเป็น `https://wittaya-tasu.github.io` |
-| Login ได้แต่อ่านชีตไม่ได้ | บัญชี Google ต้องมีสิทธิ์แก้ไข Spreadsheet |
-| หน้าเว็บยังเป็นรุ่นเก่า | รอ Deploy แล้ว Refresh หรือเปิด PWA ใหม่ |
-| แจ้ง rollback ไม่สำเร็จ | หยุดทำรายการและ Reconcile ทุก Account ที่เกี่ยวข้อง |
-| เงินใช้จ่ายคงเหลือเป็น `฿—` | ตรวจว่ามี Account ชื่อ `บัญชีใช้จ่ายรายเดือน` เพียงรายการเดียว |
+| แจ้ง rollback ไม่สำเร็จ | หยุดทำรายการและ Reconcile Accounts ที่เกี่ยวข้อง |
 
-## ข้อจำกัดที่ยังเหลือ
+## ข้อจำกัด
 
-- ไม่มี Database transaction ข้าม Accounts และ Transactions
-- ไม่มีระบบหลายผู้ใช้หรือป้องกันการแก้พร้อมกันจากหลายอุปกรณ์
-- Legacy transactions ไม่เชื่อมกับ Accounts
+- Google Sheets API ไม่มี Database transaction ข้ามชีต
+- ไม่มีระบบหลายผู้ใช้หรือป้องกันการแก้พร้อมกันหลายอุปกรณ์
+- Goal ผูกบัญชีอ้างอิงด้วย `account_name` ไม่ใช่ `account_id`
+- Goal หนึ่งรายการผูกได้หนึ่ง Account ใน v2.2.0
+- Milestone มีสถานะ 3 ระดับและไม่มีรายการงานย่อย
+- Legacy transactions ไม่เชื่อม Accounts
 - Investments ต้องอัปเดตมูลค่าด้วยตนเอง
-- ไม่มีระบบซื้อขายหุ้น RMF/PVD หรือราคาตลาด
-- ไม่มี Refresh Token หรือการเชื่อมต่อแบบถาวร
-- เงินใช้จ่ายคงเหลืออ้างอิงชื่อ Account แบบตายตัว `บัญชีใช้จ่ายรายเดือน`
+- ไม่มี Refresh Token
 
 ## เอกสารอ้างอิง
 

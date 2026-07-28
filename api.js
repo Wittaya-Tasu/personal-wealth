@@ -5,6 +5,7 @@
   const SHEETS_API_BASE = "https://sheets.googleapis.com/v4/spreadsheets";
   const LINKED_TRANSACTION_PREFIX = "v21-";
   const MONEY_PRECISION = 100;
+  const GOAL_METADATA_HEADERS = ["goal_type", "progress_source", "linked_account", "status"];
 
   function waitFor(predicate, timeoutMs = 15000) {
     return new Promise((resolve, reject) => {
@@ -67,6 +68,26 @@
     if (["expense", "รายจ่าย"].includes(type)) return "expense";
     if (["transfer", "โอน", "โอนเงิน"].includes(type)) return "transfer";
     return "";
+  }
+
+  function normalizeGoalType(value) {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    if (["milestone", "life", "ชีวิต", "หมุดหมาย"].includes(normalized)) return "Milestone";
+    return "Financial";
+  }
+
+  function normalizeGoalProgressSource(value) {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    return ["account", "บัญชี"].includes(normalized) ? "Account" : "Manual";
+  }
+
+  function normalizeGoalStatus(value) {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    if (["completed", "complete", "done", "สำเร็จ", "เสร็จสิ้น"].includes(normalized)) return "Completed";
+    if (["in progress", "in_progress", "progress", "กำลังทำ", "กำลังดำเนินการ"].includes(normalized)) {
+      return "In Progress";
+    }
+    return "Not Started";
   }
 
   function parseUpdatedRow(range) {
@@ -249,6 +270,15 @@
       return headers;
     }
 
+    getMissingHeaders(sheetName, requiredHeaders) {
+      const headers = this.getHeaders(sheetName);
+      return (requiredHeaders || []).filter((header) => !headers.includes(header));
+    }
+
+    getMissingGoalMetadataHeaders() {
+      return this.getMissingHeaders(this.config.SHEETS.goals, GOAL_METADATA_HEADERS);
+    }
+
     buildRow(sheetName, record) {
       return this.getHeaders(sheetName).map((header) => {
         if (header.endsWith("_id") && !record[header]) return createShortId();
@@ -350,11 +380,30 @@
       return account;
     }
 
-    isAccountReferenced(name) {
+    isAccountReferencedByTransaction(name) {
       const key = accountKey(name);
       return (this.currentData?.transactions || []).some((transaction) => {
         return accountKey(transaction.account_from) === key || accountKey(transaction.account_to) === key;
       });
+    }
+
+    isAccountReferencedByGoal(name) {
+      const key = accountKey(name);
+      return (this.currentData?.goals || []).some((goal) => {
+        const source = normalizeGoalProgressSource(goal.progress_source);
+        return source === "Account" && accountKey(goal.linked_account) === key;
+      });
+    }
+
+    isAccountReferenced(name) {
+      return this.isAccountReferencedByTransaction(name) || this.isAccountReferencedByGoal(name);
+    }
+
+    accountReferenceLabel(name) {
+      const references = [];
+      if (this.isAccountReferencedByTransaction(name)) references.push("Transaction");
+      if (this.isAccountReferencedByGoal(name)) references.push("Goal");
+      return references.join(" และ ") || "ข้อมูลอื่น";
     }
 
     validateAccountRecord(record, existingRecord = null) {
@@ -375,7 +424,8 @@
 
       const oldName = normalizeName(existingRecord?.account_name);
       if (oldName && accountKey(oldName) !== accountKey(name) && this.isAccountReferenced(oldName)) {
-        const error = new Error(`เปลี่ยนชื่อบัญชี “${oldName}” ไม่ได้ เพราะมี Transaction อ้างถึงชื่อนี้อยู่`);
+        const referenceLabel = this.accountReferenceLabel(oldName);
+        const error = new Error(`เปลี่ยนชื่อบัญชี “${oldName}” ไม่ได้ เพราะมี ${referenceLabel} อ้างถึงชื่อนี้อยู่`);
         error.code = "ACCOUNT_NAME_REFERENCED";
         throw error;
       }
@@ -400,11 +450,83 @@
       const account = this.getAccountRows().find((row) => row._rowNumber === rowNumber);
       if (!account) throw new Error("ไม่พบบัญชีที่ต้องการลบ");
       if (this.isAccountReferenced(account.account_name)) {
-        const error = new Error(`ลบบัญชี “${account.account_name}” ไม่ได้ เพราะยังมี Transaction อ้างถึงบัญชีนี้`);
+        const referenceLabel = this.accountReferenceLabel(account.account_name);
+        const error = new Error(`ลบบัญชี “${account.account_name}” ไม่ได้ เพราะยังมี ${referenceLabel} อ้างถึงบัญชีนี้`);
         error.code = "ACCOUNT_REFERENCED";
         throw error;
       }
       return this.delete(this.config.SHEETS.accounts, rowNumber);
+    }
+
+    validateGoalRecord(record) {
+      const missingHeaders = this.getMissingGoalMetadataHeaders();
+      if (missingHeaders.length) {
+        const error = new Error(
+          `ชีต Goals ยังขาด Header: ${missingHeaders.join(", ")} `
+          + "กรุณาเพิ่ม Header ต่อท้ายแถวที่ 1 ก่อนบันทึกเป้าหมายรุ่นนี้"
+        );
+        error.code = "GOAL_SCHEMA_MIGRATION_REQUIRED";
+        error.missingHeaders = missingHeaders;
+        throw error;
+      }
+
+      const goalName = normalizeName(record?.goal_name);
+      if (!goalName) throw new Error("กรุณาระบุชื่อเป้าหมาย");
+      const goalType = normalizeGoalType(record?.goal_type);
+      const validated = {
+        ...record,
+        goal_name: goalName,
+        goal_type: goalType
+      };
+
+      if (goalType === "Milestone") {
+        validated.target_amount = "";
+        validated.current_amount = "";
+        validated.progress_source = "Status";
+        validated.linked_account = "";
+        validated.status = normalizeGoalStatus(record?.status);
+        return validated;
+      }
+
+      const targetAmount = roundMoney(record?.target_amount);
+      if (!(targetAmount > 0)) {
+        const error = new Error("เงินเป้าหมายต้องมากกว่า 0 บาท");
+        error.code = "INVALID_GOAL_TARGET";
+        throw error;
+      }
+      const progressSource = normalizeGoalProgressSource(record?.progress_source);
+      validated.target_amount = targetAmount;
+      validated.progress_source = progressSource;
+      validated.status = "";
+
+      if (progressSource === "Account") {
+        const account = this.findAccountByName(record?.linked_account);
+        validated.linked_account = normalizeName(account.account_name);
+        validated.current_amount = record?.current_amount ?? "";
+      } else {
+        const currentAmount = roundMoney(record?.current_amount);
+        if (currentAmount < 0) {
+          const error = new Error("ยอดสะสมต้องไม่ติดลบ");
+          error.code = "INVALID_GOAL_CURRENT";
+          throw error;
+        }
+        validated.current_amount = currentAmount;
+        validated.linked_account = "";
+      }
+      return validated;
+    }
+
+    async appendGoal(record) {
+      const validated = this.validateGoalRecord(record);
+      return this.append(this.config.SHEETS.goals, validated);
+    }
+
+    async updateGoalRecord(rowNumber, existingRecord, record) {
+      const validated = this.validateGoalRecord({
+        ...existingRecord,
+        ...record
+      });
+      return this.update(this.config.SHEETS.goals, rowNumber, validated);
     }
 
     validateTransactionAccounts(record) {

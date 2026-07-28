@@ -747,6 +747,33 @@ svg {
   font-weight: 600;
 }
 
+.goal-topline .goal-status {
+  padding: 3px 8px;
+  background: rgba(145, 164, 155, 0.08);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.goal-topline .goal-status.is-completed {
+  background: var(--green-soft);
+  border-color: rgba(69, 209, 139, 0.18);
+  color: var(--green);
+}
+
+.goal-topline .goal-status.is-in_progress {
+  background: var(--gold-soft);
+  border-color: rgba(226, 196, 109, 0.18);
+  color: var(--gold);
+}
+
+.goal-topline .goal-status.is-warning {
+  background: var(--red-soft);
+  border-color: rgba(255, 116, 111, 0.18);
+  color: var(--red);
+}
+
 .goal-meta {
   display: flex;
   justify-content: space-between;
@@ -1086,6 +1113,26 @@ svg {
 .data-form {
   display: grid;
   gap: 14px;
+}
+
+.data-form [hidden] {
+  display: none !important;
+}
+
+[data-goal-financial-fields] {
+  display: grid;
+  gap: 14px;
+}
+
+.form-warning {
+  margin: 0;
+  padding: 11px 13px;
+  background: rgba(226, 196, 109, 0.1);
+  border: 1px solid rgba(226, 196, 109, 0.22);
+  border-radius: 12px;
+  color: var(--gold);
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .field {

@@ -1,13 +1,14 @@
-const CACHE_NAME = "personal-wealth-shell-v2.1.1";
+const APP_VERSION = "2.2.0";
+const CACHE_NAME = `personal-wealth-shell-v${APP_VERSION}`;
 const STATIC_ASSETS = [
   "./",
   "./index.html",
-  "./style.css",
-  "./config.js",
-  "./analytics.js",
-  "./api.js",
-  "./app.js",
-  "./manifest.json",
+  `./style.css?v=${APP_VERSION}`,
+  `./config.js?v=${APP_VERSION}`,
+  `./analytics.js?v=${APP_VERSION}`,
+  `./api.js?v=${APP_VERSION}`,
+  `./app.js?v=${APP_VERSION}`,
+  `./manifest.json?v=${APP_VERSION}`,
   "./icons/wealth-icon.svg",
   "./icons/icon-192.png",
   "./icons/icon-512.png"

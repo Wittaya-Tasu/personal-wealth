@@ -6,6 +6,10 @@
   const TRANSFER_TYPES = new Set(["transfer", "โอน", "โอนเงิน"]);
   const COLORS = ["#45d18b", "#e2c46d", "#68a7ff", "#b594f6", "#f4a65a", "#ff746f", "#91a49b"];
   const MONTHLY_SPENDING_ACCOUNT_NAME = "บัญชีใช้จ่ายรายเดือน";
+  const FINANCIAL_GOAL_TYPES = new Set(["financial", "finance", "การเงิน"]);
+  const MILESTONE_GOAL_TYPES = new Set(["milestone", "life", "ชีวิต", "หมุดหมาย"]);
+  const ACCOUNT_PROGRESS_SOURCES = new Set(["account", "บัญชี"]);
+  const COMPLETED_GOAL_STATUSES = new Set(["completed", "complete", "done", "สำเร็จ", "เสร็จสิ้น"]);
 
   function toNumber(value) {
     if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -55,6 +59,29 @@
 
   function normalizeAccountName(value) {
     return String(value || "").trim().toLocaleLowerCase("th-TH");
+  }
+
+  function normalizeGoalType(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (MILESTONE_GOAL_TYPES.has(normalized)) return "milestone";
+    if (FINANCIAL_GOAL_TYPES.has(normalized)) return "financial";
+    return "financial";
+  }
+
+  function normalizeGoalProgressSource(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    return ACCOUNT_PROGRESS_SOURCES.has(normalized) ? "account" : "manual";
+  }
+
+  function normalizeGoalStatus(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (COMPLETED_GOAL_STATUSES.has(normalized)) {
+      return { value: "completed", label: "สำเร็จแล้ว" };
+    }
+    if (["in progress", "in_progress", "progress", "กำลังทำ", "กำลังดำเนินการ"].includes(normalized)) {
+      return { value: "in_progress", label: "กำลังดำเนินการ" };
+    }
+    return { value: "not_started", label: "ยังไม่เริ่ม" };
   }
 
   function sum(rows, selector) {
@@ -203,19 +230,58 @@
       .sort((a, b) => a.date - b.date);
   }
 
-  function buildGoalRows(goals) {
+  function buildGoalRows(goals, accounts = []) {
+    const accountMatches = new Map();
+    (accounts || []).forEach((account) => {
+      const key = normalizeAccountName(account.account_name);
+      if (!key) return;
+      if (!accountMatches.has(key)) accountMatches.set(key, []);
+      accountMatches.get(key).push(account);
+    });
+
     return (goals || [])
       .map((row) => {
+        const goalType = normalizeGoalType(row.goal_type);
+        const isMilestone = goalType === "milestone";
+        const progressSource = isMilestone
+          ? "status"
+          : normalizeGoalProgressSource(row.progress_source);
         const target = Math.max(0, toNumber(row.target_amount));
-        const current = Math.max(0, toNumber(row.current_amount));
+        let current = Math.max(0, toNumber(row.current_amount));
+        let linkedAccount = null;
+        let trackingError = "";
+
+        if (!isMilestone && progressSource === "account") {
+          const accountName = String(row.linked_account || "").trim();
+          const matches = accountMatches.get(normalizeAccountName(accountName)) || [];
+          if (!accountName || matches.length === 0) {
+            trackingError = `ไม่พบบัญชีที่ผูกกับเป้าหมาย “${row.goal_name || "ไม่ระบุชื่อ"}”`;
+          } else if (matches.length > 1) {
+            trackingError = `พบบัญชีชื่อ “${accountName}” ซ้ำ จึงคำนวณเป้าหมายไม่ได้`;
+          } else {
+            linkedAccount = matches[0];
+            current = Math.max(0, toNumber(linkedAccount.balance));
+          }
+        }
+
+        const status = normalizeGoalStatus(row.status);
         const deadline = parseDate(row.deadline);
         return {
           ...row,
+          goalType,
+          isMilestone,
+          progressSource,
+          linkedAccount,
+          trackingError,
+          status: status.value,
+          statusLabel: status.label,
           target,
           current,
           deadline,
-          percentage: target > 0 ? Math.min(current / target, 1) : 0,
-          remaining: Math.max(target - current, 0)
+          percentage: isMilestone || trackingError || target <= 0
+            ? null
+            : Math.min(current / target, 1),
+          remaining: isMilestone ? null : Math.max(target - current, 0)
         };
       })
       .sort((a, b) => {
@@ -226,7 +292,7 @@
       });
   }
 
-  function buildWarnings(data, settings, snapshots, monthly) {
+  function buildWarnings(data, settings, snapshots, monthly, goals = []) {
     const warnings = [];
     const accountCash = sum(data.accounts, (row) => row.balance);
     const investmentCash = sum((data.investments || []).filter(isCashInvestment), getInvestmentValue);
@@ -250,6 +316,11 @@
       const overBudget = monthly.at(-1).expense - settings.monthly_budget;
       warnings.push(`รายจ่ายเดือนนี้เกินงบที่ตั้งไว้ ${new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(overBudget)}`);
     }
+    goals.forEach((goal) => {
+      if (goal.trackingError && !warnings.includes(goal.trackingError)) {
+        warnings.push(goal.trackingError);
+      }
+    });
     return warnings;
   }
 
@@ -305,7 +376,12 @@
     };
     const savingsRate = currentMonth.income > 0 ? currentMonth.cashflow / currentMonth.income : null;
     const debtPayments = sum(safeData.liabilities, (row) => row.monthly_payment);
-    const debtServiceRatio = currentMonth.income > 0 ? debtPayments / currentMonth.income : null;
+    const hasDebt = liabilities > 0 || debtPayments > 0;
+    const debtServiceRatio = debtPayments === 0
+      ? 0
+      : currentMonth.income > 0
+        ? debtPayments / currentMonth.income
+        : null;
 
     const cashInvestments = sum(safeData.investments.filter(isCashInvestment), getInvestmentValue);
     const cashAccounts = settings.include_accounts_in_net_worth
@@ -330,7 +406,8 @@
       ? netWorthChange / Math.abs(previousSnapshot.netWorth)
       : null;
     const allocation = buildAllocation(safeData, settings.include_accounts_in_net_worth);
-    const warnings = buildWarnings(safeData, settings, snapshots, monthly);
+    const goals = buildGoalRows(safeData.goals, safeData.accounts);
+    const warnings = buildWarnings(safeData, settings, snapshots, monthly, goals);
     if (monthlySpending.status === "missing") {
       warnings.push(`ไม่พบบัญชี “${MONTHLY_SPENDING_ACCOUNT_NAME}” จึงยังแสดงเงินใช้จ่ายคงเหลือไม่ได้`);
     }
@@ -364,6 +441,7 @@
         netWorth,
         investableNetWorth: accountAssets + investments - liabilities,
         debtPayments,
+        hasDebt,
         liquidCash
       },
       currentMonth,
@@ -377,7 +455,7 @@
       netWorthChange,
       netWorthChangeRate,
       allocation,
-      goals: buildGoalRows(safeData.goals),
+      goals,
       transactions,
       warnings
     };
@@ -392,6 +470,7 @@
     getAssetValue,
     rowsToSettings,
     buildMonthlyCashflow,
+    buildGoalRows,
     buildViewModel
   });
 })(window);

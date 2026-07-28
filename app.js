@@ -12,6 +12,7 @@
     activeSheet: null,
     activeFormType: null,
     activeRecord: null,
+    goalSchemaMissingHeaders: [],
     charts: {
       netWorth: null,
       cashflow: null,
@@ -32,7 +33,7 @@
     account: { title: "บัญชีเงิน", eyebrow: "CASH & BANK", sheet: config.SHEETS.accounts },
     asset: { title: "ทรัพย์สิน", eyebrow: "ASSET", sheet: config.SHEETS.assets },
     liability: { title: "หนี้สิน", eyebrow: "LIABILITY", sheet: config.SHEETS.liabilities },
-    goal: { title: "เป้าหมายทางการเงิน", eyebrow: "GOAL", sheet: config.SHEETS.goals }
+    goal: { title: "เป้าหมาย", eyebrow: "GOAL", sheet: config.SHEETS.goals }
   };
 
   const qs = (selector, scope = document) => scope.querySelector(selector);
@@ -84,6 +85,11 @@
     if (element) element.textContent = value;
   }
 
+  function setClassName(id, value) {
+    const element = document.getElementById(id);
+    if (element) element.className = value;
+  }
+
   function setConnection(status, text, showLogin = false) {
     const bar = qs("#connectionBar");
     bar.className = `connection-bar ${status ? `is-${status}` : ""}`;
@@ -129,7 +135,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.2.0").catch(() => {});
     }
   }
 
@@ -230,6 +236,7 @@
     try {
       const data = await store.loadAll();
       state.data = data;
+      state.goalSchemaMissingHeaders = store.getMissingGoalMetadataHeaders();
       state.viewModel = analytics.buildViewModel(data, config.DEFAULTS);
       renderAll();
       setConnection("", `เชื่อมต่อแล้ว · อัปเดต ${new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}`);
@@ -274,7 +281,7 @@
     setText("netWorthValue", formatCurrency(vm.totals.netWorth));
     setText("asOfLabel", `ข้อมูลล่าสุด ${formatDate(new Date())}`);
     setText("netWorthStatus", vm.netWorthChange === null ? "มูลค่าปัจจุบัน" : vm.netWorthChange >= 0 ? "เพิ่มขึ้น" : "ลดลง");
-    qs("#netWorthStatus").className = `status-pill ${vm.netWorthChange === null ? "neutral" : changeClass}`;
+    setClassName("netWorthStatus", `status-pill ${vm.netWorthChange === null ? "neutral" : changeClass}`);
 
     if (vm.netWorthChange === null) {
       setText("netWorthChange", "ยังไม่มี Snapshot เดือนก่อนสำหรับเปรียบเทียบ");
@@ -282,20 +289,20 @@
       const sign = vm.netWorthChange >= 0 ? "+" : "";
       setText("netWorthChange", `${sign}${formatCurrency(vm.netWorthChange)} (${formatPercent(vm.netWorthChangeRate, 1)}) จาก Snapshot ก่อน`);
     }
-    qs("#netWorthChange").className = `hero-change ${changeClass}`;
+    setClassName("netWorthChange", `hero-change ${changeClass}`);
 
     const monthlySpending = vm.monthlySpending;
     if (monthlySpending.status === "available") {
       setText("monthlySpendingBalanceValue", formatCurrency(monthlySpending.balance));
-      qs("#monthlySpendingBalanceValue").className = monthlySpending.balance < 0
+      setClassName("monthlySpendingBalanceValue", monthlySpending.balance < 0
         ? "negative"
         : monthlySpending.balance > 0
           ? "positive"
-          : "";
+          : "");
       setText("monthlySpendingBalanceDetail", `ใช้จากบัญชีนี้เดือนนี้ ${formatCurrency(monthlySpending.expense, true)}`);
     } else {
       setText("monthlySpendingBalanceValue", "฿—");
-      qs("#monthlySpendingBalanceValue").className = "";
+      setClassName("monthlySpendingBalanceValue", "");
       setText(
         "monthlySpendingBalanceDetail",
         monthlySpending.status === "duplicate"
@@ -307,8 +314,20 @@
     qs("#savingsRateBar").style.width = `${Math.max(0, Math.min((vm.savingsRate || 0) * 100, 100))}%`;
     setText("emergencyMonthsValue", vm.emergencyMonths === null ? "— เดือน" : `${vm.emergencyMonths.toFixed(1)} เดือน`);
     setText("emergencyDetail", `เงินพร้อมใช้ ${formatCurrency(vm.totals.liquidCash, true)} · เป้าหมาย ${vm.settings.emergency_months_target} เดือน`);
-    setText("debtServiceValue", formatPercent(vm.debtServiceRatio, 0));
-    setText("debtServiceDetail", `ค่างวดรวม ${formatCurrency(vm.totals.debtPayments, true)}/เดือน`);
+    if (!vm.totals.hasDebt) {
+      setText("debtServiceValue", "0%");
+      setClassName("debtServiceValue", "positive");
+      setText("debtServiceDetail", "ไม่มีภาระหนี้");
+    } else {
+      setText("debtServiceValue", formatPercent(vm.debtServiceRatio, 0));
+      setClassName("debtServiceValue", "");
+      setText(
+        "debtServiceDetail",
+        vm.debtServiceRatio === null
+          ? `ค่างวด ${formatCurrency(vm.totals.debtPayments, true)}/เดือน · ยังไม่มีรายรับเดือนนี้`
+          : `ค่างวดรวม ${formatCurrency(vm.totals.debtPayments, true)}/เดือน`
+      );
+    }
     setText("totalAssetsCenter", formatCurrency(vm.totals.totalAssets, true));
 
     renderWarnings();
@@ -321,7 +340,13 @@
 
   function renderWarnings() {
     const container = qs("#dataWarnings");
-    const warnings = state.viewModel?.warnings || [];
+    const warnings = [...(state.viewModel?.warnings || [])];
+    if (state.goalSchemaMissingHeaders.length) {
+      warnings.push(
+        `ฟังก์ชัน Goal รุ่นใหม่ยังไม่พร้อม: เพิ่ม Header ในชีต Goals ต่อท้ายแถวที่ 1 ได้แก่ `
+        + state.goalSchemaMissingHeaders.join(", ")
+      );
+    }
     container.hidden = warnings.length === 0;
     container.replaceChildren();
     warnings.forEach((warning) => {
@@ -508,13 +533,13 @@
       ? vm.monthlySpending.balance
       : null;
     setText("txBalanceSummary", spendingBalance === null ? "—" : formatCurrency(spendingBalance));
-    qs("#txBalanceSummary").className = spendingBalance === null
+    setClassName("txBalanceSummary", spendingBalance === null
       ? ""
       : spendingBalance < 0
         ? "negative"
         : spendingBalance > 0
           ? "positive"
-          : "";
+          : "");
 
     const query = qs("#transactionSearch").value.trim().toLowerCase();
     const filter = qs("#transactionTypeFilter").value;
@@ -668,27 +693,57 @@
       const item = createElement("article", "goal-row");
       const topline = createElement("div", "goal-topline");
       topline.appendChild(createElement("strong", "", goal.goal_name || "เป้าหมาย"));
+      const summaryText = goal.isMilestone
+        ? goal.statusLabel
+        : goal.trackingError
+          ? "ตรวจสอบบัญชี"
+          : formatPercent(goal.percentage, 0);
       if (withActions) {
         const actions = createElement("div", "row-actions");
         actions.append(
-          createElement("span", "", formatPercent(goal.percentage, 0)),
+          createElement(
+            "span",
+            goal.isMilestone ? `goal-status is-${goal.status}` : goal.trackingError ? "goal-status is-warning" : "",
+            summaryText
+          ),
           editButton("goal", goal._rowNumber, goal.goal_name || "เป้าหมาย"),
           deleteButton(config.SHEETS.goals, goal._rowNumber, goal.goal_name || "เป้าหมาย")
         );
         topline.appendChild(actions);
       } else {
-        topline.appendChild(createElement("span", "", formatPercent(goal.percentage, 0)));
+        topline.appendChild(createElement(
+          "span",
+          goal.isMilestone ? `goal-status is-${goal.status}` : goal.trackingError ? "goal-status is-warning" : "",
+          summaryText
+        ));
       }
-      const progress = createElement("div", "goal-progress");
-      const progressBar = createElement("span");
-      progressBar.style.width = `${goal.percentage * 100}%`;
-      progress.appendChild(progressBar);
       const meta = createElement("div", "goal-meta");
-      meta.append(
-        createElement("span", "", `${formatCurrency(goal.current)} / ${formatCurrency(goal.target)}`),
-        createElement("span", "", goal.deadline ? `ครบ ${formatDate(goal.deadline, { month: "short", year: "numeric" })}` : "ไม่กำหนดวัน")
-      );
-      item.append(topline, progress, meta);
+      if (goal.isMilestone) {
+        meta.append(
+          createElement("span", "", "เป้าหมายแบบ Milestone"),
+          createElement("span", "", goal.deadline ? `ครบ ${formatDate(goal.deadline, { month: "short", year: "numeric" })}` : "ไม่กำหนดวัน")
+        );
+        item.append(topline, meta);
+      } else {
+        const progress = createElement("div", "goal-progress");
+        const progressBar = createElement("span");
+        progressBar.style.width = `${Math.max(0, (goal.percentage || 0) * 100)}%`;
+        progress.appendChild(progressBar);
+        const sourceText = goal.progressSource === "account"
+          ? goal.linkedAccount
+            ? `อ้างอิง ${goal.linkedAccount.account_name}`
+            : goal.trackingError
+          : "อัปเดตยอดสะสมเอง";
+        meta.append(
+          createElement("span", "", `${formatCurrency(goal.current)} / ${formatCurrency(goal.target)}`),
+          createElement(
+            "span",
+            "",
+            `${sourceText}${goal.deadline ? ` · ครบ ${formatDate(goal.deadline, { month: "short", year: "numeric" })}` : ""}`
+          )
+        );
+        item.append(topline, progress, meta);
+      }
       container.appendChild(item);
     });
   }
@@ -861,9 +916,9 @@
     return parsed ? localIsoDate(parsed) : fallback;
   }
 
-  function accountOptions(selectedValue = "") {
+  function accountOptions(selectedValue = "", placeholder = "เลือกบัญชี") {
     const selected = String(selectedValue || "").trim().toLocaleLowerCase("th-TH");
-    const options = ['<option value="">เลือกบัญชี</option>'];
+    const options = [`<option value="">${inputValue({ value: placeholder }, "value")}</option>`];
     (state.data?.accounts || []).forEach((account) => {
       const name = String(account.account_name || "").trim();
       if (!name) return;
@@ -967,14 +1022,51 @@
         ${submit}`;
     }
 
+    const goalType = String(record?.goal_type || "Financial").toLowerCase() === "milestone"
+      ? "Milestone"
+      : "Financial";
+    const progressSource = String(record?.progress_source || "Manual").toLowerCase() === "account"
+      ? "Account"
+      : "Manual";
+    const goalStatus = String(record?.status || "Not Started").toLowerCase();
+    const schemaWarning = state.goalSchemaMissingHeaders.length
+      ? `<p class="form-warning">ก่อนบันทึก ให้เพิ่ม Header ในชีต Goals: ${state.goalSchemaMissingHeaders.map((header) => inputValue({ value: header }, "value")).join(", ")}</p>`
+      : "";
     return `
-      <label class="field"><span>ชื่อเป้าหมาย</span><input name="goal_name" value="${inputValue(record, "goal_name")}" placeholder="เช่น เงินสำรองฉุกเฉิน เกษียณ" required></label>
-      <div class="field-row">
-        <label class="field"><span>เงินเป้าหมาย</span><input name="target_amount" type="number" min="0" step="0.01" inputmode="decimal" value="${inputValue(record, "target_amount")}" required></label>
-        <label class="field"><span>สะสมแล้ว</span><input name="current_amount" type="number" min="0" step="0.01" inputmode="decimal" value="${inputValue(record, "current_amount", "0")}" required></label>
+      ${schemaWarning}
+      <label class="field"><span>ชื่อเป้าหมาย</span><input name="goal_name" value="${inputValue(record, "goal_name")}" placeholder="เช่น เงินสำรองฉุกเฉิน หรือ จัดทำพินัยกรรม" required></label>
+      <label class="field"><span>รูปแบบเป้าหมาย</span>
+        <select name="goal_type" required>
+          <option value="Financial" ${goalType === "Financial" ? "selected" : ""}>เป้าหมายการเงิน</option>
+          <option value="Milestone" ${goalType === "Milestone" ? "selected" : ""}>เป้าหมายชีวิต / Milestone</option>
+        </select>
+        <small>Milestone เหมาะกับเป้าหมายที่ไม่ต้องวัดเป็นจำนวนเงิน</small>
+      </label>
+      <div data-goal-financial-fields>
+        <div class="field-row">
+          <label class="field"><span>เงินเป้าหมาย</span><input name="target_amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="${inputValue(record, "target_amount")}" placeholder="0"></label>
+          <label class="field"><span>ติดตามความคืบหน้าจาก</span>
+            <select name="progress_source">
+              <option value="Manual" ${progressSource === "Manual" ? "selected" : ""}>กรอกยอดสะสมเอง</option>
+              <option value="Account" ${progressSource === "Account" ? "selected" : ""}>ยอดคงเหลือในบัญชี</option>
+            </select>
+          </label>
+        </div>
+        <label class="field" data-goal-manual-field><span>สะสมแล้ว</span><input name="current_amount" type="number" min="0" step="0.01" inputmode="decimal" value="${inputValue(record, "current_amount", "0")}" placeholder="0"></label>
+        <label class="field" data-goal-account-field><span>บัญชีที่ใช้อ้างอิง</span>
+          <select name="linked_account">${accountOptions(record?.linked_account || "", "เลือกบัญชีสำหรับติดตาม Goal")}</select>
+          <small>ระบบอ่านยอดปัจจุบันจาก Accounts.balance โดยไม่แก้ยอดบัญชี</small>
+        </label>
       </div>
+      <label class="field" data-goal-status-field><span>สถานะ Milestone</span>
+        <select name="status">
+          <option value="Not Started" ${goalStatus === "not started" || goalStatus === "" ? "selected" : ""}>ยังไม่เริ่ม</option>
+          <option value="In Progress" ${goalStatus === "in progress" ? "selected" : ""}>กำลังดำเนินการ</option>
+          <option value="Completed" ${goalStatus === "completed" ? "selected" : ""}>สำเร็จแล้ว</option>
+        </select>
+      </label>
       <label class="field"><span>วันที่ต้องการสำเร็จ</span><input name="deadline" type="date" value="${inputDate(record, "deadline")}"></label>
-      ${note("เหตุผลหรือแผนการสะสม")}
+      ${note("เหตุผล แผนการ หรือสิ่งที่ต้องทำต่อ")}
       ${submit}`;
   }
 
@@ -997,6 +1089,38 @@
   }
 
   function bindFormBehavior(type) {
+    if (type === "goal") {
+      const updateGoalFields = () => {
+        const form = qs("#dynamicForm");
+        const goalType = form.elements.goal_type.value;
+        const progressSource = form.elements.progress_source.value;
+        const isFinancial = goalType === "Financial";
+        const usesAccount = isFinancial && progressSource === "Account";
+        const financialFields = qs("[data-goal-financial-fields]", form);
+        const manualField = qs("[data-goal-manual-field]", form);
+        const accountField = qs("[data-goal-account-field]", form);
+        const statusField = qs("[data-goal-status-field]", form);
+
+        financialFields.hidden = !isFinancial;
+        statusField.hidden = isFinancial;
+        manualField.hidden = !isFinancial || usesAccount;
+        accountField.hidden = !usesAccount;
+        form.elements.target_amount.disabled = !isFinancial;
+        form.elements.target_amount.required = isFinancial;
+        form.elements.progress_source.disabled = !isFinancial;
+        form.elements.current_amount.disabled = !isFinancial || usesAccount;
+        form.elements.current_amount.required = isFinancial && !usesAccount;
+        form.elements.linked_account.disabled = !usesAccount;
+        form.elements.linked_account.required = usesAccount;
+        form.elements.status.disabled = isFinancial;
+        form.elements.status.required = !isFinancial;
+      };
+      const form = qs("#dynamicForm");
+      form.elements.goal_type.addEventListener("change", updateGoalFields);
+      form.elements.progress_source.addEventListener("change", updateGoalFields);
+      updateGoalFields();
+      return;
+    }
     if (type !== "transaction") return;
     const update = () => {
       const selected = analytics.normalizeType(qs("#dynamicForm input[name='type']:checked")?.value);
@@ -1048,6 +1172,25 @@
         return;
       }
     }
+    if (type === "goal") {
+      if (values.goal_type === "Financial") {
+        if (!(analytics.toNumber(values.target_amount) > 0)) {
+          showToast("เงินเป้าหมายต้องมากกว่า 0 บาท", "error");
+          return;
+        }
+        values.status = "";
+        if (values.progress_source === "Account") {
+          values.current_amount = state.activeRecord?.current_amount ?? "";
+        } else {
+          values.linked_account = "";
+        }
+      } else {
+        values.target_amount = "";
+        values.current_amount = "";
+        values.progress_source = "Status";
+        values.linked_account = "";
+      }
+    }
 
     try {
       setLoading(true);
@@ -1067,6 +1210,14 @@
         );
       } else if (type === "account") {
         await store.appendAccount(values);
+      } else if (type === "goal" && state.activeRecord?._rowNumber) {
+        await store.updateGoalRecord(
+          state.activeRecord._rowNumber,
+          state.activeRecord,
+          values
+        );
+      } else if (type === "goal") {
+        await store.appendGoal(values);
       } else if (state.activeRecord?._rowNumber) {
         await store.update(meta.sheet, state.activeRecord._rowNumber, { ...state.activeRecord, ...values });
       } else {
