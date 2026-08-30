@@ -9,14 +9,14 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="description" content="แดชบอร์ดติดตามกระแสเงินสด ทรัพย์สิน หนี้สิน การลงทุน และเป้าหมายการเงินกับเป้าหมายชีวิต">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://sheets.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; img-src 'self' data:; manifest-src 'self'; worker-src 'self'">
-  <title>Vetza Wealth</title>
-  <link rel="manifest" href="manifest.json?v=2.2.0">
+  <title>Personal Wealth</title>
+  <link rel="manifest" href="manifest.json?v=2.3.0">
   <link rel="icon" href="icons/wealth-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.2.0">
+  <link rel="stylesheet" href="style.css?v=2.3.0">
 </head>
 <body>
   <svg class="svg-sprite" aria-hidden="true">
@@ -110,12 +110,36 @@
                 <p class="eyebrow">CASH FLOW</p>
                 <h2>รายรับและรายจ่าย</h2>
               </div>
-              <select id="cashflowPeriod" class="compact-select" aria-label="ช่วงเวลาของกราฟกระแสเงินสด">
-                <option value="6">6 เดือน</option>
-                <option value="12">12 เดือน</option>
-              </select>
+              <div class="chart-filter-group">
+                <select id="cashflowYear" class="compact-select" aria-label="ปีของกราฟกระแสเงินสด"></select>
+                <select id="cashflowPeriod" class="compact-select" aria-label="ช่วงเวลาของกราฟกระแสเงินสด">
+                  <option value="6">6 เดือน</option>
+                  <option value="12">12 เดือน</option>
+                </select>
+              </div>
             </div>
             <div class="chart-medium"><canvas id="cashflowChart" aria-label="กราฟรายรับและรายจ่าย"></canvas></div>
+          </article>
+
+          <article class="panel expense-breakdown-panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">EXPENSE MIX</p>
+                <h2>สัดส่วนรายจ่าย</h2>
+              </div>
+              <select id="expenseMonth" class="compact-select" aria-label="เดือนของกราฟสัดส่วนรายจ่าย"></select>
+            </div>
+            <div class="allocation-content expense-breakdown-content">
+              <div class="donut-wrap">
+                <canvas id="expenseBreakdownChart" aria-label="กราฟสัดส่วนรายจ่ายแต่ละประเภท"></canvas>
+                <div id="expenseBreakdownCenter" class="donut-center expense-donut-center">
+                  <span>รายจ่ายรวม</span>
+                  <strong id="expenseBreakdownTotal">฿—</strong>
+                </div>
+                <div id="expenseBreakdownEmpty" class="chart-empty" hidden>ยังไม่มีรายจ่ายในเดือนนี้</div>
+              </div>
+              <div id="expenseBreakdownLegend" class="legend-list"></div>
+            </div>
           </article>
 
           <article class="panel allocation-panel">
@@ -128,7 +152,7 @@
             <div class="allocation-content">
               <div class="donut-wrap">
                 <canvas id="allocationChart" aria-label="กราฟสัดส่วนทรัพย์สิน"></canvas>
-                <div class="donut-center"><span>สินทรัพย์รวม</span><strong id="totalAssetsCenter">฿—</strong></div>
+                <div class="donut-center allocation-donut-center"><strong id="totalAssetsCenter">฿—</strong></div>
               </div>
               <div id="allocationLegend" class="legend-list"></div>
             </div>
@@ -324,9 +348,9 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="config.js?v=2.2.0"></script>
-  <script src="analytics.js?v=2.2.0"></script>
-  <script src="api.js?v=2.2.0"></script>
-  <script src="app.js?v=2.2.0"></script>
+  <script src="config.js?v=2.3.0"></script>
+  <script src="analytics.js?v=2.3.0"></script>
+  <script src="api.js?v=2.3.0"></script>
+  <script src="app.js?v=2.3.0"></script>
 </body>
 </html>

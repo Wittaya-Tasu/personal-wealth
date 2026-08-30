@@ -13,9 +13,11 @@
     activeFormType: null,
     activeRecord: null,
     goalSchemaMissingHeaders: [],
+    investmentSchemaMissingHeaders: [],
     charts: {
       netWorth: null,
       cashflow: null,
+      expenseBreakdown: null,
       allocation: null
     }
   };
@@ -46,14 +48,14 @@
     return element;
   }
 
-  function formatCurrency(value, compact = false) {
+  function formatCurrency(value, compact = false, fractionDigits = 0) {
     const number = analytics.toNumber(value);
     const options = {
       style: "currency",
       currency: config.CURRENCY,
       currencyDisplay: "narrowSymbol",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits
     };
     if (compact && Math.abs(number) >= 1_000_000) {
       options.notation = "compact";
@@ -135,7 +137,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js?v=2.2.0").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.3.0").catch(() => {});
     }
   }
 
@@ -174,6 +176,8 @@
     });
 
     qs("#cashflowPeriod").addEventListener("change", renderCashflowChart);
+    qs("#cashflowYear").addEventListener("change", renderCashflowChart);
+    qs("#expenseMonth").addEventListener("change", renderExpenseBreakdownChart);
     qs("#transactionSearch").addEventListener("input", renderTransactions);
     qs("#transactionTypeFilter").addEventListener("change", renderTransactions);
     qs("#modalOverlay").addEventListener("click", closeSheets);
@@ -237,7 +241,9 @@
       const data = await store.loadAll();
       state.data = data;
       state.goalSchemaMissingHeaders = store.getMissingGoalMetadataHeaders();
+      state.investmentSchemaMissingHeaders = store.getMissingInvestmentFundingHeaders();
       state.viewModel = analytics.buildViewModel(data, config.DEFAULTS);
+      populateChartFilters();
       renderAll();
       setConnection("", `เชื่อมต่อแล้ว · อัปเดต ${new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}`);
     } catch (error) {
@@ -254,7 +260,7 @@
   function renderSignedOutState() {
     [
       "netWorthValue", "monthlySpendingBalanceValue", "savingsRateValue", "emergencyMonthsValue",
-      "debtServiceValue", "totalAssetsCenter", "txIncomeSummary", "txExpenseSummary",
+      "debtServiceValue", "totalAssetsCenter", "expenseBreakdownTotal", "txIncomeSummary", "txExpenseSummary",
       "txBalanceSummary", "wealthAssetsSummary", "wealthLiabilitiesSummary", "wealthNetSummary"
     ].forEach((id) => setText(id, id === "emergencyMonthsValue" ? "— เดือน" : "฿—"));
     setText("netWorthStatus", "รอเชื่อมต่อ");
@@ -263,6 +269,7 @@
       const container = document.getElementById(id);
       container.replaceChildren(emptyState());
     });
+    qs("#expenseBreakdownLegend").replaceChildren();
     destroyCharts();
   }
 
@@ -271,6 +278,37 @@
     renderTransactions();
     renderWealth();
     renderGoals();
+  }
+
+  function populateChartFilters() {
+    const now = new Date();
+    const yearSelect = qs("#cashflowYear");
+    const currentYear = now.getFullYear();
+    const previousYear = Number(yearSelect.value || currentYear);
+    const years = analytics.getTransactionYears(state.data?.transactions, now);
+    yearSelect.replaceChildren();
+    years.forEach((year) => {
+      const option = document.createElement("option");
+      option.value = String(year);
+      option.textContent = `พ.ศ. ${year + 543}`;
+      yearSelect.appendChild(option);
+    });
+    yearSelect.value = years.includes(previousYear) ? String(previousYear) : String(currentYear);
+
+    const monthSelect = qs("#expenseMonth");
+    const currentMonthKey = analytics.monthKey(now);
+    const previousMonth = monthSelect.value || currentMonthKey;
+    const months = analytics.getExpenseMonthOptions(state.data?.transactions, now);
+    monthSelect.replaceChildren();
+    months.forEach((month) => {
+      const option = document.createElement("option");
+      option.value = month.key;
+      option.textContent = month.label;
+      monthSelect.appendChild(option);
+    });
+    monthSelect.value = months.some((month) => month.key === previousMonth)
+      ? previousMonth
+      : currentMonthKey;
   }
 
   function renderDashboard() {
@@ -328,11 +366,12 @@
           : `ค่างวดรวม ${formatCurrency(vm.totals.debtPayments, true)}/เดือน`
       );
     }
-    setText("totalAssetsCenter", formatCurrency(vm.totals.totalAssets, true));
+    setText("totalAssetsCenter", formatCurrency(vm.totals.totalAssets, true, 1));
 
     renderWarnings();
     renderNetWorthChart();
     renderCashflowChart();
+    renderExpenseBreakdownChart();
     renderAllocationChart();
     renderGoalContainer(qs("#goalPreview"), vm.goals.slice(0, 3), false);
     renderTransactionContainer(qs("#recentTransactions"), vm.transactions.slice(0, 5), false);
@@ -345,6 +384,12 @@
       warnings.push(
         `ฟังก์ชัน Goal รุ่นใหม่ยังไม่พร้อม: เพิ่ม Header ในชีต Goals ต่อท้ายแถวที่ 1 ได้แก่ `
         + state.goalSchemaMissingHeaders.join(", ")
+      );
+    }
+    if (state.investmentSchemaMissingHeaders.length) {
+      warnings.push(
+        `ฟังก์ชันหักเงินลงทุนจากบัญชียังไม่พร้อม: เพิ่ม Header ในชีต Investments ต่อท้ายแถวที่ 1 ได้แก่ `
+        + state.investmentSchemaMissingHeaders.join(", ")
       );
     }
     container.hidden = warnings.length === 0;
@@ -435,8 +480,16 @@
     state.charts.cashflow = null;
     if (!state.viewModel || !global.Chart) return;
     const count = Number(qs("#cashflowPeriod").value || 6);
-    const rows = state.viewModel.monthly.slice(-count);
+    const selectedYear = Number(qs("#cashflowYear").value || new Date().getFullYear());
+    const currentDate = new Date();
+    const endMonthIndex = selectedYear === currentDate.getFullYear()
+      ? currentDate.getMonth()
+      : 11;
+    const yearRows = analytics.buildYearCashflow(state.data?.transactions, selectedYear);
+    const startMonthIndex = count === 12 ? 0 : Math.max(0, endMonthIndex - count + 1);
+    const rows = yearRows.slice(startMonthIndex, endMonthIndex + 1);
     const options = baseChartOptions();
+    options.layout = { padding: { top: 8, right: 10, bottom: 0, left: 4 } };
     options.plugins.legend = {
       display: true,
       position: "bottom",
@@ -453,6 +506,15 @@
     options.plugins.tooltip.callbacks = {
       label: (context) => `${context.dataset.label}: ${formatCurrency(context.raw)}`
     };
+    options.scales.x.ticks.autoSkip = count === 12;
+    options.scales.x.ticks.maxTicksLimit = count === 12 ? 12 : 6;
+    options.scales.x.ticks.maxRotation = 0;
+    options.scales.y.ticks.callback = (value) => formatCurrency(value);
+    options.scales.y.ticks.maxTicksLimit = 6;
+    options.scales.y.ticks.padding = 8;
+    options.scales.y.afterFit = (axis) => {
+      axis.width += 8;
+    };
 
     state.charts.cashflow = new global.Chart(qs("#cashflowChart"), {
       type: "bar",
@@ -464,6 +526,70 @@
         ]
       },
       options
+    });
+  }
+
+  function renderExpenseBreakdownChart() {
+    state.charts.expenseBreakdown?.destroy();
+    state.charts.expenseBreakdown = null;
+    const legend = qs("#expenseBreakdownLegend");
+    const empty = qs("#expenseBreakdownEmpty");
+    const center = qs("#expenseBreakdownCenter");
+    legend.replaceChildren();
+    if (!state.viewModel) return;
+
+    const selectedMonth = qs("#expenseMonth").value || analytics.monthKey(new Date());
+    const breakdown = analytics.buildExpenseBreakdown(state.data?.transactions, selectedMonth);
+    setText("expenseBreakdownTotal", formatCurrency(breakdown.total));
+    empty.hidden = breakdown.rows.length > 0;
+    center.hidden = breakdown.rows.length === 0;
+
+    breakdown.rows.forEach((row) => {
+      const item = createElement("div", "legend-row");
+      const dot = createElement("span", "legend-dot");
+      dot.style.backgroundColor = row.color;
+      item.append(
+        dot,
+        createElement("span", "", row.name),
+        createElement("strong", "", `${formatPercent(row.percentage, 0)} · ${formatCurrency(row.value)}`)
+      );
+      legend.appendChild(item);
+    });
+    if (!breakdown.rows.length || !global.Chart) return;
+
+    state.charts.expenseBreakdown = new global.Chart(qs("#expenseBreakdownChart"), {
+      type: "doughnut",
+      data: {
+        labels: breakdown.rows.map((row) => row.name),
+        datasets: [{
+          data: breakdown.rows.map((row) => row.value),
+          backgroundColor: breakdown.rows.map((row) => row.color),
+          borderColor: "#10251f",
+          borderWidth: 3,
+          hoverOffset: 3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: "68%",
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: "#071410",
+            titleColor: "#91a49b",
+            bodyColor: "#f5f7f2",
+            borderColor: "rgba(226,238,232,.16)",
+            borderWidth: 1,
+            callbacks: {
+              label: (context) => {
+                const row = breakdown.rows[context.dataIndex];
+                return ` ${formatCurrency(context.raw)} (${formatPercent(row.percentage, 0)})`;
+              }
+            }
+          }
+        }
+      }
     });
   }
 
@@ -521,7 +647,7 @@
 
   function destroyCharts() {
     Object.values(state.charts).forEach((chart) => chart?.destroy());
-    state.charts = { netWorth: null, cashflow: null, allocation: null };
+    state.charts = { netWorth: null, cashflow: null, expenseBreakdown: null, allocation: null };
   }
 
   function renderTransactions() {
@@ -792,6 +918,9 @@
     const transaction = sheetName === config.SHEETS.transactions
       ? (state.data?.transactions || []).find((row) => row._rowNumber === rowNumber)
       : null;
+    const investment = sheetName === config.SHEETS.investments
+      ? (state.data?.investments || []).find((row) => row._rowNumber === rowNumber)
+      : null;
     const account = sheetName === config.SHEETS.accounts
       ? (state.data?.accounts || []).find((row) => row._rowNumber === rowNumber)
       : null;
@@ -799,12 +928,18 @@
       ? store.isAccountLinkedTransaction(transaction)
         ? "\nระบบจะย้อนผลของรายการนี้ในยอด Accounts ก่อนลบ"
         : "\nรายการเดิมก่อน v2.1.0 จะถูกลบโดยไม่ปรับ Opening Balance"
-      : "";
+      : investment
+        ? store.isAccountLinkedInvestment(investment)
+          ? "\nระบบจะคืนเงินลงทุนเดิมเข้าบัญชีต้นทางก่อนลบ"
+          : "\nInvestment เดิมจะถูกลบโดยไม่ปรับยอด Accounts"
+        : "";
     if (!global.confirm(`ยืนยันลบ “${label}”?\nการลบนี้จะนำแถวออกจาก Google Sheet${accountEffectText}`)) return;
     try {
       setLoading(true);
       if (transaction) {
         await store.deleteTransactionWithAccountEffects(transaction);
+      } else if (investment) {
+        await store.deleteInvestmentWithAccountEffects(investment);
       } else if (account) {
         await store.deleteAccount(rowNumber);
       } else {
@@ -967,7 +1102,13 @@
     }
 
     if (type === "investment") {
+      const isLinkedInvestment = Boolean(record?.account_from && analytics.toNumber(record?.funded_amount) > 0);
+      const fundingRequired = !record || isLinkedInvestment;
+      const migrationWarning = state.investmentSchemaMissingHeaders.length
+        ? `<p class="security-note">ก่อนบันทึก กรุณาเพิ่ม Header ในชีต Investments: ${state.investmentSchemaMissingHeaders.join(", ")}</p>`
+        : "";
       return `
+        ${migrationWarning}
         <label class="field"><span>ชื่อสินทรัพย์ลงทุน</span><input name="asset_name" value="${inputValue(record, "asset_name")}" placeholder="เช่น RMF, ETF, หุ้นไทย" required></label>
         <label class="field"><span>ประเภท</span><input name="category" list="investmentCategories" value="${inputValue(record, "category")}" placeholder="กองทุนรวม หุ้น ตราสารหนี้"><datalist id="investmentCategories"><option value="กองทุนรวม"><option value="หุ้น"><option value="ETF"><option value="ตราสารหนี้"><option value="เงินเกษียณ"><option value="สินทรัพย์ดิจิทัล"><option value="เงินสด"></datalist></label>
         <div class="field-row">
@@ -978,6 +1119,11 @@
           <label class="field"><span>ราคาปัจจุบัน</span><input name="current_price" type="number" min="0" step="any" inputmode="decimal" value="${inputValue(record, "current_price")}"></label>
           <label class="field"><span>มูลค่าปัจจุบัน (บาท)</span><input name="current_value" type="number" min="0" step="0.01" inputmode="decimal" value="${inputValue(record, "current_value")}" placeholder="หากเว้นว่างจะคำนวณจากหน่วย × ราคา"></label>
         </div>
+        <div class="field-row investment-funding-fields">
+          <label class="field"><span>ใช้เงินจากบัญชี</span><select name="account_from" ${fundingRequired ? "required" : ""}>${accountOptions(record?.account_from, record ? "ไม่เชื่อมบัญชี (รายการเดิม)" : "เลือกบัญชีที่ใช้ลงทุน")}</select></label>
+          <label class="field"><span>จำนวนเงินที่ใช้ลงทุน (บาท)</span><input name="funded_amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="${inputValue(record, "funded_amount")}" placeholder="เช่น 5000" ${fundingRequired ? "required" : ""}></label>
+        </div>
+        <p class="security-note">ยอดนี้จะถูกหักจากบัญชี แต่ไม่นับเป็นรายจ่ายใน Cash Flow</p>
         <label class="field toggle-field"><span><strong>ลดหย่อนภาษีได้</strong><small>เช่น RMF, Thai ESG</small></span><input name="tax_deductible" type="checkbox" ${String(record?.tax_deductible || "").toLowerCase() === "yes" ? "checked" : ""}></label>
         ${note()}
         ${submit}`;
@@ -1089,6 +1235,19 @@
   }
 
   function bindFormBehavior(type) {
+    if (type === "investment") {
+      const form = qs("#dynamicForm");
+      const accountSelect = form.elements.account_from;
+      const fundedAmount = form.elements.funded_amount;
+      const mustRemainLinked = !state.activeRecord || store.isAccountLinkedInvestment(state.activeRecord);
+      const updateFundingRequirement = () => {
+        accountSelect.required = mustRemainLinked;
+        fundedAmount.required = Boolean(accountSelect.value) || mustRemainLinked;
+      };
+      accountSelect.addEventListener("change", updateFundingRequirement);
+      updateFundingRequirement();
+      return;
+    }
     if (type === "goal") {
       const updateGoalFields = () => {
         const form = qs("#dynamicForm");
@@ -1158,6 +1317,14 @@
       if (!analytics.toNumber(values.current_value)) {
         values.current_value = analytics.toNumber(values.units) * analytics.toNumber(values.current_price);
       }
+      if (!values.account_from && !state.activeRecord) {
+        showToast("กรุณาเลือกบัญชีที่ใช้เงินลงทุน", "error");
+        return;
+      }
+      if (values.account_from && !(analytics.toNumber(values.funded_amount) > 0)) {
+        showToast("จำนวนเงินที่ใช้ลงทุนต้องมากกว่า 0 บาท", "error");
+        return;
+      }
     }
     if (type === "transaction") {
       const normalized = analytics.normalizeType(values.type);
@@ -1218,6 +1385,14 @@
         );
       } else if (type === "goal") {
         await store.appendGoal(values);
+      } else if (type === "investment" && state.activeRecord?._rowNumber) {
+        await store.updateInvestmentWithAccountEffects(
+          state.activeRecord._rowNumber,
+          state.activeRecord,
+          values
+        );
+      } else if (type === "investment") {
+        await store.appendInvestmentWithAccountEffects(values);
       } else if (state.activeRecord?._rowNumber) {
         await store.update(meta.sheet, state.activeRecord._rowNumber, { ...state.activeRecord, ...values });
       } else {

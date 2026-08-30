@@ -1,8 +1,9 @@
 # Personal Wealth — Project State
 
-> อัปเดต: 28 กรกฎาคม 2569 (2026-07-28), Asia/Bangkok  
-> รุ่น: **v2.2.0 — Account-linked Goals**  
-> สถานะ: ผ่าน Static/Mock tests; ต้อง Migration Goals, Deploy และทดสอบกับ Google Sheet จริง
+> อัปเดต: 30 สิงหาคม 2569 (2026-08-30), Asia/Bangkok  
+> รุ่นพัฒนา: **v2.3.0 — Account-linked Investments & Spending Analytics**  
+> รุ่นที่ผู้ใช้ยืนยันว่า Deploy แล้ว: **v2.2.0**  
+> สถานะ v2.3.0: ผ่าน Static/Mock tests; ต้อง Migration Investments, Deploy และทดสอบกับ Google Sheet จริง
 
 ## 1. สรุปโครงการ
 
@@ -18,52 +19,29 @@
 | API | Google Sheets API v4 โดยตรง |
 | Backend | ไม่มี; GAS deployments เดิม Archived |
 | UI | ภาษาไทย, Dark Emerald + Gold, Sarabun |
-| อุปกรณ์หลัก | iPhone และ Desktop |
+| อุปกรณ์หลัก | iPhone โดยเฉพาะหน้าจอประมาณ 390–430px และ Desktop |
 
-## 2. การเปลี่ยนแปลง v2.2.0
+## 2. การเปลี่ยนแปลง v2.3.0
 
-### ภาระหนี้ต่อรายได้
-
-- ถ้า `Liabilities` ไม่มีรายการ หรือยอดหนี้และค่างวดรวมเป็น 0 แสดง `0%`
-- Detail แสดง `ไม่มีภาระหนี้`
-- ไม่ต้องสร้างรายการหนี้ชื่อ “ไม่มีหนี้” หรือยอด 0
-- ถ้ามีค่างวดแต่ยังไม่มี Income เดือนปัจจุบัน แสดง `—` และเหตุผล
-
-### เป้าหมายการเงิน
-
-- `Manual`: ใช้ `current_amount` เดิม
-- `Account`: ใช้ `Accounts.balance` ของ `linked_account`
-- การอ่านยอด Goal ไม่เขียนหรือปรับยอด Account
-- Account หายหรือชื่อซ้ำทำให้ Goal แสดงคำเตือนและไม่เดาบัญชี
-
-### เป้าหมายชีวิต / Milestone
-
-- ไม่ใช้จำนวนเงินหรือเปอร์เซ็นต์สมมติ
-- สถานะ: `Not Started`, `In Progress`, `Completed`
-- แสดงวันเป้าหมายและบันทึกช่วยจำได้
-
-### ความถูกต้องของการอ้างอิง
-
-- ห้ามเปลี่ยน `account_name` เมื่อ Transaction หรือ Goal อ้างถึง
-- ห้ามลบ Account เมื่อ Transaction หรือ Goal อ้างถึง
-- Duplicate `account_name` ยังถือเป็น Error
-
-### PWA Cache
-
-- Local Assets ใน `index.html` ใช้ Query `?v=2.2.0`
-- Service Worker ลงทะเบียนด้วย `sw.js?v=2.2.0`
-- Cache name: `personal-wealth-shell-v2.2.0`
-- ไม่ Cache Google API response
+| งาน | ผลลัพธ์ |
+|---|---|
+| Investment ใช้เงินจากบัญชี | เพิ่มตัวเลือก `account_from` และช่อง `funded_amount` |
+| Cash Flow บนมือถือ | แกน Y แสดงเงินบาทเต็มจำนวน ไม่ใช้ compact notation |
+| Cash Flow แกน X | แสดงเฉพาะชื่อเดือน |
+| Cash Flow ปี | เพิ่มตัวกรองปี พ.ศ. ข้างตัวกรอง 6/12 เดือน |
+| สัดส่วนรายจ่าย | เพิ่มกราฟวงกลมแยกหมวดหมู่ พร้อมเลือกเดือน |
+| Allocation | เปลี่ยนหัวข้อเป็น `ทรัพย์สิน`, เอาคำว่า `สินทรัพย์รวม` ออกจากกลางวง |
+| ตัวเลข Allocation | เพิ่ม 12px → 30px และแสดงทศนิยม 1 ตำแหน่ง |
+| Mobile layout | กราฟวงกลมเรียงแนวตั้งบนหน้าจอกว้างไม่เกิน 520px |
+| PWA | Versioned assets และ cache เป็น v2.3.0 |
 
 ## 3. โครงสร้าง Google Sheet
-
-ชื่อชีตเดิมทั้งหมดคงเดิม v2.2.0 เพิ่ม Header ต่อท้ายเฉพาะ `Goals`
 
 | Sheet | Headers |
 |---|---|
 | `Accounts` | `account_id`, `account_name`, `currency`, `balance`, `type`, `note` |
 | `Transactions` | `tx_id`, `date`, `type`, `category`, `account_from`, `account_to`, `amount`, `note` |
-| `Investments` | `investment_id`, `asset_name`, `category`, `units`, `avg_cost`, `current_price`, `current_value`, `tax_deductible`, `note` |
+| `Investments` | `investment_id`, `asset_name`, `category`, `units`, `avg_cost`, `current_price`, `current_value`, `tax_deductible`, `note`, `account_from`, `funded_amount` |
 | `Assets` | `asset_id`, `asset_name`, `category`, `purchase_price`, `estimated_value`, `note` |
 | `Liabilities` | `liability_id`, `liability_name`, `total_amount`, `monthly_payment`, `note` |
 | `Goals` | `goal_id`, `goal_name`, `target_amount`, `current_amount`, `deadline`, `note`, `goal_type`, `progress_source`, `linked_account`, `status` |
@@ -71,158 +49,132 @@
 | `MonthlySnapshots` | `snapshot_month`, `total_assets`, `total_liabilities`, `net_worth`, `monthly_cashflow`, `savings_rate`, `note` |
 | `Settings` | `key`, `value`, `description` |
 
-Migration:
+### Migration v2.3.0
 
-| Cell | Header ใหม่ |
+เพิ่มต่อท้ายชีต `Investments` เท่านั้น:
+
+| Cell | Header |
 |---|---|
-| G1 | `goal_type` |
-| H1 | `progress_source` |
-| I1 | `linked_account` |
-| J1 | `status` |
+| J1 | `account_from` |
+| K1 | `funded_amount` |
 
-Goal เดิมที่ G–J ว่างจะถูกตีความเป็น `Financial` + `Manual`
+ข้อมูล Investment เดิมให้ J–K ว่าง ระบบจะถือเป็น Legacy และไม่ปรับ Accounts ย้อนหลัง อ่านขั้นตอนเต็มใน `INVESTMENTS_MIGRATION.md`
 
-## 4. กติกา Goal
+## 4. กติกา Account-linked Investment
 
-### Financial + Manual
+| การกระทำ | กติกา |
+|---|---|
+| เพิ่ม Investment ใหม่ | ต้องเลือก Account และ `funded_amount > 0` |
+| บันทึกสำเร็จ | ลด `Accounts.balance` ตามเงินลงทุน |
+| ยอดบัญชีไม่พอ | ไม่บันทึกและไม่ให้ยอดติดลบ |
+| แก้ราคาปัจจุบัน | ไม่เปลี่ยน Account หาก `account_from` และ `funded_amount` เดิม |
+| แก้เงินลงทุน/บัญชี | คืนผลเดิมก่อน แล้วใช้ผลใหม่ |
+| ลบรายการเชื่อมบัญชี | คืนเงินลงทุนเดิมเข้าบัญชีก่อนลบ |
+| Legacy Investment | แก้/ลบโดยไม่ปรับ Opening Balance |
+| การเขียน Investment ล้มเหลว | Rollback ยอด Account เป็นค่าก่อนทำรายการ |
 
-- `target_amount` > 0
-- `current_amount` >= 0
-- `linked_account` ว่าง
+Investment เป็นการเปลี่ยนรูปสินทรัพย์ จึงไม่เป็น Income/Expense และไม่เข้ากราฟ Cash Flow หรือสัดส่วนรายจ่าย
 
-### Financial + Account
+Account ที่ Transaction, Goal หรือ Investment อ้างถึงจะเปลี่ยนชื่อหรือลบไม่ได้ ชื่อ `account_name` ต้องไม่ซ้ำ
 
-- `target_amount` > 0
-- `linked_account` ต้องตรงกับ Account ที่มีอยู่และชื่อไม่ซ้ำ
-- ยอดแสดงผล = `max(Accounts.balance, 0)`
-- `current_amount` ไม่ถูกใช้ขณะผูกบัญชี และไม่ถูกลบเพื่อรองรับการสลับกลับ Manual
+## 5. กติกากราฟ
 
-### Milestone
+### Cash Flow
 
-- `target_amount` และ `current_amount` ว่าง
-- `progress_source = Status`
-- `linked_account` ว่าง
-- ใช้ `status` แทนเปอร์เซ็นต์
+- ปีในตัวกรองเก็บเป็น ค.ศ. ภายใน แต่แสดงเป็น พ.ศ.
+- ตัวเลือกปีมีปีปัจจุบันและปีที่พบใน Transactions
+- 12 เดือนแสดง ม.ค.–ธ.ค. ของปีที่เลือก
+- 6 เดือนของปีปัจจุบันสิ้นสุดที่เดือนปัจจุบัน
+- 6 เดือนของปีก่อนสิ้นสุดที่เดือนธันวาคม
+- แกน X ใช้ชื่อเดือนเท่านั้น เช่น `มี.ค.`
+- แกน Y ใช้เงินบาทเต็มจำนวน เช่น `฿20,000`
 
-## 5. Account-linked Transactions และ Opening Balance
+### สัดส่วนรายจ่าย
 
-- ยอด Accounts ตอนเริ่มใช้ v2.1.0 เป็น Opening Balance
-- Transaction เก่าไม่ถูกคำนวณย้อนกลับ
-- Transaction ใหม่มี `tx_id` ขึ้นต้น `v21-`
-- Income เพิ่มปลายทาง
-- Expense ลดต้นทาง
-- Transfer ลดต้นทางและเพิ่มปลายทาง
-- แก้/ลบรายการใหม่ย้อนผลเดิมก่อนใช้ผลใหม่
-- Legacy transaction แก้/ลบโดยไม่ปรับ Opening Balance
-- Investments ไม่ถูก Transaction automation แก้ไข
+- ใช้เฉพาะ Transaction ประเภท Expense ของเดือนที่เลือก
+- รวมรายการตาม `category`
+- เรียงจากยอดมากไปน้อย
+- แสดงเปอร์เซ็นต์และจำนวนเงินบาทใน Legend
+- Investment ไม่ถูกรวม
 
-## 6. เงินใช้จ่ายคงเหลือ
+### Allocation
 
-- อ่านยอดจาก Account ชื่อ `บัญชีใช้จ่ายรายเดือน`
-- ยอดยกมาคงอยู่ ไม่ Reset รายเดือน
-- Expense ใหม่เลือกบัญชีนี้เป็นค่าเริ่มต้น
-- Detail นับ Expense เดือนปัจจุบันจากบัญชีนี้
-- เงินเติมงบใช้ Transfer จากบัญชีหลัก
+- สูตร Allocation เดิมไม่เปลี่ยน
+- จำนวนกลางวงใช้ compact currency 1 ตำแหน่ง
+- ไม่มีข้อความ `สินทรัพย์รวม` กลางวง
 
-## 7. ไฟล์ที่เปลี่ยน
+## 6. ไฟล์ที่เปลี่ยน
 
 | ไฟล์ | การเปลี่ยนแปลง |
 |---|---|
-| `index.html` | ชื่อ Goals ใหม่และ Version URLs |
-| `style.css` | สถานะ Goal, Migration warning และ Dynamic goal fields |
-| `analytics.js` | No-debt logic, Goal types, Account-linked progress และคำเตือน |
-| `api.js` | Validate/Save Goal, ตรวจ Header และป้องกัน Account references |
-| `app.js` | ฟอร์ม/Render Goal, Debt display, Schema warning และ Null-safe class |
-| `sw.js` | Cache v2.2.0 และ Versioned assets |
-| `README.md` | คู่มือ v2.2.0 |
-| `PROJECT_STATE.md` | สถานะฉบับนี้ |
-| `CHANGELOG.md` | ประวัติ v2.2.0 |
-| `GOALS_MIGRATION.md` | ขั้นตอนเพิ่ม Header Goals |
-| `PERSONAL_WEALTH_AGENT_MASTER_PROMPT.md` | อัปเดต Schema และสถานะความสามารถล่าสุด |
+| `index.html` | ตัวกรองปี, กราฟรายจ่าย, Allocation และ Version URL |
+| `style.css` | Mobile chart layout, filters และตัวเลข Allocation 30px |
+| `analytics.js` | Cash Flow รายปี, รายการเดือน และสัดส่วนรายจ่าย |
+| `api.js` | Investment validation, Account effects, Rollback และ reference protection |
+| `app.js` | ฟอร์ม Investment, chart rendering, filters และการลบ Investment |
+| `sw.js` | Cache v2.3.0 |
+| `README.md` | คู่มือระบบและ Deploy |
+| `PROJECT_STATE.md` | สถานะล่าสุด |
+| `CHANGELOG.md` | ประวัติ v2.3.0 |
+| `INVESTMENTS_MIGRATION.md` | วิธีเพิ่ม J1–K1 |
+| `PERSONAL_WEALTH_AGENT_MASTER_PROMPT.md` | Handoff รุ่นล่าสุด |
 
-ไฟล์ที่ตรวจแล้วแต่ไม่เปลี่ยน:
+ไม่แก้ `config.js`, `manifest.json`, Google OAuth Client ID, Spreadsheet ID หรือชื่อชีต
 
-- `config.js`: Client ID, Spreadsheet ID, Sheet names และ Defaults เดิม
-- `manifest.json`: PWA configuration เดิมถูกต้อง
+## 7. ผลทดสอบในสภาพแวดล้อมจำลอง
 
-## 8. OAuth และ Security
+| การทดสอบ | ผล |
+|---|---|
+| JavaScript syntax: analytics/api/app/sw | ผ่าน |
+| Cash Flow รายปีและชื่อเดือนโดยไม่มีปี | ผ่าน |
+| รวม Expense ตามหมวดหมู่และเปอร์เซ็นต์ | ผ่าน |
+| เพิ่ม Investment → หัก Account | ผ่าน |
+| ย้าย Investment จาก Account A → B | ผ่าน |
+| แก้เงินลงทุน → ใช้ผลสุทธิ | ผ่าน |
+| ลบ Investment → คืน Account | ผ่าน |
+| Legacy Investment → ไม่ปรับ Account | ผ่าน |
+| ยอดบัญชีไม่พอ | ผ่าน |
+| Append Investment ล้มเหลว → Rollback | ผ่าน |
+| ขาด Header J–K → Block พร้อมข้อความ | ผ่าน |
+| Account ที่ Investment อ้างถึง → Block Rename/Delete | ผ่าน |
+| HTML IDs/Versioned assets | ผ่าน |
+| Regression Transaction/Goal/Monthly Spending | ผ่าน Static checks |
 
-- `GOOGLE_CLIENT_ID` และ `SPREADSHEET_ID` ไม่เปลี่ยน
-- Google Cloud configuration ไม่เปลี่ยน
-- Quick Reconnect ใช้ user gesture และ `prompt` ว่าง
-- Token เก็บเฉพาะ `sessionStorage`
-- ไม่มี Client Secret, Refresh Token, Password หรือข้อมูลการเงินจริงใน Repository
-- Goal ที่ผูกบัญชีใช้ OAuth Scope เดิม
-- Service Worker Cache เฉพาะ Static Assets
+## 8. สิ่งที่ต้องทดสอบกับ Google Sheet จริง
 
-## 9. ผลการทดสอบ
+1. เพิ่ม J1 `account_from` และ K1 `funded_amount`
+2. Deploy v2.3.0 และปิด–เปิด PWA ใหม่
+3. เพิ่ม Investment ทดสอบ 1 บาทจาก Account ที่เลือก
+4. ตรวจ Account ลด 1 บาท และ Cash Flow/กราฟรายจ่ายไม่เปลี่ยน
+5. แก้เฉพาะราคาปัจจุบัน ตรวจว่า Account ไม่ลดซ้ำ
+6. ลบรายการ ตรวจว่า Account กลับมาเท่าเดิม
+7. ทดสอบ Cash Flow 6/12 เดือนและเลือกปี พ.ศ.
+8. ทดสอบกราฟสัดส่วนรายจ่ายอย่างน้อยสองเดือน
+9. ตรวจ Allocation บน iPhone ว่าตัวเลข 1 ตำแหน่งไม่ล้นวง
+10. ทดสอบ Income, Expense, Transfer และ Goal เดิมอย่างละหนึ่งครั้ง
 
-### ผ่าน Static/Mock
+## 9. Deploy
 
-| # | กรณี | ผล |
-|---:|---|---|
-| 1 | JavaScript syntax: analytics/api/app/sw | ผ่าน |
-| 2 | ไม่มีหนี้และไม่มี Income → DSR = 0 | ผ่าน |
-| 3 | มีค่างวดแต่ไม่มี Income → DSR = null/แสดง — | ผ่าน |
-| 4 | Goal เดิม → Financial + Manual | ผ่าน |
-| 5 | Goal DIME target 100,000, balance 60,000 → 60% | ผ่าน |
-| 6 | Goal ผูกบัญชีที่ไม่มี → warning | ผ่าน |
-| 7 | Milestone Completed → สถานะสำเร็จ ไม่มีเปอร์เซ็นต์เงิน | ผ่าน |
-| 8 | Missing Goal headers → บล็อกการบันทึกพร้อม Error | ผ่าน |
-| 9 | Account ที่ Goal อ้างถึง → บล็อก Rename/Delete | ผ่าน |
-| 10 | Account-linked Transaction regression | ผ่าน |
-| 11 | Monthly Spending Balance regression | ผ่าน |
-| 12 | Service Worker v2.2.0 ไม่ Cache Google API | ผ่าน |
-| 13 | Config identifiers ไม่เปลี่ยน | ผ่าน |
+1. สำรอง Google Sheet และ Repository
+2. ทำ `INVESTMENTS_MIGRATION.md`
+3. Replace ไฟล์จาก `personal-wealth-v2.3.0.zip` ที่ Root
+4. Commit: `feat: add account-linked investments and spending charts`
+5. รอ GitHub Pages workflow เป็นสีเขียว
+6. ปิด PWA เดิม เปิดใหม่ และ Refresh
 
-### ต้องให้ผู้ใช้ทดสอบกับ Google Sheet จริง
+## 10. Rollback
 
-ห้ามถือ Static/Mock ว่าเป็น REST API จริง ต้องทดสอบหลัง Migration และ Deploy:
+1. หยุดบันทึก Transaction และ Investment
+2. Revert v2.3.0 หรือ Replace Code ด้วย Backup v2.2.0
+3. Header J–K คงไว้ได้
+4. Code rollback ไม่ย้อนยอด Account ที่ v2.3.0 เขียนแล้ว
+5. ตรวจ Investment ที่มี `account_from`/`funded_amount` และ Reconcile Accounts ก่อนใช้งานต่อ
 
-1. Goal เดิมยังแสดงยอดเดิม
-2. Goal Manual 1/100 แสดง 1%
-3. Goal Account ผูก Account ทดสอบและแสดง Balance ถูกต้อง
-4. แก้ Balance Account โดยตรงแล้ว Goal เปลี่ยนตามหลัง Refresh
-5. Milestone เปลี่ยนสถานะและลบได้
-6. Account ที่ Goal อ้างถึง Rename/Delete ไม่ได้
-7. ไม่มีหนี้แสดง 0% และไม่มีภาระหนี้
-8. Income/Expense/Transfer ยังทำงาน
-9. iPhone Safe Area และ Desktop Responsive ไม่เสีย
-10. ไม่มีแถบ Error จาก Cache เก่า
+## 11. ข้อจำกัด
 
-หากสร้างข้อมูลทดสอบใน Sheet ให้ลบหลังทดสอบ
-
-## 10. ข้อจำกัด
-
-- Goal หนึ่งรายการผูกได้หนึ่ง Account
-- Goal เก็บ `account_name` ไม่ใช่ `account_id`
-- Milestone ไม่มี Checklist ย่อย
-- Google Sheets API ไม่มี Transaction แบบฐานข้อมูลข้ามชีต
-- ไม่มีระบบหลายผู้ใช้หรือ concurrency lock
-- Investments อัปเดตเอง
-- ไม่มี Refresh Token
-
-## 11. Deploy
-
-1. สำรอง Google Sheet และ Repository v2.1.1
-2. ทำตาม `GOALS_MIGRATION.md`
-3. Replace ไฟล์จาก `personal-wealth-v2.2.0.zip`
-4. Commit:
-
-```text
-feat: add account-linked goals and debt clarity
-```
-
-5. รอ Pages deployment สีเขียว
-6. ปิด PWA/Tab เก่าและเปิดใหม่
-7. Refresh และทดสอบ Checklist ด้านบน
-
-## 12. Rollback
-
-1. หยุดแก้ Goal
-2. Revert Commit v2.2.0 หรือ Replace Code ด้วย Backup v2.1.1
-3. คง Header G–J ใน Goals ได้ รุ่นเก่าจะเพิกเฉย
-4. Deploy และเปิด PWA ใหม่
-5. ตรวจ Accounts, Transactions, Investments และ Goals
-
-Rollback Code ไม่ปรับยอดการเงินและไม่ต้องลบ Header ใหม่
+- ไม่มี Database transaction แบบ Atomic ข้ามชีต
+- Account-linked Investment เป็นเงินต้นต่อหนึ่งแถว ไม่ใช่ประวัติซื้อ–ขายเต็มรูปแบบ
+- ยังไม่มี Sale, Dividend, Fee, Tax, Reinvest และ Market Price API
+- Investments ยังคงต้องอัปเดต `current_price`/`current_value` เอง
+- Legacy Transactions และ Legacy Investments ไม่ปรับ Opening Balance ย้อนหลัง
+- ไม่มี Refresh Token และไม่มี Multi-user concurrency control

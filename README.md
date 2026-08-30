@@ -1,6 +1,6 @@
-# Personal Wealth v2.2.0
+# Personal Wealth v2.3.0
 
-**Account-linked Goals** — WebApp/PWA ส่วนตัวสำหรับบันทึกรายรับ รายจ่าย การโอนเงิน ทรัพย์สิน หนี้สิน การลงทุน และเป้าหมายการเงินกับเป้าหมายชีวิต โดยใช้ GitHub Pages เป็น Frontend และอ่าน–เขียน Google Sheet แบบ Private ผ่าน Google OAuth และ Google Sheets API v4 โดยตรง
+**Account-linked Investments & Spending Analytics** — WebApp/PWA ส่วนตัวสำหรับบันทึกรายรับ รายจ่าย การโอนเงิน ทรัพย์สิน หนี้สิน การลงทุน และเป้าหมายการเงินกับเป้าหมายชีวิต โดยใช้ GitHub Pages เป็น Frontend และอ่าน–เขียน Google Sheet แบบ Private ผ่าน Google OAuth และ Google Sheets API v4 โดยตรง
 
 ## ความสามารถหลัก
 
@@ -11,8 +11,12 @@
 - Goal เดิมยังใช้ยอด `current_amount` แบบกรอกเอง
 - Goal การเงินเลือกติดตามจาก `Accounts.balance` ได้ เช่น เลือก DIME สำหรับเงินสำรองฉุกเฉิน
 - Goal แบบ Milestone ใช้สถานะ `ยังไม่เริ่ม`, `กำลังดำเนินการ`, `สำเร็จแล้ว` โดยไม่สร้างเปอร์เซ็นต์เงินสมมติ
-- ป้องกันการเปลี่ยนชื่อหรือลบ Account ที่ Transaction หรือ Goal ยังอ้างถึง
-- Static Asset ใช้ Version URL `v=2.2.0` ลดปัญหา PWA โหลด HTML และ JavaScript คนละรุ่น
+- Investment ใหม่เลือก Account ต้นทางและหัก `funded_amount` โดยไม่ถูกนับเป็น Expense
+- การแก้หรือลบ Investment ที่เชื่อมบัญชีย้อนผลเดิมก่อนใช้ผลใหม่
+- กราฟ Cash Flow เลือก 6/12 เดือนและปี พ.ศ. ได้ แกน X แสดงชื่อเดือน แกน Y แสดงจำนวนเต็ม
+- กราฟสัดส่วนรายจ่ายแยกตามหมวดหมู่และเลือกเดือนได้
+- ป้องกันการเปลี่ยนชื่อหรือลบ Account ที่ Transaction, Goal หรือ Investment ยังอ้างถึง
+- Static Asset ใช้ Version URL `v=2.3.0` ลดปัญหา PWA โหลด HTML และ JavaScript คนละรุ่น
 - รักษา Quick Reconnect, PWA, iPhone Safe Area และ Theme เดิม
 
 ## สถาปัตยกรรม
@@ -47,6 +51,7 @@ iPhone / Browser
 ├── PROJECT_STATE.md
 ├── CHANGELOG.md
 ├── GOALS_MIGRATION.md
+├── INVESTMENTS_MIGRATION.md
 └── icons/
 ```
 
@@ -54,13 +59,13 @@ iPhone / Browser
 
 ## โครงสร้าง Google Sheet
 
-v2.2.0 เปลี่ยนเฉพาะ Header ของ `Goals` โดยเพิ่ม 4 ช่องต่อท้าย ข้อมูลและ Header เดิมไม่ถูกลบหรือเปลี่ยนชื่อ
+v2.3.0 คง Migration ของ `Goals` จาก v2.2.0 และเพิ่ม Header ต่อท้าย `Investments` อีก 2 ช่อง ข้อมูลเดิมไม่ถูกลบหรือเปลี่ยนชื่อ
 
 | Sheet | Headers ตามลำดับ |
 |---|---|
 | `Accounts` | `account_id`, `account_name`, `currency`, `balance`, `type`, `note` |
 | `Transactions` | `tx_id`, `date`, `type`, `category`, `account_from`, `account_to`, `amount`, `note` |
-| `Investments` | `investment_id`, `asset_name`, `category`, `units`, `avg_cost`, `current_price`, `current_value`, `tax_deductible`, `note` |
+| `Investments` | `investment_id`, `asset_name`, `category`, `units`, `avg_cost`, `current_price`, `current_value`, `tax_deductible`, `note`, `account_from`, `funded_amount` |
 | `Assets` | `asset_id`, `asset_name`, `category`, `purchase_price`, `estimated_value`, `note` |
 | `Liabilities` | `liability_id`, `liability_name`, `total_amount`, `monthly_payment`, `note` |
 | `Goals` | `goal_id`, `goal_name`, `target_amount`, `current_amount`, `deadline`, `note`, `goal_type`, `progress_source`, `linked_account`, `status` |
@@ -68,9 +73,9 @@ v2.2.0 เปลี่ยนเฉพาะ Header ของ `Goals` โดย�
 | `MonthlySnapshots` | `snapshot_month`, `total_assets`, `total_liabilities`, `net_worth`, `monthly_cashflow`, `savings_rate`, `note` |
 | `Settings` | `key`, `value`, `description` |
 
-ก่อน Deploy ให้ทำตาม [GOALS_MIGRATION.md](GOALS_MIGRATION.md) หากยังไม่เพิ่ม Header ระบบยังอ่าน Goal เดิมได้ แต่จะเตือนและไม่บันทึก Goal จนกว่า Header จะครบ
+ก่อน Deploy ให้ตรวจ [GOALS_MIGRATION.md](GOALS_MIGRATION.md) และทำตาม [INVESTMENTS_MIGRATION.md](INVESTMENTS_MIGRATION.md) หาก Header ไม่ครบ ระบบยังอ่านข้อมูลเดิมได้ แต่จะเตือนและไม่บันทึกข้อมูลชนิดนั้นจนกว่า Header จะครบ
 
-ชื่อ `account_name` ต้องไม่ซ้ำ เพราะ Transactions และ Goals ยังเก็บชื่อบัญชีตามโครงสร้างเดิม
+ชื่อ `account_name` ต้องไม่ซ้ำ เพราะ Transactions, Goals และ Investments ยังเก็บชื่อบัญชีตามโครงสร้างเดิม
 
 ## ภาระหนี้ต่อรายได้
 
@@ -158,8 +163,8 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 ## การเพิ่ม แก้ไข และลบ Account
 
 - ชื่อ Account ต้องไม่ซ้ำ
-- เปลี่ยนชื่อหรือลบ Account ไม่ได้เมื่อ Transaction หรือ Goal แบบ Account ยังอ้างถึง
-- หากต้องการเปลี่ยนชื่อ ให้แก้ Goal ไปใช้บัญชีอื่นหรือเปลี่ยนเป็น Manual ก่อน
+- เปลี่ยนชื่อหรือลบ Account ไม่ได้เมื่อ Transaction, Goal แบบ Account หรือ Investment รุ่นใหม่ยังอ้างถึง
+- หากต้องการเปลี่ยนชื่อ ให้ย้ายการอ้างอิงของ Goal/Investment ก่อน
 - แก้ `balance` โดยตรงได้เพื่อ Reconcile และไม่กระตุ้น Transaction automation
 
 ## Reconcile กับยอดธนาคารจริง
@@ -180,8 +185,10 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 
 - ผู้ใช้ย้ายเงินสดออกจาก Investments ไป Account แล้ว
 - ตั้งค่า `include_accounts_in_net_worth = true` แล้ว
-- Investments ยังคงเป็นมูลค่าที่ผู้ใช้อัปเดตเอง
-- ไม่มี `InvestmentTransactions` และไม่แก้มูลค่า Investments อัตโนมัติ
+- Investments ยังคงเป็นมูลค่าที่ผู้ใช้อัปเดตเอง แต่ Investment ใหม่สามารถหักเงินต้นจาก Account ได้
+- `funded_amount` คือเงินต้นที่หักจาก Account ส่วน `current_value` คือมูลค่าปัจจุบัน สองช่องนี้ไม่ควรถูกใช้แทนกัน
+- การลงทุนไม่ถูกนับเป็น Expense หรือ Cash Flow
+- ไม่มี `InvestmentTransactions` สำหรับประวัติซื้อ–ขาย และไม่ดึงราคาตลาดอัตโนมัติ
 - สูตร Emergency Fund เดิมไม่เปลี่ยน
 
 ## OAuth และ Quick Reconnect
@@ -190,7 +197,7 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 - ใช้ `prompt` ว่างในการเชื่อมต่อทั่วไปเพื่อลด consent ซ้ำ
 - เมื่อ Token หมดอายุจะแสดง `แตะเพื่อเชื่อมต่อ Google`
 - ไม่มี Refresh Token และไม่มี PIN แทน Google OAuth
-- ไม่ต้องเปลี่ยน Google Cloud configuration สำหรับ v2.2.0
+- ไม่ต้องเปลี่ยน Google Cloud configuration สำหรับ v2.3.0
 
 ## ความปลอดภัย
 
@@ -204,27 +211,28 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 ## วิธี Deploy
 
 1. สำรอง Google Sheet และ Repository รุ่นปัจจุบัน
-2. ทำ Migration ชีต Goals ตาม `GOALS_MIGRATION.md`
-3. ดาวน์โหลด `personal-wealth-v2.2.0.zip`
-4. แตก ZIP แล้ว Replace ไฟล์ใน Root ของ Repository
-5. Commit:
+2. ตรวจ Migration ชีต Goals ตาม `GOALS_MIGRATION.md`
+3. ทำ Migration ชีต Investments ตาม `INVESTMENTS_MIGRATION.md`
+4. ดาวน์โหลด `personal-wealth-v2.3.0.zip`
+5. แตก ZIP แล้ว Replace ไฟล์ใน Root ของ Repository
+6. Commit:
 
 ```text
-feat: add account-linked goals and debt clarity
+feat: add account-linked investments and spending charts
 ```
 
-6. รอ GitHub Actions `pages build and deployment` เป็นสีเขียว
-7. ปิด WebApp/PWA ทุกหน้าต่าง แล้วเปิดใหม่
-8. กด Refresh และทดสอบตาม `PROJECT_STATE.md`
+7. รอ GitHub Actions `pages build and deployment` เป็นสีเขียว
+8. ปิด WebApp/PWA ทุกหน้าต่าง แล้วเปิดใหม่
+9. กด Refresh และทดสอบตาม `PROJECT_STATE.md`
 
 ## วิธี Rollback
 
-1. หยุดแก้ Goal ชั่วคราว
-2. Revert Commit v2.2.0 หรือ Replace Code ด้วย Backup v2.1.1
-3. Header ใหม่ 4 ช่องใน Goals สามารถคงไว้ได้ เพราะ v2.1.1 จะเพิกเฉย
+1. หยุดบันทึก Transaction และ Investment ชั่วคราว
+2. Revert Commit v2.3.0 หรือ Replace Code ด้วย Backup v2.2.0
+3. Header ใหม่ใน Goals และ Investments สามารถคงไว้ได้ เพราะ Code เก่าจะเพิกเฉย
 4. รอ Deploy และเปิดแอปใหม่
 
-Rollback Code ไม่เปลี่ยนยอด Accounts, Transactions หรือ Investments และไม่ต้องลบ Header ใหม่
+Rollback Code ไม่ย้อนยอด Accounts ที่ v2.3.0 แก้ไปแล้ว ต้องตรวจ `account_from`, `funded_amount` และ Reconcile ยอดจริงก่อนใช้งานต่อ
 
 ## การแก้ปัญหา
 
@@ -232,7 +240,10 @@ Rollback Code ไม่เปลี่ยนยอด Accounts, Transactions ห
 |---|---|
 | Goal รุ่นใหม่บันทึกไม่ได้ | เพิ่ม Header `goal_type`, `progress_source`, `linked_account`, `status` ต่อท้าย Goals |
 | Goal ผูกบัญชีแสดงตรวจสอบบัญชี | ตรวจ `linked_account` และชื่อ Account; ชื่อต้องไม่ซ้ำ |
-| เปลี่ยนชื่อ/ลบ Account ไม่ได้ | มี Transaction หรือ Goal อ้างถึงบัญชี |
+| เปลี่ยนชื่อ/ลบ Account ไม่ได้ | มี Transaction, Goal หรือ Investment อ้างถึงบัญชี |
+| บันทึก Investment ไม่ได้ | เพิ่ม Header `account_from`, `funded_amount` ต่อท้าย Investments และตรวจยอด Account |
+| ยอด Account ลดหลังลงทุน | เป็นผลปกติของ Investment ใหม่ และไม่ถูกนับเป็น Expense |
+| กราฟสัดส่วนรายจ่ายว่าง | เดือนที่เลือกไม่มี Transaction ประเภท Expense |
 | ภาระหนี้แสดง `—` | มีค่างวดแต่ยังไม่มี Income เดือนปัจจุบัน |
 | หน้าเว็บยังเป็นรุ่นเก่า | รอ Deploy, ปิด PWA แล้วเปิดใหม่ หรือ Clear site data |
 | สิทธิ์หมดอายุ | กด `แตะเพื่อเชื่อมต่อ Google` |
@@ -243,10 +254,11 @@ Rollback Code ไม่เปลี่ยนยอด Accounts, Transactions ห
 - Google Sheets API ไม่มี Database transaction ข้ามชีต
 - ไม่มีระบบหลายผู้ใช้หรือป้องกันการแก้พร้อมกันหลายอุปกรณ์
 - Goal ผูกบัญชีอ้างอิงด้วย `account_name` ไม่ใช่ `account_id`
-- Goal หนึ่งรายการผูกได้หนึ่ง Account ใน v2.2.0
+- Goal หนึ่งรายการผูกได้หนึ่ง Account
 - Milestone มีสถานะ 3 ระดับและไม่มีรายการงานย่อย
 - Legacy transactions ไม่เชื่อม Accounts
-- Investments ต้องอัปเดตมูลค่าด้วยตนเอง
+- Investments ต้องอัปเดตมูลค่าปัจจุบันด้วยตนเอง
+- Account-linked Investment ยังไม่ใช่ Investment Ledger ซื้อ–ขายเต็มรูปแบบ
 - ไม่มี Refresh Token
 
 ## เอกสารอ้างอิง

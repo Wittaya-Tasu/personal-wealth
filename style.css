@@ -531,9 +531,20 @@ svg {
   font-size: 12px;
 }
 
+.chart-filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .chart-medium {
   position: relative;
   height: 220px;
+}
+
+.cashflow-panel .chart-medium {
+  height: 240px;
 }
 
 .allocation-content {
@@ -570,6 +581,24 @@ svg {
   font-variant-numeric: tabular-nums;
 }
 
+.allocation-donut-center strong {
+  margin-top: 0;
+  font-size: 30px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.expense-donut-center strong {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.expense-breakdown-content .legend-list {
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
 .legend-list {
   display: flex;
   min-width: 0;
@@ -596,6 +625,7 @@ svg {
   color: var(--text);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .legend-dot {
@@ -1379,6 +1409,37 @@ svg {
   }
 }
 
+@media (max-width: 520px) {
+  .cashflow-panel .section-heading,
+  .expense-breakdown-panel .section-heading {
+    display: grid;
+    gap: 10px;
+  }
+
+  .chart-filter-group {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .chart-filter-group .compact-select {
+    flex: 1 1 0;
+  }
+
+  .expense-breakdown-panel .compact-select {
+    width: 100%;
+  }
+
+  .allocation-content {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .donut-wrap {
+    width: min(72vw, 230px);
+    margin: 0 auto;
+  }
+}
+
 @media (max-width: 410px) {
   .main-content {
     padding: 14px;
@@ -1400,11 +1461,6 @@ svg {
 
   .hero-change {
     margin: 4px 0 0;
-  }
-
-  .allocation-content {
-    grid-template-columns: 42% minmax(0, 1fr);
-    gap: 10px;
   }
 
   .panel {

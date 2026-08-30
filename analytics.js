@@ -168,6 +168,92 @@
     return months;
   }
 
+  function buildYearCashflow(transactions, year) {
+    const selectedYear = Number(year);
+    const months = Array.from({ length: 12 }, (_, monthIndex) => {
+      const date = new Date(selectedYear, monthIndex, 1, 12, 0, 0);
+      return {
+        key: monthKey(date),
+        date,
+        label: date.toLocaleDateString("th-TH", { month: "short" }),
+        income: 0,
+        expense: 0,
+        cashflow: 0,
+        transactionCount: 0
+      };
+    });
+    const index = new Map(months.map((item) => [item.key, item]));
+
+    (transactions || []).forEach((tx) => {
+      const item = index.get(monthKey(parseDate(tx.date)));
+      if (!item) return;
+      const amount = Math.abs(toNumber(tx.amount));
+      const type = normalizeType(tx.type);
+      if (type === "income") {
+        item.income += amount;
+        item.transactionCount += 1;
+      } else if (type === "expense") {
+        item.expense += amount;
+        item.transactionCount += 1;
+      }
+    });
+
+    months.forEach((item) => {
+      item.cashflow = item.income - item.expense;
+    });
+    return months;
+  }
+
+  function getTransactionYears(transactions, anchor = new Date()) {
+    const years = new Set([anchor.getFullYear()]);
+    (transactions || []).forEach((tx) => {
+      const date = parseDate(tx.date);
+      if (date) years.add(date.getFullYear());
+    });
+    return [...years].sort((a, b) => b - a);
+  }
+
+  function getExpenseMonthOptions(transactions, anchor = new Date()) {
+    const months = new Map();
+    const addMonth = (date) => {
+      if (!date) return;
+      const key = monthKey(date);
+      months.set(key, {
+        key,
+        date: new Date(date.getFullYear(), date.getMonth(), 1, 12, 0, 0),
+        label: date.toLocaleDateString("th-TH", { month: "long", year: "numeric" })
+      });
+    };
+    addMonth(anchor);
+    (transactions || []).forEach((tx) => {
+      if (normalizeType(tx.type) === "expense") addMonth(parseDate(tx.date));
+    });
+    return [...months.values()].sort((a, b) => b.date - a.date);
+  }
+
+  function buildExpenseBreakdown(transactions, selectedMonthKey) {
+    const buckets = new Map();
+    (transactions || []).forEach((tx) => {
+      if (normalizeType(tx.type) !== "expense") return;
+      if (monthKey(parseDate(tx.date)) !== selectedMonthKey) return;
+      const name = String(tx.category || "ไม่ระบุหมวดหมู่").trim() || "ไม่ระบุหมวดหมู่";
+      const key = name.toLocaleLowerCase("th-TH");
+      const existing = buckets.get(key) || { name, value: 0 };
+      existing.value += Math.abs(toNumber(tx.amount));
+      buckets.set(key, existing);
+    });
+
+    const total = [...buckets.values()].reduce((sumValue, item) => sumValue + item.value, 0);
+    const rows = [...buckets.values()]
+      .sort((a, b) => b.value - a.value)
+      .map((item, index) => ({
+        ...item,
+        percentage: total > 0 ? item.value / total : 0,
+        color: COLORS[index % COLORS.length]
+      }));
+    return { total, rows };
+  }
+
   function classifyAllocation(label, source) {
     const text = `${label || ""} ${source || ""}`.toLowerCase();
     if (/cash|เงินสด|เงินฝาก|ออมทรัพย์|ฝากประจำ/.test(text)) return "เงินสดและเงินฝาก";
@@ -470,6 +556,10 @@
     getAssetValue,
     rowsToSettings,
     buildMonthlyCashflow,
+    buildYearCashflow,
+    getTransactionYears,
+    getExpenseMonthOptions,
+    buildExpenseBreakdown,
     buildGoalRows,
     buildViewModel
   });

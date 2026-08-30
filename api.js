@@ -6,6 +6,7 @@
   const LINKED_TRANSACTION_PREFIX = "v21-";
   const MONEY_PRECISION = 100;
   const GOAL_METADATA_HEADERS = ["goal_type", "progress_source", "linked_account", "status"];
+  const INVESTMENT_FUNDING_HEADERS = ["account_from", "funded_amount"];
 
   function waitFor(predicate, timeoutMs = 15000) {
     return new Promise((resolve, reject) => {
@@ -279,6 +280,10 @@
       return this.getMissingHeaders(this.config.SHEETS.goals, GOAL_METADATA_HEADERS);
     }
 
+    getMissingInvestmentFundingHeaders() {
+      return this.getMissingHeaders(this.config.SHEETS.investments, INVESTMENT_FUNDING_HEADERS);
+    }
+
     buildRow(sheetName, record) {
       return this.getHeaders(sheetName).map((header) => {
         if (header.endsWith("_id") && !record[header]) return createShortId();
@@ -395,14 +400,25 @@
       });
     }
 
+    isAccountReferencedByInvestment(name) {
+      const key = accountKey(name);
+      return (this.currentData?.investments || []).some((investment) => {
+        return this.isAccountLinkedInvestment(investment)
+          && accountKey(investment.account_from) === key;
+      });
+    }
+
     isAccountReferenced(name) {
-      return this.isAccountReferencedByTransaction(name) || this.isAccountReferencedByGoal(name);
+      return this.isAccountReferencedByTransaction(name)
+        || this.isAccountReferencedByGoal(name)
+        || this.isAccountReferencedByInvestment(name);
     }
 
     accountReferenceLabel(name) {
       const references = [];
       if (this.isAccountReferencedByTransaction(name)) references.push("Transaction");
       if (this.isAccountReferencedByGoal(name)) references.push("Goal");
+      if (this.isAccountReferencedByInvestment(name)) references.push("Investment");
       return references.join(" และ ") || "ข้อมูลอื่น";
     }
 
@@ -527,6 +543,101 @@
         ...record
       });
       return this.update(this.config.SHEETS.goals, rowNumber, validated);
+    }
+
+    isAccountLinkedInvestment(record) {
+      return Boolean(normalizeName(record?.account_from) && roundMoney(record?.funded_amount) > 0);
+    }
+
+    validateInvestmentRecord(record, existingRecord = null) {
+      const missingHeaders = this.getMissingInvestmentFundingHeaders();
+      if (missingHeaders.length) {
+        const error = new Error(
+          `ชีต Investments ยังขาด Header: ${missingHeaders.join(", ")} `
+          + "กรุณาเพิ่ม Header ต่อท้ายแถวที่ 1 ก่อนบันทึกการลงทุนรุ่นนี้"
+        );
+        error.code = "INVESTMENT_SCHEMA_MIGRATION_REQUIRED";
+        error.missingHeaders = missingHeaders;
+        throw error;
+      }
+
+      const assetName = normalizeName(record?.asset_name);
+      if (!assetName) throw new Error("กรุณาระบุชื่อสินทรัพย์ลงทุน");
+      const accountFrom = normalizeName(record?.account_from);
+      const fundedAmount = roundMoney(record?.funded_amount);
+      const isLegacyUnlinked = Boolean(
+        existingRecord
+        && !normalizeName(existingRecord.account_from)
+        && !(roundMoney(existingRecord.funded_amount) > 0)
+      );
+
+      if (!accountFrom) {
+        if (!isLegacyUnlinked) {
+          const error = new Error("กรุณาเลือกบัญชีที่ใช้เงินลงทุน");
+          error.code = "INVESTMENT_ACCOUNT_REQUIRED";
+          throw error;
+        }
+        return { ...record, asset_name: assetName, account_from: "", funded_amount: "" };
+      }
+      if (!(fundedAmount > 0)) {
+        const error = new Error("จำนวนเงินที่ใช้ลงทุนต้องมากกว่า 0 บาท");
+        error.code = "INVALID_INVESTMENT_FUNDING";
+        throw error;
+      }
+
+      const account = this.findAccountByName(accountFrom);
+      return {
+        ...record,
+        asset_name: assetName,
+        account_from: normalizeName(account.account_name),
+        funded_amount: fundedAmount
+      };
+    }
+
+    getInvestmentEffects(record, multiplier = 1) {
+      if (!this.isAccountLinkedInvestment(record)) return [];
+      return [{
+        accountName: normalizeName(record.account_from),
+        delta: roundMoney(-roundMoney(record.funded_amount) * multiplier)
+      }];
+    }
+
+    async appendInvestmentWithAccountEffects(record) {
+      const investment = this.validateInvestmentRecord(record);
+      const changes = await this.applyAccountEffects(this.getInvestmentEffects(investment));
+      try {
+        const result = await this.append(this.config.SHEETS.investments, investment);
+        return { ...result, investment };
+      } catch (error) {
+        return this.rollbackAccountChanges(changes, error, "การเพิ่ม Investment");
+      }
+    }
+
+    async updateInvestmentWithAccountEffects(rowNumber, existingRecord, record) {
+      const investment = this.validateInvestmentRecord({
+        ...existingRecord,
+        ...record
+      }, existingRecord);
+      const effects = [
+        ...this.getInvestmentEffects(existingRecord, -1),
+        ...this.getInvestmentEffects(investment)
+      ];
+      const changes = await this.applyAccountEffects(effects);
+      try {
+        return await this.update(this.config.SHEETS.investments, rowNumber, investment);
+      } catch (error) {
+        return this.rollbackAccountChanges(changes, error, "การแก้ไข Investment");
+      }
+    }
+
+    async deleteInvestmentWithAccountEffects(record) {
+      if (!record?._rowNumber) throw new Error("ไม่พบตำแหน่ง Investment ที่ต้องการลบ");
+      const changes = await this.applyAccountEffects(this.getInvestmentEffects(record, -1));
+      try {
+        return await this.delete(this.config.SHEETS.investments, record._rowNumber);
+      } catch (error) {
+        return this.rollbackAccountChanges(changes, error, "การลบ Investment");
+      }
     }
 
     validateTransactionAccounts(record) {
