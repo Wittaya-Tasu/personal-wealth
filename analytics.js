@@ -238,6 +238,7 @@
       if (monthKey(parseDate(tx.date)) !== selectedMonthKey) return;
       const name = String(tx.category || "ไม่ระบุหมวดหมู่").trim() || "ไม่ระบุหมวดหมู่";
       const key = name.toLocaleLowerCase("th-TH");
+      if (key === "บัตรเครดิต") return;
       const existing = buckets.get(key) || { name, value: 0 };
       existing.value += Math.abs(toNumber(tx.amount));
       buckets.set(key, existing);

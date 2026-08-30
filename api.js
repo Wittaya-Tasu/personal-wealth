@@ -7,6 +7,7 @@
   const MONEY_PRECISION = 100;
   const GOAL_METADATA_HEADERS = ["goal_type", "progress_source", "linked_account", "status"];
   const INVESTMENT_FUNDING_HEADERS = ["account_from", "funded_amount"];
+  const TRANSACTION_ITEM_HEADERS = ["item_name"];
 
   function waitFor(predicate, timeoutMs = 15000) {
     return new Promise((resolve, reject) => {
@@ -69,6 +70,12 @@
     if (["expense", "รายจ่าย"].includes(type)) return "expense";
     if (["transfer", "โอน", "โอนเงิน"].includes(type)) return "transfer";
     return "";
+  }
+
+  function investmentValue(record) {
+    const explicitValue = toMoney(record?.current_value);
+    if (explicitValue > 0) return explicitValue;
+    return roundMoney(toMoney(record?.units) * toMoney(record?.current_price));
   }
 
   function normalizeGoalType(value) {
@@ -282,6 +289,10 @@
 
     getMissingInvestmentFundingHeaders() {
       return this.getMissingHeaders(this.config.SHEETS.investments, INVESTMENT_FUNDING_HEADERS);
+    }
+
+    getMissingTransactionItemHeaders() {
+      return this.getMissingHeaders(this.config.SHEETS.transactions, TRANSACTION_ITEM_HEADERS);
     }
 
     buildRow(sheetName, record) {
@@ -640,7 +651,91 @@
       }
     }
 
-    validateTransactionAccounts(record) {
+    async addInvestmentContribution(record) {
+      const missingHeaders = this.getMissingInvestmentFundingHeaders();
+      if (missingHeaders.length) {
+        const error = new Error(
+          `ชีต Investments ยังขาด Header: ${missingHeaders.join(", ")} `
+          + "กรุณาเพิ่ม Header ต่อท้ายแถวที่ 1 ก่อนบันทึกการลงทุน"
+        );
+        error.code = "INVESTMENT_SCHEMA_MIGRATION_REQUIRED";
+        throw error;
+      }
+
+      const amount = roundMoney(record?.funded_amount);
+      if (!(amount > 0)) {
+        const error = new Error("จำนวนเงินที่ใช้ลงทุนต้องมากกว่า 0 บาท");
+        error.code = "INVALID_INVESTMENT_FUNDING";
+        throw error;
+      }
+      const account = this.findAccountByName(record?.account_from);
+      const accountName = normalizeName(account.account_name);
+      const targetRow = Number(record?.investment_row);
+      const existing = Number.isInteger(targetRow) && targetRow >= 2
+        ? (this.currentData?.investments || []).find((row) => row._rowNumber === targetRow)
+        : null;
+      if (record?.investment_row !== "new" && !existing) {
+        const error = new Error("ไม่พบสินทรัพย์ลงทุนที่เลือก กรุณาซิงก์ข้อมูลแล้วลองใหม่");
+        error.code = "INVESTMENT_NOT_FOUND";
+        throw error;
+      }
+
+      let action;
+      let actionLabel;
+      if (existing) {
+        const existingAccount = normalizeName(existing.account_from);
+        if (existingAccount && accountKey(existingAccount) !== accountKey(accountName)) {
+          const error = new Error(
+            `“${existing.asset_name || "สินทรัพย์นี้"}” ใช้บัญชีต้นทาง “${existingAccount}” อยู่แล้ว `
+            + "กรุณาใช้บัญชีเดิมเพื่อให้ยอดย้อนหลังถูกต้อง"
+          );
+          error.code = "INVESTMENT_ACCOUNT_MISMATCH";
+          throw error;
+        }
+        const updated = {
+          ...existing,
+          account_from: existingAccount || accountName,
+          funded_amount: roundMoney((existingAccount ? toMoney(existing.funded_amount) : 0) + amount),
+          current_value: roundMoney(investmentValue(existing) + amount)
+        };
+        action = () => this.update(this.config.SHEETS.investments, existing._rowNumber, updated);
+        actionLabel = `การเพิ่มเงินใน ${existing.asset_name || "Investment"}`;
+      } else {
+        const assetName = normalizeName(record?.asset_name);
+        if (!assetName) throw new Error("กรุณาระบุชื่อสินทรัพย์ลงทุนใหม่");
+        const duplicate = (this.currentData?.investments || []).find((row) => {
+          return accountKey(row.asset_name) === accountKey(assetName);
+        });
+        if (duplicate) {
+          const error = new Error(`มี “${assetName}” อยู่แล้ว กรุณาเลือกจากรายการสินทรัพย์เดิม`);
+          error.code = "DUPLICATE_INVESTMENT_NAME";
+          throw error;
+        }
+        const investment = {
+          asset_name: assetName,
+          category: "เงินลงทุน",
+          units: "",
+          avg_cost: "",
+          current_price: "",
+          current_value: amount,
+          tax_deductible: "",
+          note: "",
+          account_from: accountName,
+          funded_amount: amount
+        };
+        action = () => this.append(this.config.SHEETS.investments, investment);
+        actionLabel = `การเพิ่ม ${assetName}`;
+      }
+
+      const changes = await this.applyAccountEffects([{ accountName, delta: -amount }]);
+      try {
+        return await action();
+      } catch (error) {
+        return this.rollbackAccountChanges(changes, error, actionLabel);
+      }
+    }
+
+    validateTransactionAccounts(record, { requireExpenseItem = true } = {}) {
       const amount = roundMoney(record?.amount);
       if (!(amount > 0)) {
         const error = new Error("จำนวนเงินต้องมากกว่า 0 บาท");
@@ -662,6 +757,22 @@
         validated.account_from = "";
         validated.account_to = normalizeName(accountTo.account_name);
       } else if (type === "expense") {
+        if (requireExpenseItem) {
+          const missingHeaders = this.getMissingTransactionItemHeaders();
+          if (missingHeaders.length) {
+            const error = new Error(
+              `ชีต Transactions ยังขาด Header: ${missingHeaders.join(", ")} `
+              + "กรุณาเพิ่ม Header ต่อท้ายแถวที่ 1 ก่อนบันทึกรายจ่าย"
+            );
+            error.code = "TRANSACTION_SCHEMA_MIGRATION_REQUIRED";
+            error.missingHeaders = missingHeaders;
+            throw error;
+          }
+          validated.category = normalizeName(record.category);
+          validated.item_name = normalizeName(record.item_name);
+          if (!validated.category) throw new Error("กรุณาเลือกหมวดหมู่รายจ่าย");
+          if (!validated.item_name) throw new Error("กรุณาระบุรายการรายจ่าย");
+        }
         const accountFrom = this.findAccountByName(record.account_from);
         validated.type = "Expense";
         validated.account_from = normalizeName(accountFrom.account_name);
@@ -678,11 +789,12 @@
         validated.account_from = normalizeName(accountFrom.account_name);
         validated.account_to = normalizeName(accountTo.account_name);
       }
+      if (type !== "expense") validated.item_name = "";
       return validated;
     }
 
     getTransactionEffects(record, multiplier = 1) {
-      const transaction = this.validateTransactionAccounts(record);
+      const transaction = this.validateTransactionAccounts(record, { requireExpenseItem: false });
       const amount = roundMoney(transaction.amount * multiplier);
       const type = normalizeTransactionType(transaction.type);
       if (type === "income") {

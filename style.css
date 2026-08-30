@@ -1211,6 +1211,12 @@ svg {
   color: #5d7068;
 }
 
+.field input:disabled,
+.field select:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
 .field-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -79,7 +79,7 @@
 | UI Theme | Dark Emerald + Gold |
 | Font | Sarabun |
 | อุปกรณ์หลัก | iPhone 16+ และ Desktop |
-| เวอร์ชันล่าสุด | v2.3.0 — Account-linked Investments & Spending Analytics |
+| เวอร์ชันล่าสุด | v2.4.0 — Expense Categories & Simple Investment Contributions |
 
 ค่าจริงของ OAuth Client ID และ Spreadsheet ID ให้ตรวจจาก `config.js` ล่าสุด ห้ามคัดลอกค่าจากข้อความเก่ามาเขียนทับ
 
@@ -143,6 +143,7 @@ iPhone / Browser
 | `CHANGELOG.md` | ประวัติการเปลี่ยนแปลงตามรุ่น |
 | `GOALS_MIGRATION.md` | วิธีเพิ่ม Header Goal รุ่น v2.2.0 |
 | `INVESTMENTS_MIGRATION.md` | วิธีเพิ่ม Header เงินลงทุนรุ่น v2.3.0 |
+| `TRANSACTIONS_MIGRATION.md` | วิธีเพิ่ม Header ชื่อรายการรายจ่ายรุ่น v2.4.0 |
 | `icons/` | ไอคอน WebApp/PWA |
 
 ไฟล์ `script.js` แบบเดิมไม่ถูกใช้งานแล้ว ห้ามนำกลับมาเชื่อมกับ `index.html`
@@ -156,7 +157,7 @@ iPhone / Browser
 | Sheet | Headers ตามลำดับ |
 |---|---|
 | `Accounts` | `account_id`, `account_name`, `currency`, `balance`, `type`, `note` |
-| `Transactions` | `tx_id`, `date`, `type`, `category`, `account_from`, `account_to`, `amount`, `note` |
+| `Transactions` | `tx_id`, `date`, `type`, `category`, `account_from`, `account_to`, `amount`, `note`, `item_name` |
 | `Investments` | `investment_id`, `asset_name`, `category`, `units`, `avg_cost`, `current_price`, `current_value`, `tax_deductible`, `note`, `account_from`, `funded_amount` |
 | `Assets` | `asset_id`, `asset_name`, `category`, `purchase_price`, `estimated_value`, `note` |
 | `Liabilities` | `liability_id`, `liability_name`, `total_amount`, `monthly_payment`, `note` |
@@ -263,22 +264,23 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 - แกน X ของ Cash Flow แสดงเฉพาะชื่อเดือน
 - แกน Y แสดงเงินบาทเต็มจำนวน ไม่ใช้ compact notation
 - Expense Mix รวมเฉพาะ Expense ตามหมวดหมู่และเลือกเดือนได้
+- Expense Mix ตัด category `บัตรเครดิต` ออก และเปอร์เซ็นต์ต่ำกว่า 10% แสดงทศนิยม 1 ตำแหน่ง
 - Investment ไม่รวมใน Expense Mix
 - Allocation กลางวงแสดงตัวเลข compact 1 ตำแหน่งและไม่มีคำว่า `สินทรัพย์รวม`
 
 ---
 
-### 8. ความสามารถและข้อจำกัดปัจจุบันของ v2.3.0
+### 8. ความสามารถและข้อจำกัดปัจจุบันของ v2.4.0
 
 | การกระทำ | สิ่งที่ระบบทำ | ข้อจำกัด |
 |---|---|---|
 | Income | เพิ่ม `account_to` และนับรายรับ | รายการเก่าก่อน v2.1.0 ไม่ Replay |
-| Expense | ลด `account_from` และนับรายจ่าย | ยอดไม่พอต้องไม่บันทึก |
+| Expense | เลือก category ก่อนกรอก `item_name`, ลด `account_from` และนับรายจ่าย | ยอดไม่พอต้องไม่บันทึก |
 | Transfer | ลดต้นทาง เพิ่มปลายทาง ไม่นับ Cash Flow | ปลายทางต้องเป็น Account |
 | Goal Manual | ใช้ `current_amount` | ผู้ใช้ต้องอัปเดตเอง |
 | Goal Account | อ่าน `Accounts.balance` | ผูกได้หนึ่ง Account และอ้างอิงด้วยชื่อ |
 | Goal Milestone | ติดตามสถานะ 3 ระดับ | ไม่มี Checklist ย่อย |
-| Investment ใหม่ | หัก `funded_amount` จาก `account_from` และไม่นับ Cash Flow | เป็นเงินต้นต่อหนึ่งแถว ไม่ใช่ Ledger ซื้อ–ขาย |
+| Investment Contribution | เลือกสินทรัพย์เดิม/ชื่อใหม่ หักเงินรอบใหม่ และเพิ่ม `current_value`/`funded_amount` | หนึ่งสินทรัพย์ใช้ Account ต้นทางเดิมและไม่ใช่ Ledger ซื้อ–ขาย |
 | RMF/ETF/PVD | เก็บมูลค่าใน Investments | ไม่มี InvestmentTransactions/ราคาตลาด |
 
 ยอด Accounts ตอนเริ่มใช้ v2.1.0 เป็น Opening Balance ห้ามนำ Transactions เก่ามาคำนวณย้อนกลับ
@@ -298,10 +300,12 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 | Debt/Goal v2.2.0 Mock | ผ่าน |
 | Account-linked Investment v2.3.0 Mock | ผ่าน |
 | Cash Flow year/Expense breakdown v2.3.0 Mock | ผ่าน |
+| Expense category/item_name v2.4.0 Mock | ผ่าน |
+| Investment contribution v2.4.0 Mock | ผ่าน |
 | Refresh หลัง Archive GAS | ผ่าน |
 | GAS Active deployment | ไม่มี |
 | iPhone Safe Area / Dynamic Island | แก้แล้วและผู้ใช้ยืนยัน |
-| PWA cache base | `personal-wealth-shell-v2.3.0` |
+| PWA cache base | `personal-wealth-shell-v2.4.0` |
 
 เคยทดสอบด้วยรายการรายรับ 1 บาท หมวด `ทดสอบระบบ` และลบออกสำเร็จแล้ว ห้ามถือรายการดังกล่าวว่าเป็นข้อมูลจริงหรือสร้างซ้ำ
 
@@ -311,7 +315,7 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 
 ### 10. งานพัฒนาหลักลำดับถัดไป
 
-ระบบหักเงินลงทุนจาก Account แบบหนึ่งแถวต่อหนึ่งสินทรัพย์ได้รับอนุมัติและทำแล้วใน v2.3.0 แต่ **Investment Ledger ซื้อ–ขายเต็มรูปแบบ** ยังไม่ได้อนุมัติ ก่อนลงมือต้องเสนอ Migration และขอกติกา:
+ระบบรวม Investment Contribution ในแถวสินทรัพย์เดิมและใช้ Account ต้นทางเดิมได้รับอนุมัติและทำแล้วใน v2.4.0 แต่ **Investment Ledger ซื้อ–ขายเต็มรูปแบบ** ยังไม่ได้อนุมัติ ก่อนลงมือต้องเสนอ Migration และขอกติกา:
 
 1. การซื้อ–ขาย Investment
 2. ค่าธรรมเนียม ปันผล และภาษี
@@ -500,6 +504,7 @@ Net Worth ไม่ควรเปลี่ยนจากการโอนเ�
 | จำเป็น | `manifest.json`, `sw.js` |
 | จำเป็นเมื่อใช้ v2.2.0+ | `GOALS_MIGRATION.md` |
 | จำเป็นเมื่อใช้ v2.3.0+ | `INVESTMENTS_MIGRATION.md` |
+| จำเป็นเมื่อใช้ v2.4.0+ | `TRANSACTIONS_MIGRATION.md` |
 | แนะนำ | Google Sheet Template `.xlsx` |
 | แนะนำ | `PROJECT_STATE.md` และ `CHANGELOG.md` เมื่อสร้างแล้ว |
 | ไม่จำเป็นต่อการวิเคราะห์ Code | ไฟล์ PNG ใน `icons/` |

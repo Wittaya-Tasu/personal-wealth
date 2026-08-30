@@ -1,6 +1,6 @@
-# Personal Wealth v2.3.0
+# Personal Wealth v2.4.0
 
-**Account-linked Investments & Spending Analytics** — WebApp/PWA ส่วนตัวสำหรับบันทึกรายรับ รายจ่าย การโอนเงิน ทรัพย์สิน หนี้สิน การลงทุน และเป้าหมายการเงินกับเป้าหมายชีวิต โดยใช้ GitHub Pages เป็น Frontend และอ่าน–เขียน Google Sheet แบบ Private ผ่าน Google OAuth และ Google Sheets API v4 โดยตรง
+**Expense Categories & Simple Investment Contributions** — WebApp/PWA ส่วนตัวสำหรับบันทึกรายรับ รายจ่าย การโอนเงิน ทรัพย์สิน หนี้สิน การลงทุน และเป้าหมายการเงินกับเป้าหมายชีวิต โดยใช้ GitHub Pages เป็น Frontend และอ่าน–เขียน Google Sheet แบบ Private ผ่าน Google OAuth และ Google Sheets API v4 โดยตรง
 
 ## ความสามารถหลัก
 
@@ -11,12 +11,13 @@
 - Goal เดิมยังใช้ยอด `current_amount` แบบกรอกเอง
 - Goal การเงินเลือกติดตามจาก `Accounts.balance` ได้ เช่น เลือก DIME สำหรับเงินสำรองฉุกเฉิน
 - Goal แบบ Milestone ใช้สถานะ `ยังไม่เริ่ม`, `กำลังดำเนินการ`, `สำเร็จแล้ว` โดยไม่สร้างเปอร์เซ็นต์เงินสมมติ
-- Investment ใหม่เลือก Account ต้นทางและหัก `funded_amount` โดยไม่ถูกนับเป็น Expense
-- การแก้หรือลบ Investment ที่เชื่อมบัญชีย้อนผลเดิมก่อนใช้ผลใหม่
+- Expense ต้องเลือกหมวดหมู่ก่อน แล้วจึงพิมพ์ชื่อรายการใน `item_name`
+- Investment เลือกสินทรัพย์เดิมจากชีต Investments หรือเพิ่มชื่อใหม่ แล้วกรอกเฉพาะยอดเงินลงทุนรอบนี้
+- เงินลงทุนรอบใหม่เพิ่มใน `current_value`/`funded_amount` ของสินทรัพย์เดิมและหัก Account ต้นทาง โดยไม่ถูกนับเป็น Expense
 - กราฟ Cash Flow เลือก 6/12 เดือนและปี พ.ศ. ได้ แกน X แสดงชื่อเดือน แกน Y แสดงจำนวนเต็ม
-- กราฟสัดส่วนรายจ่ายแยกตามหมวดหมู่และเลือกเดือนได้
+- กราฟสัดส่วนรายจ่ายแยกตามหมวดหมู่และเลือกเดือนได้ โดยไม่นับหมวด `บัตรเครดิต`
 - ป้องกันการเปลี่ยนชื่อหรือลบ Account ที่ Transaction, Goal หรือ Investment ยังอ้างถึง
-- Static Asset ใช้ Version URL `v=2.3.0` ลดปัญหา PWA โหลด HTML และ JavaScript คนละรุ่น
+- Static Asset ใช้ Version URL `v=2.4.0` ลดปัญหา PWA โหลด HTML และ JavaScript คนละรุ่น
 - รักษา Quick Reconnect, PWA, iPhone Safe Area และ Theme เดิม
 
 ## สถาปัตยกรรม
@@ -52,6 +53,7 @@ iPhone / Browser
 ├── CHANGELOG.md
 ├── GOALS_MIGRATION.md
 ├── INVESTMENTS_MIGRATION.md
+├── TRANSACTIONS_MIGRATION.md
 └── icons/
 ```
 
@@ -59,12 +61,12 @@ iPhone / Browser
 
 ## โครงสร้าง Google Sheet
 
-v2.3.0 คง Migration ของ `Goals` จาก v2.2.0 และเพิ่ม Header ต่อท้าย `Investments` อีก 2 ช่อง ข้อมูลเดิมไม่ถูกลบหรือเปลี่ยนชื่อ
+v2.4.0 คง Migration เดิมและเพิ่ม Header `item_name` ต่อท้ายชีต Transactions ข้อมูลเดิมไม่ถูกลบหรือเปลี่ยนชื่อ
 
 | Sheet | Headers ตามลำดับ |
 |---|---|
 | `Accounts` | `account_id`, `account_name`, `currency`, `balance`, `type`, `note` |
-| `Transactions` | `tx_id`, `date`, `type`, `category`, `account_from`, `account_to`, `amount`, `note` |
+| `Transactions` | `tx_id`, `date`, `type`, `category`, `account_from`, `account_to`, `amount`, `note`, `item_name` |
 | `Investments` | `investment_id`, `asset_name`, `category`, `units`, `avg_cost`, `current_price`, `current_value`, `tax_deductible`, `note`, `account_from`, `funded_amount` |
 | `Assets` | `asset_id`, `asset_name`, `category`, `purchase_price`, `estimated_value`, `note` |
 | `Liabilities` | `liability_id`, `liability_name`, `total_amount`, `monthly_payment`, `note` |
@@ -73,7 +75,7 @@ v2.3.0 คง Migration ของ `Goals` จาก v2.2.0 และเพิ่
 | `MonthlySnapshots` | `snapshot_month`, `total_assets`, `total_liabilities`, `net_worth`, `monthly_cashflow`, `savings_rate`, `note` |
 | `Settings` | `key`, `value`, `description` |
 
-ก่อน Deploy ให้ตรวจ [GOALS_MIGRATION.md](GOALS_MIGRATION.md) และทำตาม [INVESTMENTS_MIGRATION.md](INVESTMENTS_MIGRATION.md) หาก Header ไม่ครบ ระบบยังอ่านข้อมูลเดิมได้ แต่จะเตือนและไม่บันทึกข้อมูลชนิดนั้นจนกว่า Header จะครบ
+ก่อน Deploy ให้ตรวจ [GOALS_MIGRATION.md](GOALS_MIGRATION.md), [INVESTMENTS_MIGRATION.md](INVESTMENTS_MIGRATION.md) และทำ [TRANSACTIONS_MIGRATION.md](TRANSACTIONS_MIGRATION.md) หาก Header ไม่ครบ ระบบยังอ่านข้อมูลเดิมได้ แต่จะเตือนและไม่บันทึกรายจ่ายรูปแบบใหม่จนกว่า Header จะครบ
 
 ชื่อ `account_name` ต้องไม่ซ้ำ เพราะ Transactions, Goals และ Investments ยังเก็บชื่อบัญชีตามโครงสร้างเดิม
 
@@ -160,6 +162,15 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 
 การเติมงบรายเดือนให้ใช้ Transfer จากบัญชีหลักไป `บัญชีใช้จ่ายรายเดือน`
 
+## หมวดหมู่และชื่อรายการรายจ่าย
+
+- Expense ใหม่ต้องเลือก `category` ก่อน จึงจะพิมพ์ `item_name` ได้
+- หมวดมาตรฐานในแอป: อาหาร, เครื่องดื่ม, หนังสือ, ทำบุญ, ของใช้ส่วนตัว, ค่าเดินทาง, ครอบครัว, สุขภาพ, อิเล็กทรอนิกส์ และ อื่น ๆ
+- เพิ่มหมวดเองได้ในชีต `Categories` โดยระบุ `type` เป็น `Expense`
+- กราฟรวมตาม `category`; ชื่อร้านหรือรายละเอียดเฉพาะเก็บใน `item_name`
+- กราฟไม่นำ Transaction ที่ `category` เท่ากับ `บัตรเครดิต` มาคำนวณ เพื่อไม่ให้ยอดชำระบัตรถูกนับซ้ำ
+- เปอร์เซ็นต์ต่ำกว่า 10% แสดงทศนิยม 1 ตำแหน่ง ส่วนตั้งแต่ 10% ขึ้นไปแสดงจำนวนเต็ม
+
 ## การเพิ่ม แก้ไข และลบ Account
 
 - ชื่อ Account ต้องไม่ซ้ำ
@@ -185,7 +196,10 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 
 - ผู้ใช้ย้ายเงินสดออกจาก Investments ไป Account แล้ว
 - ตั้งค่า `include_accounts_in_net_worth = true` แล้ว
-- Investments ยังคงเป็นมูลค่าที่ผู้ใช้อัปเดตเอง แต่ Investment ใหม่สามารถหักเงินต้นจาก Account ได้
+- ฟอร์มลงทุนแสดงเฉพาะสินทรัพย์ Account ต้นทาง และยอดเงินลงทุนรอบใหม่
+- เลือกสินทรัพย์เดิม เช่น RMF แล้วระบบเพิ่มยอดรอบใหม่ในแถวเดิม
+- หากไม่มีชื่อในรายการ ให้เลือก `เพิ่มชื่อสินทรัพย์ใหม่`
+- สินทรัพย์เดิมที่เชื่อม Account แล้วต้องใช้ Account ต้นทางเดิม เพื่อรักษาประวัติการหักและคืนยอด
 - `funded_amount` คือเงินต้นที่หักจาก Account ส่วน `current_value` คือมูลค่าปัจจุบัน สองช่องนี้ไม่ควรถูกใช้แทนกัน
 - การลงทุนไม่ถูกนับเป็น Expense หรือ Cash Flow
 - ไม่มี `InvestmentTransactions` สำหรับประวัติซื้อ–ขาย และไม่ดึงราคาตลาดอัตโนมัติ
@@ -197,7 +211,7 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 - ใช้ `prompt` ว่างในการเชื่อมต่อทั่วไปเพื่อลด consent ซ้ำ
 - เมื่อ Token หมดอายุจะแสดง `แตะเพื่อเชื่อมต่อ Google`
 - ไม่มี Refresh Token และไม่มี PIN แทน Google OAuth
-- ไม่ต้องเปลี่ยน Google Cloud configuration สำหรับ v2.3.0
+- ไม่ต้องเปลี่ยน Google Cloud configuration สำหรับ v2.4.0
 
 ## ความปลอดภัย
 
@@ -213,26 +227,27 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 1. สำรอง Google Sheet และ Repository รุ่นปัจจุบัน
 2. ตรวจ Migration ชีต Goals ตาม `GOALS_MIGRATION.md`
 3. ทำ Migration ชีต Investments ตาม `INVESTMENTS_MIGRATION.md`
-4. ดาวน์โหลด `personal-wealth-v2.3.0.zip`
-5. แตก ZIP แล้ว Replace ไฟล์ใน Root ของ Repository
-6. Commit:
+4. ทำ Migration ชีต Transactions ตาม `TRANSACTIONS_MIGRATION.md`
+5. ดาวน์โหลด `personal-wealth-v2.4.0.zip`
+6. แตก ZIP แล้ว Replace ไฟล์ใน Root ของ Repository
+7. Commit:
 
 ```text
-feat: add account-linked investments and spending charts
+feat: add expense categories and investment contributions
 ```
 
-7. รอ GitHub Actions `pages build and deployment` เป็นสีเขียว
-8. ปิด WebApp/PWA ทุกหน้าต่าง แล้วเปิดใหม่
-9. กด Refresh และทดสอบตาม `PROJECT_STATE.md`
+8. รอ GitHub Actions `pages build and deployment` เป็นสีเขียว
+9. ปิด WebApp/PWA ทุกหน้าต่าง แล้วเปิดใหม่
+10. กด Refresh และทดสอบตาม `PROJECT_STATE.md`
 
 ## วิธี Rollback
 
 1. หยุดบันทึก Transaction และ Investment ชั่วคราว
-2. Revert Commit v2.3.0 หรือ Replace Code ด้วย Backup v2.2.0
-3. Header ใหม่ใน Goals และ Investments สามารถคงไว้ได้ เพราะ Code เก่าจะเพิกเฉย
+2. Revert Commit v2.4.0 หรือ Replace Code ด้วย Backup v2.3.0
+3. Header ใหม่ใน Goals, Investments และ Transactions สามารถคงไว้ได้ เพราะ Code เก่าจะเพิกเฉย
 4. รอ Deploy และเปิดแอปใหม่
 
-Rollback Code ไม่ย้อนยอด Accounts ที่ v2.3.0 แก้ไปแล้ว ต้องตรวจ `account_from`, `funded_amount` และ Reconcile ยอดจริงก่อนใช้งานต่อ
+Rollback Code ไม่ย้อนยอด Accounts ที่ v2.4.0 แก้ไปแล้ว ต้องตรวจ `account_from`, `funded_amount` และ Reconcile ยอดจริงก่อนใช้งานต่อ
 
 ## การแก้ปัญหา
 
@@ -242,8 +257,9 @@ Rollback Code ไม่ย้อนยอด Accounts ที่ v2.3.0 แก้
 | Goal ผูกบัญชีแสดงตรวจสอบบัญชี | ตรวจ `linked_account` และชื่อ Account; ชื่อต้องไม่ซ้ำ |
 | เปลี่ยนชื่อ/ลบ Account ไม่ได้ | มี Transaction, Goal หรือ Investment อ้างถึงบัญชี |
 | บันทึก Investment ไม่ได้ | เพิ่ม Header `account_from`, `funded_amount` ต่อท้าย Investments และตรวจยอด Account |
+| บันทึกรายจ่ายไม่ได้ | เพิ่ม Header `item_name` ที่ I1 ของ Transactions แล้วเลือกหมวดและพิมพ์ชื่อรายการ |
 | ยอด Account ลดหลังลงทุน | เป็นผลปกติของ Investment ใหม่ และไม่ถูกนับเป็น Expense |
-| กราฟสัดส่วนรายจ่ายว่าง | เดือนที่เลือกไม่มี Transaction ประเภท Expense |
+| กราฟสัดส่วนรายจ่ายว่าง | เดือนที่เลือกไม่มี Expense หรือมีเฉพาะหมวด `บัตรเครดิต` |
 | ภาระหนี้แสดง `—` | มีค่างวดแต่ยังไม่มี Income เดือนปัจจุบัน |
 | หน้าเว็บยังเป็นรุ่นเก่า | รอ Deploy, ปิด PWA แล้วเปิดใหม่ หรือ Clear site data |
 | สิทธิ์หมดอายุ | กด `แตะเพื่อเชื่อมต่อ Google` |
@@ -257,7 +273,7 @@ Rollback Code ไม่ย้อนยอด Accounts ที่ v2.3.0 แก้
 - Goal หนึ่งรายการผูกได้หนึ่ง Account
 - Milestone มีสถานะ 3 ระดับและไม่มีรายการงานย่อย
 - Legacy transactions ไม่เชื่อม Accounts
-- Investments ต้องอัปเดตมูลค่าปัจจุบันด้วยตนเอง
+- การเติมเงินลงทุนเพิ่ม `current_value` ตามเงินรอบใหม่ แต่ยังไม่มีราคาตลาดอัตโนมัติ
 - Account-linked Investment ยังไม่ใช่ Investment Ledger ซื้อ–ขายเต็มรูปแบบ
 - ไม่มี Refresh Token
 

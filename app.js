@@ -14,6 +14,7 @@
     activeRecord: null,
     goalSchemaMissingHeaders: [],
     investmentSchemaMissingHeaders: [],
+    transactionSchemaMissingHeaders: [],
     charts: {
       netWorth: null,
       cashflow: null,
@@ -31,12 +32,17 @@
 
   const formMeta = {
     transaction: { title: "รายรับ–รายจ่าย", eyebrow: "CASH FLOW", sheet: config.SHEETS.transactions },
-    investment: { title: "ข้อมูลการลงทุน", eyebrow: "PORTFOLIO", sheet: config.SHEETS.investments },
+    investment: { title: "เงินลงทุน", eyebrow: "PORTFOLIO", sheet: config.SHEETS.investments },
     account: { title: "บัญชีเงิน", eyebrow: "CASH & BANK", sheet: config.SHEETS.accounts },
     asset: { title: "ทรัพย์สิน", eyebrow: "ASSET", sheet: config.SHEETS.assets },
     liability: { title: "หนี้สิน", eyebrow: "LIABILITY", sheet: config.SHEETS.liabilities },
     goal: { title: "เป้าหมาย", eyebrow: "GOAL", sheet: config.SHEETS.goals }
   };
+
+  const EXPENSE_CATEGORIES = [
+    "อาหาร", "เครื่องดื่ม", "หนังสือ", "ทำบุญ", "ของใช้ส่วนตัว",
+    "ค่าเดินทาง", "ครอบครัว", "สุขภาพ", "อิเล็กทรอนิกส์", "อื่น ๆ"
+  ];
 
   const qs = (selector, scope = document) => scope.querySelector(selector);
   const qsa = (selector, scope = document) => [...scope.querySelectorAll(selector)];
@@ -71,6 +77,10 @@
       minimumFractionDigits: digits,
       maximumFractionDigits: digits
     }).format(value);
+  }
+
+  function formatExpensePercent(value) {
+    return formatPercent(value, value > 0 && value < 0.1 ? 1 : 0);
   }
 
   function formatDate(date, options = { day: "numeric", month: "short", year: "numeric" }) {
@@ -137,7 +147,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js?v=2.3.0").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.4.0").catch(() => {});
     }
   }
 
@@ -242,6 +252,7 @@
       state.data = data;
       state.goalSchemaMissingHeaders = store.getMissingGoalMetadataHeaders();
       state.investmentSchemaMissingHeaders = store.getMissingInvestmentFundingHeaders();
+      state.transactionSchemaMissingHeaders = store.getMissingTransactionItemHeaders();
       state.viewModel = analytics.buildViewModel(data, config.DEFAULTS);
       populateChartFilters();
       renderAll();
@@ -390,6 +401,12 @@
       warnings.push(
         `ฟังก์ชันหักเงินลงทุนจากบัญชียังไม่พร้อม: เพิ่ม Header ในชีต Investments ต่อท้ายแถวที่ 1 ได้แก่ `
         + state.investmentSchemaMissingHeaders.join(", ")
+      );
+    }
+    if (state.transactionSchemaMissingHeaders.length) {
+      warnings.push(
+        `ฟังก์ชันชื่อรายการรายจ่ายยังไม่พร้อม: เพิ่ม Header ในชีต Transactions ต่อท้ายแถวที่ 1 ได้แก่ `
+        + state.transactionSchemaMissingHeaders.join(", ")
       );
     }
     container.hidden = warnings.length === 0;
@@ -551,7 +568,7 @@
       item.append(
         dot,
         createElement("span", "", row.name),
-        createElement("strong", "", `${formatPercent(row.percentage, 0)} · ${formatCurrency(row.value)}`)
+        createElement("strong", "", `${formatExpensePercent(row.percentage)} · ${formatCurrency(row.value)}`)
       );
       legend.appendChild(item);
     });
@@ -584,7 +601,7 @@
             callbacks: {
               label: (context) => {
                 const row = breakdown.rows[context.dataIndex];
-                return ` ${formatCurrency(context.raw)} (${formatPercent(row.percentage, 0)})`;
+                return ` ${formatCurrency(context.raw)} (${formatExpensePercent(row.percentage)})`;
               }
             }
           }
@@ -670,7 +687,7 @@
     const query = qs("#transactionSearch").value.trim().toLowerCase();
     const filter = qs("#transactionTypeFilter").value;
     const rows = vm.transactions.filter((row) => {
-      const haystack = `${row.category || ""} ${row.note || ""} ${row.account_from || ""} ${row.account_to || ""}`.toLowerCase();
+      const haystack = `${row.category || ""} ${row.item_name || ""} ${row.note || ""} ${row.account_from || ""} ${row.account_to || ""}`.toLowerCase();
       const matchesQuery = !query || haystack.includes(query);
       const matchesType = filter === "all" || row.normalizedType === filter;
       return matchesQuery && matchesType;
@@ -680,7 +697,7 @@
 
   function transactionLabel(row) {
     if (row.normalizedType === "income") return row.category || "รายรับ";
-    if (row.normalizedType === "expense") return row.category || "รายจ่าย";
+    if (row.normalizedType === "expense") return row.item_name || row.category || "รายจ่าย";
     if (row.normalizedType === "transfer") return row.category || "โอนเงิน";
     return row.category || row.type || "รายการ";
   }
@@ -699,9 +716,12 @@
         row.normalizedType === "income" ? "+" : row.normalizedType === "expense" ? "−" : "↔"
       );
       const copy = createElement("div", "row-copy");
+      const details = [formatDate(row.parsedDate, { day: "numeric", month: "short" })];
+      if (row.normalizedType === "expense" && row.item_name && row.category) details.unshift(row.category);
+      if (row.note) details.push(row.note);
       copy.append(
         createElement("strong", "", transactionLabel(row)),
-        createElement("span", "", `${formatDate(row.parsedDate, { day: "numeric", month: "short" })}${row.note ? ` · ${row.note}` : ""}`)
+        createElement("span", "", details.join(" · "))
       );
       const amount = createElement("span", `row-amount ${row.normalizedType === "income" ? "positive" : row.normalizedType === "expense" ? "negative" : ""}`);
       amount.textContent = `${row.normalizedType === "income" ? "+" : row.normalizedType === "expense" ? "−" : ""}${formatCurrency(row.numericAmount)}`;
@@ -796,7 +816,8 @@
                 ? "asset"
                 : "liability",
           row._rowNumber,
-          definition.name(row)
+          definition.name(row),
+          state.wealthTab === "investments" ? "เพิ่มเงิน" : "แก้"
         ),
         deleteButton(definition.sheet, row._rowNumber, definition.name(row))
       );
@@ -885,10 +906,10 @@
     return button;
   }
 
-  function editButton(type, rowNumber, label) {
-    const button = createElement("button", "edit-button", "แก้");
+  function editButton(type, rowNumber, label, buttonText = "แก้") {
+    const button = createElement("button", "edit-button", buttonText);
     button.type = "button";
-    button.setAttribute("aria-label", `แก้ไข ${label}`);
+    button.setAttribute("aria-label", `${buttonText} ${label}`);
     button.dataset.editType = type;
     button.dataset.editRow = rowNumber;
     return button;
@@ -1028,7 +1049,14 @@
     state.activeRecord = record;
     const meta = formMeta[type];
     setText("formEyebrow", meta.eyebrow);
-    setText("formTitle", `${record ? "แก้ไข" : "เพิ่ม"}${meta.title}`);
+    setText(
+      "formTitle",
+      type === "investment"
+        ? record
+          ? `เพิ่มเงินใน ${record.asset_name || "สินทรัพย์ลงทุน"}`
+          : "บันทึกเงินลงทุน"
+        : `${record ? "แก้ไข" : "เพิ่ม"}${meta.title}`
+    );
     qs("#dynamicForm").innerHTML = formTemplate(type, record);
     populateDynamicLists();
     bindFormBehavior(type);
@@ -1065,6 +1093,50 @@
     return options.join("");
   }
 
+  function transactionCategoryOptions(type, selectedValue = "") {
+    const normalizedType = analytics.normalizeType(type);
+    const defaults = normalizedType === "expense"
+      ? EXPENSE_CATEGORIES
+      : normalizedType === "income"
+        ? ["เงินเดือน", "รายได้พิเศษ", "เงินปันผล", "ดอกเบี้ย", "อื่น ๆ"]
+        : ["โอนเงิน", "ย้ายเงิน", "อื่น ๆ"];
+    const names = [...defaults];
+    (state.data?.categories || []).forEach((row) => {
+      if (analytics.normalizeType(row.type) !== normalizedType) return;
+      const name = String(row.category_name || "").trim();
+      if (name && !names.includes(name)) names.push(name);
+    });
+    const current = String(selectedValue || "").trim();
+    if (current && !names.includes(current)) names.push(current);
+    const options = [`<option value="">เลือกหมวดหมู่</option>`];
+    names.forEach((name) => {
+      const value = inputValue({ value: name }, "value");
+      options.push(`<option value="${value}" ${name === current ? "selected" : ""}>${value}</option>`);
+    });
+    return options.join("");
+  }
+
+  function investmentTargetOptions(record = null) {
+    const rows = (state.data?.investments || []).filter((row) => String(row.asset_name || "").trim());
+    const selectedRow = Number(record?._rowNumber || 0);
+    const nameCounts = new Map();
+    rows.forEach((row) => {
+      const key = String(row.asset_name).trim().toLocaleLowerCase("th-TH");
+      nameCounts.set(key, (nameCounts.get(key) || 0) + 1);
+    });
+    const options = [`<option value="">เลือกสินทรัพย์จาก Investments</option>`];
+    rows.forEach((row) => {
+      const name = String(row.asset_name).trim();
+      const key = name.toLocaleLowerCase("th-TH");
+      const suffix = nameCounts.get(key) > 1 ? ` · แถว ${row._rowNumber}` : "";
+      const label = inputValue({ value: `${name} — ${formatCurrency(analytics.getInvestmentValue(row))}${suffix}` }, "value");
+      options.push(`<option value="${row._rowNumber}" ${row._rowNumber === selectedRow ? "selected" : ""}>${label}</option>`);
+    });
+    const newSelected = !record && rows.length === 0;
+    options.push(`<option value="new" ${newSelected ? "selected" : ""}>＋ เพิ่มชื่อสินทรัพย์ใหม่</option>`);
+    return options.join("");
+  }
+
   function formTemplate(type, record) {
     const saveLabel = record ? "บันทึกการแก้ไข" : "บันทึกข้อมูล";
     const note = (placeholder = "รายละเอียดเพิ่มเติม") => `
@@ -1082,6 +1154,7 @@
         })?.account_name || "";
       const selectedFrom = currentType === "expense" ? defaultExpenseAccount : record?.account_from || "";
       const selectedTo = record?.account_to || "";
+      const isExpense = currentType === "expense";
       return `
         <div class="form-segments" role="radiogroup" aria-label="ประเภทรายการ">
           <label><input type="radio" name="type" value="Expense" ${currentType === "expense" ? "checked" : ""}><span>รายจ่าย</span></label>
@@ -1092,7 +1165,9 @@
           <label class="field"><span>วันที่</span><input name="date" type="date" value="${inputDate(record, "date", localIsoDate())}" required></label>
           <label class="field"><span>จำนวนเงิน (บาท)</span><input name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="${inputValue(record, "amount")}" placeholder="0" required></label>
         </div>
-        <label class="field"><span>หมวดหมู่</span><input name="category" list="categoryOptions" value="${inputValue(record, "category")}" placeholder="เช่น อาหาร เงินเดือน น้ำมัน" required><datalist id="categoryOptions"></datalist></label>
+        <label class="field" data-expense-category-field ${isExpense ? "" : "hidden"}><span>หมวดหมู่รายจ่าย</span><select name="category" data-expense-category ${isExpense ? "required" : "disabled"}>${transactionCategoryOptions("Expense", isExpense ? record?.category : "")}</select></label>
+        <label class="field" data-expense-item-field ${isExpense ? "" : "hidden"}><span>รายการรายจ่าย</span><input name="item_name" value="${inputValue(record, "item_name")}" placeholder="เลือกหมวดหมู่ก่อน แล้วพิมพ์รายการ" ${isExpense && record?.category ? "required" : "disabled"}></label>
+        <label class="field" data-general-category-field ${isExpense ? "hidden" : ""}><span>หมวดหมู่</span><input name="category" value="${isExpense ? "" : inputValue(record, "category")}" placeholder="เช่น เงินเดือน หรือ โอนเงิน" ${isExpense ? "disabled" : "required"}></label>
         <div class="field-row account-fields">
           <label class="field" data-account-from-field><span data-account-from-label>จ่ายจากบัญชี</span><select name="account_from">${accountOptions(selectedFrom)}</select></label>
           <label class="field" data-account-to-field><span data-account-to-label>เงินเข้าบัญชี</span><select name="account_to">${accountOptions(selectedTo)}</select></label>
@@ -1102,31 +1177,19 @@
     }
 
     if (type === "investment") {
-      const isLinkedInvestment = Boolean(record?.account_from && analytics.toNumber(record?.funded_amount) > 0);
-      const fundingRequired = !record || isLinkedInvestment;
       const migrationWarning = state.investmentSchemaMissingHeaders.length
         ? `<p class="security-note">ก่อนบันทึก กรุณาเพิ่ม Header ในชีต Investments: ${state.investmentSchemaMissingHeaders.join(", ")}</p>`
         : "";
+      const initialTarget = record?._rowNumber || ((state.data?.investments || []).length ? "" : "new");
       return `
         ${migrationWarning}
-        <label class="field"><span>ชื่อสินทรัพย์ลงทุน</span><input name="asset_name" value="${inputValue(record, "asset_name")}" placeholder="เช่น RMF, ETF, หุ้นไทย" required></label>
-        <label class="field"><span>ประเภท</span><input name="category" list="investmentCategories" value="${inputValue(record, "category")}" placeholder="กองทุนรวม หุ้น ตราสารหนี้"><datalist id="investmentCategories"><option value="กองทุนรวม"><option value="หุ้น"><option value="ETF"><option value="ตราสารหนี้"><option value="เงินเกษียณ"><option value="สินทรัพย์ดิจิทัล"><option value="เงินสด"></datalist></label>
-        <div class="field-row">
-          <label class="field"><span>จำนวนหน่วย</span><input name="units" type="number" min="0" step="any" inputmode="decimal" value="${inputValue(record, "units")}"></label>
-          <label class="field"><span>ต้นทุนเฉลี่ย</span><input name="avg_cost" type="number" min="0" step="any" inputmode="decimal" value="${inputValue(record, "avg_cost")}"></label>
-        </div>
-        <div class="field-row">
-          <label class="field"><span>ราคาปัจจุบัน</span><input name="current_price" type="number" min="0" step="any" inputmode="decimal" value="${inputValue(record, "current_price")}"></label>
-          <label class="field"><span>มูลค่าปัจจุบัน (บาท)</span><input name="current_value" type="number" min="0" step="0.01" inputmode="decimal" value="${inputValue(record, "current_value")}" placeholder="หากเว้นว่างจะคำนวณจากหน่วย × ราคา"></label>
-        </div>
-        <div class="field-row investment-funding-fields">
-          <label class="field"><span>ใช้เงินจากบัญชี</span><select name="account_from" ${fundingRequired ? "required" : ""}>${accountOptions(record?.account_from, record ? "ไม่เชื่อมบัญชี (รายการเดิม)" : "เลือกบัญชีที่ใช้ลงทุน")}</select></label>
-          <label class="field"><span>จำนวนเงินที่ใช้ลงทุน (บาท)</span><input name="funded_amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="${inputValue(record, "funded_amount")}" placeholder="เช่น 5000" ${fundingRequired ? "required" : ""}></label>
-        </div>
-        <p class="security-note">ยอดนี้จะถูกหักจากบัญชี แต่ไม่นับเป็นรายจ่ายใน Cash Flow</p>
-        <label class="field toggle-field"><span><strong>ลดหย่อนภาษีได้</strong><small>เช่น RMF, Thai ESG</small></span><input name="tax_deductible" type="checkbox" ${String(record?.tax_deductible || "").toLowerCase() === "yes" ? "checked" : ""}></label>
-        ${note()}
-        ${submit}`;
+        <label class="field"><span>สินทรัพย์ลงทุน</span><select name="investment_target" required>${investmentTargetOptions(record)}</select></label>
+        <label class="field" data-new-investment-field ${initialTarget === "new" ? "" : "hidden"}><span>ชื่อสินทรัพย์ลงทุนใหม่</span><input name="asset_name" placeholder="เช่น RMF, ETF, หุ้นไทย" ${initialTarget === "new" ? "required" : "disabled"}></label>
+        <p class="security-note" data-investment-current>${record ? `มูลค่าปัจจุบัน ${formatCurrency(analytics.getInvestmentValue(record))}` : "เลือกสินทรัพย์เดิมเพื่อเพิ่มยอด หรือเพิ่มชื่อใหม่"}</p>
+        <label class="field"><span>ใช้เงินจากบัญชี</span><select name="account_from" required>${accountOptions(record?.account_from, "เลือกบัญชีที่ใช้ลงทุน")}</select></label>
+        <label class="field"><span>ยอดเงินที่ลงทุนเพิ่ม (บาท)</span><input name="funded_amount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="เช่น 5000" required></label>
+        <p class="security-note">ระบบจะหักเฉพาะยอดเงินรอบนี้จากบัญชี และเพิ่มเข้ามูลค่าสินทรัพย์เดิม โดยไม่นับเป็นรายจ่ายใน Cash Flow</p>
+        <button class="primary-button full-width" type="submit">เพิ่มเงินลงทุน</button>`;
     }
 
     if (type === "account") {
@@ -1217,35 +1280,43 @@
   }
 
   function populateDynamicLists() {
-    const categoryList = qs("#categoryOptions");
-    if (categoryList) {
-      const names = new Set([
-        "อาหารและเครื่องดื่ม", "เดินทาง/น้ำมัน", "บิลและค่าใช้จ่าย", "ครอบครัว",
-        "สุขภาพ", "ช้อปปิ้ง", "ท่องเที่ยว", "เงินเดือน", "รายได้พิเศษ", "เงินปันผล"
-      ]);
-      (state.data?.categories || []).forEach((row) => row.category_name && names.add(String(row.category_name)));
-      (state.data?.transactions || []).forEach((row) => row.category && names.add(String(row.category)));
-      [...names].sort((a, b) => a.localeCompare(b, "th")).forEach((name) => {
-        const option = document.createElement("option");
-        option.value = name;
-        categoryList.appendChild(option);
-      });
-    }
-
+    // Select options are rendered with the form so category and investment
+    // dependencies are available before the user starts typing.
   }
 
   function bindFormBehavior(type) {
     if (type === "investment") {
       const form = qs("#dynamicForm");
+      const targetSelect = form.elements.investment_target;
       const accountSelect = form.elements.account_from;
-      const fundedAmount = form.elements.funded_amount;
-      const mustRemainLinked = !state.activeRecord || store.isAccountLinkedInvestment(state.activeRecord);
-      const updateFundingRequirement = () => {
-        accountSelect.required = mustRemainLinked;
-        fundedAmount.required = Boolean(accountSelect.value) || mustRemainLinked;
+      const newAssetField = qs("[data-new-investment-field]", form);
+      const newAssetInput = form.elements.asset_name;
+      const currentText = qs("[data-investment-current]", form);
+      const updateInvestmentTarget = () => {
+        const isNew = targetSelect.value === "new";
+        const selectedRecord = (state.data?.investments || []).find((row) => {
+          return row._rowNumber === Number(targetSelect.value);
+        });
+        newAssetField.hidden = !isNew;
+        newAssetInput.disabled = !isNew;
+        newAssetInput.required = isNew;
+
+        if (accountSelect.dataset.locked === "true") accountSelect.value = "";
+        accountSelect.disabled = false;
+        accountSelect.dataset.locked = "false";
+        if (selectedRecord?.account_from) {
+          accountSelect.value = selectedRecord.account_from;
+          accountSelect.disabled = true;
+          accountSelect.dataset.locked = "true";
+        }
+        currentText.textContent = selectedRecord
+          ? `มูลค่าปัจจุบัน ${formatCurrency(analytics.getInvestmentValue(selectedRecord))}${selectedRecord.account_from ? ` · ใช้บัญชี ${selectedRecord.account_from}` : " · เลือกบัญชีต้นทางสำหรับเงินรอบแรก"}`
+          : isNew
+            ? "ชื่อใหม่จะถูกเพิ่มเป็นแถวใหม่ในชีต Investments"
+            : "เลือกสินทรัพย์เดิมเพื่อเพิ่มยอด หรือเพิ่มชื่อใหม่";
       };
-      accountSelect.addEventListener("change", updateFundingRequirement);
-      updateFundingRequirement();
+      targetSelect.addEventListener("change", updateInvestmentTarget);
+      updateInvestmentTarget();
       return;
     }
     if (type === "goal") {
@@ -1288,8 +1359,15 @@
       const toField = qs("#dynamicForm [data-account-to-field]");
       const fromSelect = qs("#dynamicForm select[name='account_from']");
       const toSelect = qs("#dynamicForm select[name='account_to']");
+      const expenseCategoryField = qs("#dynamicForm [data-expense-category-field]");
+      const expenseCategory = qs("#dynamicForm [data-expense-category]");
+      const expenseItemField = qs("#dynamicForm [data-expense-item-field]");
+      const expenseItem = qs("#dynamicForm input[name='item_name']");
+      const generalCategoryField = qs("#dynamicForm [data-general-category-field]");
+      const generalCategory = qs("#dynamicForm [data-general-category-field] input[name='category']");
       const showFrom = selected === "expense" || selected === "transfer";
       const showTo = selected === "income" || selected === "transfer";
+      const isExpense = selected === "expense";
 
       fromField.hidden = !showFrom;
       toField.hidden = !showTo;
@@ -1297,11 +1375,21 @@
       toSelect.disabled = !showTo;
       fromSelect.required = showFrom;
       toSelect.required = showTo;
+      expenseCategoryField.hidden = !isExpense;
+      expenseCategory.disabled = !isExpense;
+      expenseCategory.required = isExpense;
+      expenseItemField.hidden = !isExpense;
+      expenseItem.disabled = !isExpense || !expenseCategory.value;
+      expenseItem.required = isExpense;
+      generalCategoryField.hidden = isExpense;
+      generalCategory.disabled = isExpense;
+      generalCategory.required = !isExpense;
       qs("#dynamicForm [data-account-from-label]").textContent = selected === "expense" ? "จ่ายจากบัญชี" : "จากบัญชี";
       qs("#dynamicForm [data-account-to-label]").textContent = selected === "income" ? "เงินเข้าบัญชี" : "เข้าบัญชี";
       accountFields.style.gridTemplateColumns = selected === "transfer" ? "repeat(2, minmax(0, 1fr))" : "1fr";
     };
     qsa("#dynamicForm input[name='type']").forEach((input) => input.addEventListener("change", update));
+    qs("#dynamicForm [data-expense-category]").addEventListener("change", update);
     update();
   }
 
@@ -1313,15 +1401,18 @@
     const meta = formMeta[type];
     const values = Object.fromEntries(new FormData(form).entries());
     if (type === "investment") {
-      values.tax_deductible = form.elements.tax_deductible.checked ? "Yes" : "No";
-      if (!analytics.toNumber(values.current_value)) {
-        values.current_value = analytics.toNumber(values.units) * analytics.toNumber(values.current_price);
+      values.investment_row = form.elements.investment_target.value;
+      values.account_from = form.elements.account_from.value;
+      values.asset_name = form.elements.asset_name?.value || "";
+      if (!values.investment_row) {
+        showToast("กรุณาเลือกสินทรัพย์ลงทุน หรือเลือกเพิ่มชื่อใหม่", "error");
+        return;
       }
-      if (!values.account_from && !state.activeRecord) {
+      if (!values.account_from) {
         showToast("กรุณาเลือกบัญชีที่ใช้เงินลงทุน", "error");
         return;
       }
-      if (values.account_from && !(analytics.toNumber(values.funded_amount) > 0)) {
+      if (!(analytics.toNumber(values.funded_amount) > 0)) {
         showToast("จำนวนเงินที่ใช้ลงทุนต้องมากกว่า 0 บาท", "error");
         return;
       }
@@ -1334,6 +1425,10 @@
       }
       if (normalized === "income") values.account_from = "";
       if (normalized === "expense") values.account_to = "";
+      if (normalized === "expense" && !String(values.item_name || "").trim()) {
+        showToast("กรุณาเลือกรายจ่ายและพิมพ์ชื่อรายการ", "error");
+        return;
+      }
       if (normalized === "transfer" && values.account_from === values.account_to) {
         showToast("บัญชีต้นทางและปลายทางต้องเป็นคนละบัญชี", "error");
         return;
@@ -1385,14 +1480,8 @@
         );
       } else if (type === "goal") {
         await store.appendGoal(values);
-      } else if (type === "investment" && state.activeRecord?._rowNumber) {
-        await store.updateInvestmentWithAccountEffects(
-          state.activeRecord._rowNumber,
-          state.activeRecord,
-          values
-        );
       } else if (type === "investment") {
-        await store.appendInvestmentWithAccountEffects(values);
+        await store.addInvestmentContribution(values);
       } else if (state.activeRecord?._rowNumber) {
         await store.update(meta.sheet, state.activeRecord._rowNumber, { ...state.activeRecord, ...values });
       } else {
