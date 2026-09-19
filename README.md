@@ -1,10 +1,14 @@
-# Personal Wealth v2.4.0
+# Personal Wealth v2.6.0
 
-**Expense Categories & Simple Investment Contributions** — WebApp/PWA ส่วนตัวสำหรับบันทึกรายรับ รายจ่าย การโอนเงิน ทรัพย์สิน หนี้สิน การลงทุน และเป้าหมายการเงินกับเป้าหมายชีวิต โดยใช้ GitHub Pages เป็น Frontend และอ่าน–เขียน Google Sheet แบบ Private ผ่าน Google OAuth และ Google Sheets API v4 โดยตรง
+**Credit Card Liabilities + Daily Gratitude** — WebApp/PWA ส่วนตัวสำหรับบันทึกการเงิน เป้าหมายชีวิต และสิ่งที่อยากขอบคุณในแต่ละวัน โดยใช้ GitHub Pages เป็น Frontend และอ่าน–เขียน Google Sheet แบบ Private ผ่าน Google OAuth และ Google Sheets API v4 โดยตรง
 
 ## ความสามารถหลัก
 
 - Income, Expense และ Transfer ปรับ `Accounts.balance` อัตโนมัติ
+- Expense ผ่านบัตรเครดิตเพิ่มหนี้ระยะสั้นและแสดงในกราฟรายเดือน โดยไม่หัก Account ทันที
+- จ่ายบัตรเต็มจำนวนหรือระบุยอดได้ ระบบลด Account และหนี้บัตรโดยไม่สร้าง Expense ซ้ำ
+- Tab `ขอบคุณวันนี้` บันทึกได้วันละ 1–3 เรื่อง แยกหมวด คน สัตว์ สิ่งของ สถานที่ เหตุการณ์ และอื่น ๆ
+- เลือกวันที่ย้อนหลัง แก้ไข ล้างรายการ และเปิดดูประวัติวันที่เคยบันทึกได้
 - การแก้หรือลบ Transaction ที่สร้างตั้งแต่ v2.1.0 ย้อนผลเดิมก่อนใช้ผลใหม่
 - การ์ด `เงินใช้จ่ายคงเหลือ` อ่านยอดจริงจาก Account ชื่อ `บัญชีใช้จ่ายรายเดือน`
 - เมื่อไม่มีหนี้ การ์ด `ภาระหนี้ต่อรายได้` แสดง `0%` และ `ไม่มีภาระหนี้`
@@ -17,7 +21,7 @@
 - กราฟ Cash Flow เลือก 6/12 เดือนและปี พ.ศ. ได้ แกน X แสดงชื่อเดือน แกน Y แสดงจำนวนเต็ม
 - กราฟสัดส่วนรายจ่ายแยกตามหมวดหมู่และเลือกเดือนได้ โดยไม่นับหมวด `บัตรเครดิต`
 - ป้องกันการเปลี่ยนชื่อหรือลบ Account ที่ Transaction, Goal หรือ Investment ยังอ้างถึง
-- Static Asset ใช้ Version URL `v=2.4.0` ลดปัญหา PWA โหลด HTML และ JavaScript คนละรุ่น
+- Static Asset ใช้ Version URL `v=2.6.0` ลดปัญหา PWA โหลด HTML และ JavaScript คนละรุ่น
 - รักษา Quick Reconnect, PWA, iPhone Safe Area และ Theme เดิม
 
 ## สถาปัตยกรรม
@@ -54,6 +58,8 @@ iPhone / Browser
 ├── GOALS_MIGRATION.md
 ├── INVESTMENTS_MIGRATION.md
 ├── TRANSACTIONS_MIGRATION.md
+├── CREDIT_CARD_MIGRATION.md
+├── GRATITUDE_MIGRATION.md
 └── icons/
 ```
 
@@ -61,21 +67,22 @@ iPhone / Browser
 
 ## โครงสร้าง Google Sheet
 
-v2.4.0 คง Migration เดิมและเพิ่ม Header `item_name` ต่อท้ายชีต Transactions ข้อมูลเดิมไม่ถูกลบหรือเปลี่ยนชื่อ
+v2.6.0 รวม Migration บัตรเครดิต v2.5.0 และเพิ่มชีต Gratitude แยกจากข้อมูลการเงิน ข้อมูลเดิมไม่ถูกลบหรือเปลี่ยนชื่อ
 
 | Sheet | Headers ตามลำดับ |
 |---|---|
 | `Accounts` | `account_id`, `account_name`, `currency`, `balance`, `type`, `note` |
-| `Transactions` | `tx_id`, `date`, `type`, `category`, `account_from`, `account_to`, `amount`, `note`, `item_name` |
+| `Transactions` | `tx_id`, `date`, `type`, `category`, `account_from`, `account_to`, `amount`, `note`, `item_name`, `payment_method`, `credit_card` |
 | `Investments` | `investment_id`, `asset_name`, `category`, `units`, `avg_cost`, `current_price`, `current_value`, `tax_deductible`, `note`, `account_from`, `funded_amount` |
 | `Assets` | `asset_id`, `asset_name`, `category`, `purchase_price`, `estimated_value`, `note` |
-| `Liabilities` | `liability_id`, `liability_name`, `total_amount`, `monthly_payment`, `note` |
+| `Liabilities` | `liability_id`, `liability_name`, `total_amount`, `monthly_payment`, `note`, `liability_type` |
 | `Goals` | `goal_id`, `goal_name`, `target_amount`, `current_amount`, `deadline`, `note`, `goal_type`, `progress_source`, `linked_account`, `status` |
 | `Categories` | `category_id`, `category_name`, `type`, `note` |
 | `MonthlySnapshots` | `snapshot_month`, `total_assets`, `total_liabilities`, `net_worth`, `monthly_cashflow`, `savings_rate`, `note` |
 | `Settings` | `key`, `value`, `description` |
+| `Gratitude` | `gratitude_id`, `date`, `slot`, `category`, `gratitude_text`, `created_at`, `updated_at` |
 
-ก่อน Deploy ให้ตรวจ [GOALS_MIGRATION.md](GOALS_MIGRATION.md), [INVESTMENTS_MIGRATION.md](INVESTMENTS_MIGRATION.md) และทำ [TRANSACTIONS_MIGRATION.md](TRANSACTIONS_MIGRATION.md) หาก Header ไม่ครบ ระบบยังอ่านข้อมูลเดิมได้ แต่จะเตือนและไม่บันทึกรายจ่ายรูปแบบใหม่จนกว่า Header จะครบ
+ก่อน Deploy ให้ทำ [CREDIT_CARD_MIGRATION.md](CREDIT_CARD_MIGRATION.md), [GRATITUDE_MIGRATION.md](GRATITUDE_MIGRATION.md) และตรวจ Migration เดิมทั้งหมด หากยังไม่มี Gratitude หน้าการเงินยังทำงานได้ แต่ Tab ขอบคุณจะบันทึกไม่ได้
 
 ชื่อ `account_name` ต้องไม่ซ้ำ เพราะ Transactions, Goals และ Investments ยังเก็บชื่อบัญชีตามโครงสร้างเดิม
 
@@ -162,6 +169,36 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 
 การเติมงบรายเดือนให้ใช้ Transfer จากบัญชีหลักไป `บัญชีใช้จ่ายรายเดือน`
 
+## บัตรเครดิตและหนี้ระยะสั้น
+
+| เหตุการณ์ | Accounts | Liabilities | Cash Flow / กราฟรายจ่าย |
+|---|---:|---:|---|
+| ซื้อของผ่านบัตร | ไม่เปลี่ยน | หนี้บัตรเพิ่ม | นับเป็น Expense ในเดือนที่ซื้อ |
+| จ่ายบัตรบางส่วน/เต็มจำนวน | บัญชีต้นทางลด | หนี้บัตรลด | ไม่นับเป็น Expense ซ้ำ |
+| ลบ Expense ผ่านบัตร | ไม่เปลี่ยน | ย้อนหนี้จากรายการนั้น | Expense หายจากกราฟ |
+| ลบรายการชำระบัตร | คืนยอดบัญชี | คืนยอดหนี้ | Cash Flow ไม่เปลี่ยน |
+
+- สร้างบัตรในเมนูหนี้สินโดยเลือกประเภท `บัตรเครดิต (หนี้ระยะสั้น)`
+- Expense ต้องเลือก `ช่องทางการจ่าย = บัตรเครดิต` และเลือกชื่อบัตร
+- ปุ่ม `จ่ายบัตร` รองรับเต็มจำนวนหรือระบุยอด และไม่อนุญาตให้จ่ายเกินหนี้/ยอดบัญชี
+- ปุ่ม `ลบบัตร` ลบแถวบัตรและยอดหนี้หลังยืนยันสองชั้น แต่คงประวัติ Expense เพื่อให้กราฟย้อนหลังครบ
+- หากลบบัตรแล้วต้องแก้หรือลบ Transaction เก่าที่อ้างถึงบัตร ให้สร้างบัตรชื่อเดิมก่อน
+
+## ขอบคุณวันนี้
+
+Tab `ขอบคุณ` เป็นพื้นที่บันทึกสิ่งดี ๆ แยกจากระบบการเงินโดยสมบูรณ์
+
+| ความสามารถ | กติกา |
+|---|---|
+| จำนวนต่อวัน | สูงสุด 3 เรื่อง และบันทึกก่อนได้ตั้งแต่ 1 เรื่อง |
+| หมวดหมู่ | คน, สัตว์, สิ่งของ, สถานที่, เหตุการณ์, อื่น ๆ |
+| วันที่ | ค่าเริ่มต้นเป็นวันนี้ และเลือกย้อนหลัง/วันอื่นได้ |
+| แก้ไข | เปิดวันที่เดิมแล้วแก้ข้อความหรือหมวด จากนั้นบันทึก |
+| ลบ | ล้างช่องที่ต้องการแล้วกดบันทึก |
+| ประวัติ | เรียงวันที่ล่าสุดก่อน แตะเพื่อเปิดบันทึกวันนั้น |
+
+หนึ่งเรื่องเก็บหนึ่งแถวในชีต Gratitude โดยใช้ `date + slot` เป็นตำแหน่งของเรื่อง ระบบไม่ส่งข้อมูลนี้เข้า Analytics และไม่เปลี่ยนยอดทางการเงิน
+
 ## หมวดหมู่และชื่อรายการรายจ่าย
 
 - Expense ใหม่ต้องเลือก `category` ก่อน จึงจะพิมพ์ `item_name` ได้
@@ -211,7 +248,7 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 - ใช้ `prompt` ว่างในการเชื่อมต่อทั่วไปเพื่อลด consent ซ้ำ
 - เมื่อ Token หมดอายุจะแสดง `แตะเพื่อเชื่อมต่อ Google`
 - ไม่มี Refresh Token และไม่มี PIN แทน Google OAuth
-- ไม่ต้องเปลี่ยน Google Cloud configuration สำหรับ v2.4.0
+- ไม่ต้องเปลี่ยน Google Cloud configuration สำหรับ v2.6.0
 
 ## ความปลอดภัย
 
@@ -228,26 +265,28 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 2. ตรวจ Migration ชีต Goals ตาม `GOALS_MIGRATION.md`
 3. ทำ Migration ชีต Investments ตาม `INVESTMENTS_MIGRATION.md`
 4. ทำ Migration ชีต Transactions ตาม `TRANSACTIONS_MIGRATION.md`
-5. ดาวน์โหลด `personal-wealth-v2.4.0.zip`
-6. แตก ZIP แล้ว Replace ไฟล์ใน Root ของ Repository
-7. Commit:
+5. ทำ Migration บัตรเครดิตตาม `CREDIT_CARD_MIGRATION.md`
+6. สร้างชีต Gratitude ตาม `GRATITUDE_MIGRATION.md`
+7. ดาวน์โหลด `personal-wealth-v2.6.0.zip`
+8. แตก ZIP แล้ว Replace ไฟล์ใน Root ของ Repository
+9. Commit:
 
 ```text
-feat: add expense categories and investment contributions
+feat: add credit cards and daily gratitude
 ```
 
-8. รอ GitHub Actions `pages build and deployment` เป็นสีเขียว
-9. ปิด WebApp/PWA ทุกหน้าต่าง แล้วเปิดใหม่
-10. กด Refresh และทดสอบตาม `PROJECT_STATE.md`
+10. รอ GitHub Actions `pages build and deployment` เป็นสีเขียว
+11. ปิด WebApp/PWA ทุกหน้าต่าง แล้วเปิดใหม่
+12. กด Refresh และทดสอบตามคู่มือ Migration ทั้งสองไฟล์
 
 ## วิธี Rollback
 
 1. หยุดบันทึก Transaction และ Investment ชั่วคราว
-2. Revert Commit v2.4.0 หรือ Replace Code ด้วย Backup v2.3.0
+2. Revert Commit v2.6.0 หรือ Replace Code ด้วย Backup รุ่นที่ใช้งานอยู่ก่อน Deploy
 3. Header ใหม่ใน Goals, Investments และ Transactions สามารถคงไว้ได้ เพราะ Code เก่าจะเพิกเฉย
 4. รอ Deploy และเปิดแอปใหม่
 
-Rollback Code ไม่ย้อนยอด Accounts ที่ v2.4.0 แก้ไปแล้ว ต้องตรวจ `account_from`, `funded_amount` และ Reconcile ยอดจริงก่อนใช้งานต่อ
+Rollback Code ไม่ย้อนยอด Accounts, Liabilities หรือแถว Gratitude ที่เขียนแล้ว ต้อง Reconcile ยอดจริงก่อนใช้งานต่อ
 
 ## การแก้ปัญหา
 

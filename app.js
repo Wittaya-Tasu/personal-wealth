@@ -12,9 +12,12 @@
     activeSheet: null,
     activeFormType: null,
     activeRecord: null,
+    gratitudeDate: localIsoDate(),
     goalSchemaMissingHeaders: [],
     investmentSchemaMissingHeaders: [],
     transactionSchemaMissingHeaders: [],
+    creditCardSchemaMissingHeaders: [],
+    gratitudeSchemaMissingHeaders: [],
     charts: {
       netWorth: null,
       cashflow: null,
@@ -27,11 +30,13 @@
     dashboard: "ภาพรวม",
     transactions: "รายรับ–รายจ่าย",
     wealth: "ความมั่งคั่ง",
-    goals: "เป้าหมาย"
+    goals: "เป้าหมาย",
+    gratitude: "ขอบคุณวันนี้"
   };
 
   const formMeta = {
     transaction: { title: "รายรับ–รายจ่าย", eyebrow: "CASH FLOW", sheet: config.SHEETS.transactions },
+    creditCardPayment: { title: "ชำระบัตรเครดิต", eyebrow: "CREDIT CARD", sheet: config.SHEETS.transactions },
     investment: { title: "เงินลงทุน", eyebrow: "PORTFOLIO", sheet: config.SHEETS.investments },
     account: { title: "บัญชีเงิน", eyebrow: "CASH & BANK", sheet: config.SHEETS.accounts },
     asset: { title: "ทรัพย์สิน", eyebrow: "ASSET", sheet: config.SHEETS.assets },
@@ -124,7 +129,7 @@
   function setLoading(isLoading) {
     qs("#syncButton").classList.toggle("is-spinning", isLoading);
     qsa("button[type='submit']").forEach((button) => {
-      if (button.closest(".data-form")) button.disabled = isLoading;
+      if (button.closest(".data-form, .gratitude-form")) button.disabled = isLoading;
     });
   }
 
@@ -147,7 +152,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js?v=2.4.0").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.6.0").catch(() => {});
     }
   }
 
@@ -202,6 +207,29 @@
     qs("#transactionList").addEventListener("click", handleListAction);
     qs("#wealthList").addEventListener("click", handleListAction);
     qs("#goalList").addEventListener("click", handleListAction);
+    qs("#gratitudeDate").addEventListener("change", (event) => {
+      state.gratitudeDate = event.target.value || localIsoDate();
+      renderGratitude();
+    });
+    qs("#gratitudePreviousDay").addEventListener("click", () => changeGratitudeDate(-1));
+    qs("#gratitudeNextDay").addEventListener("click", () => changeGratitudeDate(1));
+    qs("#gratitudeForm").addEventListener("submit", submitGratitude);
+    qs("#gratitudeForm").addEventListener("input", updateGratitudeProgressFromForm);
+    qs("#gratitudeForm").addEventListener("click", (event) => {
+      const clear = event.target.closest(".clear-gratitude");
+      if (!clear) return;
+      const card = clear.closest("[data-gratitude-slot]");
+      qs("select", card).value = "";
+      qs("textarea", card).value = "";
+      updateGratitudeProgressFromForm();
+    });
+    qs("#gratitudeHistory").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-gratitude-date]");
+      if (!button) return;
+      state.gratitudeDate = button.dataset.gratitudeDate;
+      renderGratitude();
+      global.scrollTo({ top: 0, behavior: "smooth" });
+    });
 
     global.addEventListener("online", async () => {
       if (!store.isAuthorized()) return;
@@ -253,6 +281,8 @@
       state.goalSchemaMissingHeaders = store.getMissingGoalMetadataHeaders();
       state.investmentSchemaMissingHeaders = store.getMissingInvestmentFundingHeaders();
       state.transactionSchemaMissingHeaders = store.getMissingTransactionItemHeaders();
+      state.creditCardSchemaMissingHeaders = store.getMissingCreditCardHeaders();
+      state.gratitudeSchemaMissingHeaders = store.getMissingGratitudeHeaders();
       state.viewModel = analytics.buildViewModel(data, config.DEFAULTS);
       populateChartFilters();
       renderAll();
@@ -280,6 +310,7 @@
       const container = document.getElementById(id);
       container.replaceChildren(emptyState());
     });
+    renderGratitude();
     qs("#expenseBreakdownLegend").replaceChildren();
     destroyCharts();
   }
@@ -289,6 +320,7 @@
     renderTransactions();
     renderWealth();
     renderGoals();
+    renderGratitude();
   }
 
   function populateChartFilters() {
@@ -407,6 +439,12 @@
       warnings.push(
         `ฟังก์ชันชื่อรายการรายจ่ายยังไม่พร้อม: เพิ่ม Header ในชีต Transactions ต่อท้ายแถวที่ 1 ได้แก่ `
         + state.transactionSchemaMissingHeaders.join(", ")
+      );
+    }
+    if (state.creditCardSchemaMissingHeaders.length) {
+      warnings.push(
+        `ระบบบัตรเครดิตยังไม่พร้อม: กรุณาทำ Migration v2.5.0 และเพิ่ม Header `
+        + state.creditCardSchemaMissingHeaders.join(", ")
       );
     }
     container.hidden = warnings.length === 0;
@@ -687,7 +725,7 @@
     const query = qs("#transactionSearch").value.trim().toLowerCase();
     const filter = qs("#transactionTypeFilter").value;
     const rows = vm.transactions.filter((row) => {
-      const haystack = `${row.category || ""} ${row.item_name || ""} ${row.note || ""} ${row.account_from || ""} ${row.account_to || ""}`.toLowerCase();
+      const haystack = `${row.category || ""} ${row.item_name || ""} ${row.note || ""} ${row.account_from || ""} ${row.account_to || ""} ${row.credit_card || ""}`.toLowerCase();
       const matchesQuery = !query || haystack.includes(query);
       const matchesType = filter === "all" || row.normalizedType === filter;
       return matchesQuery && matchesType;
@@ -699,6 +737,7 @@
     if (row.normalizedType === "income") return row.category || "รายรับ";
     if (row.normalizedType === "expense") return row.item_name || row.category || "รายจ่าย";
     if (row.normalizedType === "transfer") return row.category || "โอนเงิน";
+    if (row.normalizedType === "credit_card_payment") return row.item_name || "ชำระบัตรเครดิต";
     return row.category || row.type || "รายการ";
   }
 
@@ -713,11 +752,12 @@
       const icon = createElement(
         "span",
         `transaction-icon ${row.normalizedType}`,
-        row.normalizedType === "income" ? "+" : row.normalizedType === "expense" ? "−" : "↔"
+        row.normalizedType === "income" ? "+" : row.normalizedType === "expense" ? "−" : row.normalizedType === "credit_card_payment" ? "฿" : "↔"
       );
       const copy = createElement("div", "row-copy");
       const details = [formatDate(row.parsedDate, { day: "numeric", month: "short" })];
       if (row.normalizedType === "expense" && row.item_name && row.category) details.unshift(row.category);
+      if (row.credit_card) details.push(row.credit_card);
       if (row.note) details.push(row.note);
       copy.append(
         createElement("strong", "", transactionLabel(row)),
@@ -728,11 +768,11 @@
 
       if (withActions) {
         const actions = createElement("div", "row-actions");
-        actions.append(
-          amount,
-          editButton("transaction", row._rowNumber, transactionLabel(row)),
-          deleteButton(config.SHEETS.transactions, row._rowNumber, transactionLabel(row))
-        );
+        actions.append(amount);
+        if (row.normalizedType !== "credit_card_payment") {
+          actions.append(editButton("transaction", row._rowNumber, transactionLabel(row)));
+        }
+        actions.append(deleteButton(config.SHEETS.transactions, row._rowNumber, transactionLabel(row)));
         item.append(icon, copy, actions);
       } else {
         item.append(icon, copy, amount);
@@ -787,7 +827,9 @@
         rows: data.liabilities,
         sheet: config.SHEETS.liabilities,
         name: (row) => row.liability_name || "หนี้สิน",
-        meta: (row) => `ค่างวด ${formatCurrency(row.monthly_payment || 0)}/เดือน`,
+        meta: (row) => store.isCreditCardLiability(row)
+          ? "บัตรเครดิต · หนี้ระยะสั้น"
+          : `ค่างวด ${formatCurrency(row.monthly_payment || 0)}/เดือน`,
         value: (row) => row.total_amount,
         icon: "−",
         className: "liability"
@@ -805,8 +847,19 @@
       const copy = createElement("div", "row-copy");
       copy.append(createElement("strong", "", definition.name(row)), createElement("span", "", definition.meta(row)));
       const actions = createElement("div", "row-actions");
+      actions.append(createElement("span", `row-amount ${state.wealthTab === "liabilities" ? "negative" : ""}`, formatCurrency(definition.value(row))));
+      if (state.wealthTab === "liabilities" && store.isCreditCardLiability(row)) {
+        const payButton = createElement("button", "edit-button", "จ่ายบัตร");
+        payButton.type = "button";
+        payButton.dataset.payCardRow = row._rowNumber;
+        actions.append(payButton);
+      }
+      const removeButton = deleteButton(definition.sheet, row._rowNumber, definition.name(row));
+      if (state.wealthTab === "liabilities" && store.isCreditCardLiability(row)) {
+        removeButton.className = "edit-button danger";
+        removeButton.textContent = "ลบบัตร";
+      }
       actions.append(
-        createElement("span", `row-amount ${state.wealthTab === "liabilities" ? "negative" : ""}`, formatCurrency(definition.value(row))),
         editButton(
           state.wealthTab === "investments"
             ? "investment"
@@ -819,7 +872,7 @@
           definition.name(row),
           state.wealthTab === "investments" ? "เพิ่มเงิน" : "แก้"
         ),
-        deleteButton(definition.sheet, row._rowNumber, definition.name(row))
+        removeButton
       );
       item.append(icon, copy, actions);
       container.appendChild(item);
@@ -828,6 +881,130 @@
 
   function renderGoals() {
     renderGoalContainer(qs("#goalList"), state.viewModel?.goals || [], true);
+  }
+
+  function gratitudeDateKey(value) {
+    const date = analytics.parseDate(value);
+    return date ? localIsoDate(date) : String(value || "").slice(0, 10);
+  }
+
+  function changeGratitudeDate(dayDelta) {
+    const parts = String(state.gratitudeDate || localIsoDate()).split("-").map(Number);
+    const date = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
+    date.setDate(date.getDate() + dayDelta);
+    state.gratitudeDate = localIsoDate(date);
+    renderGratitude();
+  }
+
+  function gratitudeRowsForDate(dateKey) {
+    return (state.data?.gratitude || [])
+      .filter((row) => gratitudeDateKey(row.date) === dateKey)
+      .sort((a, b) => Number(a.slot) - Number(b.slot));
+  }
+
+  function updateGratitudeProgressFromForm() {
+    const form = qs("#gratitudeForm");
+    if (!form) return;
+    let filled = 0;
+    for (let slot = 1; slot <= 3; slot += 1) {
+      if (String(form.elements[`gratitude_text_${slot}`]?.value || "").trim()) filled += 1;
+    }
+    setText("gratitudeProgress", `${filled}/3`);
+    qs("#gratitudeProgress").classList.toggle("is-complete", filled === 3);
+  }
+
+  function renderGratitude() {
+    const form = qs("#gratitudeForm");
+    if (!form) return;
+    const dateKey = state.gratitudeDate || localIsoDate();
+    state.gratitudeDate = dateKey;
+    qs("#gratitudeDate").value = dateKey;
+    const ready = store.isGratitudeSheetReady();
+    qs("#gratitudeMigration").hidden = ready;
+    qsa("select, textarea, button[type='submit']", form).forEach((field) => {
+      field.disabled = !ready;
+    });
+    qsa(".clear-gratitude", form).forEach((button) => { button.disabled = !ready; });
+
+    const rows = gratitudeRowsForDate(dateKey);
+    for (let slot = 1; slot <= 3; slot += 1) {
+      const row = rows.find((item) => Number(item.slot) === slot);
+      form.elements[`category_${slot}`].value = row?.category || "";
+      form.elements[`gratitude_text_${slot}`].value = row?.gratitude_text || "";
+    }
+    updateGratitudeProgressFromForm();
+    renderGratitudeHistory();
+  }
+
+  function renderGratitudeHistory() {
+    const container = qs("#gratitudeHistory");
+    container.replaceChildren();
+    const grouped = new Map();
+    (state.data?.gratitude || []).forEach((row) => {
+      const dateKey = gratitudeDateKey(row.date);
+      if (!dateKey || !String(row.gratitude_text || "").trim()) return;
+      if (!grouped.has(dateKey)) grouped.set(dateKey, []);
+      grouped.get(dateKey).push(row);
+    });
+    const days = [...grouped.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+    if (!days.length) {
+      const empty = createElement("div", "empty-state");
+      empty.append(
+        createElement("span", "", "♡"),
+        createElement("strong", "", "ยังไม่มีบันทึกขอบคุณ"),
+        createElement("p", "", "เริ่มบันทึกสิ่งดี ๆ ของวันนี้ได้ด้านบน")
+      );
+      container.appendChild(empty);
+      return;
+    }
+    days.forEach(([dateKey, rows]) => {
+      const button = createElement("button", "gratitude-history-item");
+      button.type = "button";
+      button.dataset.gratitudeDate = dateKey;
+      const date = analytics.parseDate(dateKey);
+      const categories = [...new Set(rows.map((row) => row.category).filter(Boolean))];
+      const preview = rows
+        .sort((a, b) => Number(a.slot) - Number(b.slot))
+        .map((row) => row.gratitude_text)
+        .join(" · ");
+      const copy = createElement("span", "gratitude-history-copy");
+      copy.append(
+        createElement("strong", "", formatDate(date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })),
+        createElement("small", "", `${categories.join(", ") || "ไม่ระบุหมวด"} · ${preview}`)
+      );
+      button.append(copy, createElement("span", "gratitude-history-count", `${rows.length}/3`));
+      container.appendChild(button);
+    });
+  }
+
+  async function submitGratitude(event) {
+    event.preventDefault();
+    if (!ensureCanWrite()) return;
+    const form = event.currentTarget;
+    const entries = [];
+    for (let slot = 1; slot <= 3; slot += 1) {
+      const category = form.elements[`category_${slot}`].value;
+      const gratitudeText = form.elements[`gratitude_text_${slot}`].value.trim();
+      if ((category && !gratitudeText) || (!category && gratitudeText)) {
+        showToast(`เรื่องที่ ${slot} ต้องเลือกหมวดหมู่และกรอกข้อความให้ครบ`, "error");
+        return;
+      }
+      entries.push({ slot, category, gratitude_text: gratitudeText });
+    }
+    const filled = entries.filter((entry) => entry.gratitude_text).length;
+    if (!filled && gratitudeRowsForDate(state.gratitudeDate).length) {
+      if (!global.confirm("ลบคำขอบคุณทั้งหมดของวันที่เลือกหรือไม่?")) return;
+    }
+    try {
+      setLoading(true);
+      await store.saveDailyGratitude(state.gratitudeDate, entries);
+      await refreshData();
+      showToast(filled ? `บันทึกคำขอบคุณ ${filled}/3 เรื่องแล้ว` : "ลบคำขอบคุณของวันที่เลือกแล้ว");
+    } catch (error) {
+      handleError(error);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function renderGoalContainer(container, rows, withActions) {
@@ -916,6 +1093,12 @@
   }
 
   async function handleListAction(event) {
+    const payCard = event.target.closest("[data-pay-card-row]");
+    if (payCard) {
+      const record = (state.data?.liabilities || []).find((row) => row._rowNumber === Number(payCard.dataset.payCardRow));
+      if (record) openForm("creditCardPayment", record);
+      return;
+    }
     const edit = event.target.closest("[data-edit-type]");
     if (edit) {
       const collectionMap = {
@@ -945,16 +1128,24 @@
     const account = sheetName === config.SHEETS.accounts
       ? (state.data?.accounts || []).find((row) => row._rowNumber === rowNumber)
       : null;
+    const liability = sheetName === config.SHEETS.liabilities
+      ? (state.data?.liabilities || []).find((row) => row._rowNumber === rowNumber)
+      : null;
+    const creditCard = liability && store.isCreditCardLiability(liability) ? liability : null;
     const accountEffectText = transaction
       ? store.isAccountLinkedTransaction(transaction)
-        ? "\nระบบจะย้อนผลของรายการนี้ในยอด Accounts ก่อนลบ"
+        ? "\nระบบจะย้อนผลของรายการนี้ในยอดบัญชีหรือยอดหนี้บัตรก่อนลบ"
         : "\nรายการเดิมก่อน v2.1.0 จะถูกลบโดยไม่ปรับ Opening Balance"
       : investment
         ? store.isAccountLinkedInvestment(investment)
           ? "\nระบบจะคืนเงินลงทุนเดิมเข้าบัญชีต้นทางก่อนลบ"
           : "\nInvestment เดิมจะถูกลบโดยไม่ปรับยอด Accounts"
         : "";
-    if (!global.confirm(`ยืนยันลบ “${label}”?\nการลบนี้จะนำแถวออกจาก Google Sheet${accountEffectText}`)) return;
+    if (creditCard) {
+      const balance = formatCurrency(creditCard.total_amount);
+      if (!global.confirm(`ลบบัตร “${label}” ออกจากระบบ?\nยอดหนี้ปัจจุบัน ${balance}\nประวัติรายการเดิมจะยังอยู่ แต่จะเลือกบัตรนี้ทำรายการใหม่ไม่ได้`)) return;
+      if (global.prompt("เพื่อยืนยันการลบบัตรและยอดหนี้ พิมพ์คำว่า ลบบัตร") !== "ลบบัตร") return;
+    } else if (!global.confirm(`ยืนยันลบ “${label}”?\nการลบนี้จะนำแถวออกจาก Google Sheet${accountEffectText}`)) return;
     try {
       setLoading(true);
       if (transaction) {
@@ -963,6 +1154,8 @@
         await store.deleteInvestmentWithAccountEffects(investment);
       } else if (account) {
         await store.deleteAccount(rowNumber);
+      } else if (creditCard) {
+        await store.deleteCreditCard(rowNumber);
       } else {
         await store.delete(sheetName, rowNumber);
       }
@@ -1093,6 +1286,21 @@
     return options.join("");
   }
 
+  function creditCardOptions(selectedValue = "", placeholder = "เลือกบัตรเครดิต") {
+    const selected = String(selectedValue || "").trim().toLocaleLowerCase("th-TH");
+    const options = [`<option value="">${inputValue({ value: placeholder }, "value")}</option>`];
+    (state.data?.liabilities || []).forEach((liability) => {
+      if (!store.isCreditCardLiability(liability)) return;
+      const name = String(liability.liability_name || "").trim();
+      if (!name) return;
+      const value = inputValue({ value: name }, "value");
+      const label = inputValue({ value: `${name} — ยอดหนี้ ${formatCurrency(liability.total_amount)}` }, "value");
+      const isSelected = name.toLocaleLowerCase("th-TH") === selected;
+      options.push(`<option value="${value}" ${isSelected ? "selected" : ""}>${label}</option>`);
+    });
+    return options.join("");
+  }
+
   function transactionCategoryOptions(type, selectedValue = "") {
     const normalizedType = analytics.normalizeType(type);
     const defaults = normalizedType === "expense"
@@ -1147,6 +1355,8 @@
 
     if (type === "transaction") {
       const currentType = analytics.normalizeType(record?.type || "Expense");
+      const currentPaymentMethod = String(record?.payment_method || (record?.credit_card ? "CreditCard" : "Account"));
+      const usesCreditCard = currentType === "expense" && currentPaymentMethod.toLowerCase() === "creditcard";
       const defaultExpenseAccount = record
         ? record.account_from
         : (state.data?.accounts || []).find((account) => {
@@ -1168,12 +1378,41 @@
         <label class="field" data-expense-category-field ${isExpense ? "" : "hidden"}><span>หมวดหมู่รายจ่าย</span><select name="category" data-expense-category ${isExpense ? "required" : "disabled"}>${transactionCategoryOptions("Expense", isExpense ? record?.category : "")}</select></label>
         <label class="field" data-expense-item-field ${isExpense ? "" : "hidden"}><span>รายการรายจ่าย</span><input name="item_name" value="${inputValue(record, "item_name")}" placeholder="เลือกหมวดหมู่ก่อน แล้วพิมพ์รายการ" ${isExpense && record?.category ? "required" : "disabled"}></label>
         <label class="field" data-general-category-field ${isExpense ? "hidden" : ""}><span>หมวดหมู่</span><input name="category" value="${isExpense ? "" : inputValue(record, "category")}" placeholder="เช่น เงินเดือน หรือ โอนเงิน" ${isExpense ? "disabled" : "required"}></label>
+        <label class="field" data-payment-method-field ${isExpense ? "" : "hidden"}><span>ช่องทางการจ่าย</span>
+          <select name="payment_method" ${isExpense ? "required" : "disabled"}>
+            <option value="Account" ${usesCreditCard ? "" : "selected"}>บัญชีเงิน / เงินสด</option>
+            <option value="CreditCard" ${usesCreditCard ? "selected" : ""}>บัตรเครดิต</option>
+          </select>
+        </label>
+        <label class="field" data-credit-card-field ${usesCreditCard ? "" : "hidden"}><span>บัตรเครดิต</span>
+          <select name="credit_card" ${usesCreditCard ? "required" : "disabled"}>${creditCardOptions(record?.credit_card)}</select>
+          <small>ยอดนี้จะเพิ่มเป็นหนี้ระยะสั้น และยังนับเป็นรายจ่ายของเดือนที่ซื้อ</small>
+        </label>
         <div class="field-row account-fields">
           <label class="field" data-account-from-field><span data-account-from-label>จ่ายจากบัญชี</span><select name="account_from">${accountOptions(selectedFrom)}</select></label>
           <label class="field" data-account-to-field><span data-account-to-label>เงินเข้าบัญชี</span><select name="account_to">${accountOptions(selectedTo)}</select></label>
         </div>
         ${note()}
         ${submit}`;
+    }
+
+    if (type === "creditCardPayment") {
+      const selectedCard = record?.liability_name || "";
+      const outstanding = analytics.toNumber(record?.total_amount);
+      return `
+        ${state.creditCardSchemaMissingHeaders.length ? `<p class="form-warning">กรุณาทำ Migration v2.5.0 ก่อน: ${state.creditCardSchemaMissingHeaders.join(", ")}</p>` : ""}
+        <label class="field"><span>บัตรเครดิต</span><select name="credit_card" required>${creditCardOptions(selectedCard)}</select></label>
+        <p class="security-note" data-card-balance>${selectedCard ? `ยอดหนี้ปัจจุบัน ${formatCurrency(outstanding)}` : "เลือกบัตรเพื่อดูยอดหนี้ปัจจุบัน"}</p>
+        <label class="field"><span>วันที่ชำระ</span><input name="date" type="date" value="${localIsoDate()}" required></label>
+        <label class="field"><span>จ่ายจากบัญชี</span><select name="account_from" required>${accountOptions("", "เลือกบัญชีที่ใช้จ่ายบัตร")}</select></label>
+        <div class="form-segments" role="radiogroup" aria-label="รูปแบบการชำระ">
+          <label><input type="radio" name="payment_mode" value="Full" checked><span>เต็มจำนวน</span></label>
+          <label><input type="radio" name="payment_mode" value="Partial"><span>ระบุยอด</span></label>
+        </div>
+        <label class="field" data-card-payment-amount hidden><span>ยอดที่ต้องการชำระ (บาท)</span><input name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" disabled></label>
+        ${note("เช่น ชำระรอบเดือนนี้")}
+        <p class="security-note">การชำระจะลดทั้งยอดบัญชีและหนี้บัตร โดยไม่บันทึกเป็นรายจ่ายซ้ำใน Cash Flow</p>
+        <button class="primary-button full-width" type="submit">ยืนยันการชำระบัตร</button>`;
     }
 
     if (type === "investment") {
@@ -1221,11 +1460,17 @@
     }
 
     if (type === "liability") {
+      const liabilityType = store.isCreditCardLiability(record) ? "CreditCard" : "Loan";
       return `
+        ${state.creditCardSchemaMissingHeaders.length ? `<p class="form-warning">กรุณาทำ Migration v2.5.0 ก่อน: ${state.creditCardSchemaMissingHeaders.join(", ")}</p>` : ""}
         <label class="field"><span>ชื่อหนี้สิน</span><input name="liability_name" value="${inputValue(record, "liability_name")}" placeholder="เช่น สินเชื่อบ้าน บัตรเครดิต" required></label>
+        <label class="field"><span>ประเภทหนี้สิน</span><select name="liability_type" required>
+          <option value="Loan" ${liabilityType === "Loan" ? "selected" : ""}>สินเชื่อ / หนี้ทั่วไป</option>
+          <option value="CreditCard" ${liabilityType === "CreditCard" ? "selected" : ""}>บัตรเครดิต (หนี้ระยะสั้น)</option>
+        </select></label>
         <div class="field-row">
           <label class="field"><span>ยอดหนี้คงเหลือ</span><input name="total_amount" type="number" min="0" step="0.01" inputmode="decimal" value="${inputValue(record, "total_amount")}" required></label>
-          <label class="field"><span>ค่างวดต่อเดือน</span><input name="monthly_payment" type="number" min="0" step="0.01" inputmode="decimal" value="${inputValue(record, "monthly_payment")}"></label>
+          <label class="field" data-monthly-payment-field><span>ค่างวดต่อเดือน</span><input name="monthly_payment" type="number" min="0" step="0.01" inputmode="decimal" value="${inputValue(record, "monthly_payment")}"></label>
         </div>
         ${note("หากต้องการติดตามดอกเบี้ย ให้ระบุไว้ชั่วคราวในช่องนี้")}
         ${submit}`;
@@ -1285,6 +1530,42 @@
   }
 
   function bindFormBehavior(type) {
+    if (type === "creditCardPayment") {
+      const form = qs("#dynamicForm");
+      const cardSelect = form.elements.credit_card;
+      const amountField = qs("[data-card-payment-amount]", form);
+      const amountInput = form.elements.amount;
+      const balanceText = qs("[data-card-balance]", form);
+      const updatePayment = () => {
+        const card = (state.data?.liabilities || []).find((row) => {
+          return String(row.liability_name || "") === cardSelect.value && store.isCreditCardLiability(row);
+        });
+        const outstanding = analytics.toNumber(card?.total_amount);
+        const partial = form.elements.payment_mode.value === "Partial";
+        balanceText.textContent = card ? `ยอดหนี้ปัจจุบัน ${formatCurrency(outstanding)}` : "เลือกบัตรเพื่อดูยอดหนี้ปัจจุบัน";
+        amountField.hidden = !partial;
+        amountInput.disabled = !partial;
+        amountInput.required = partial;
+        amountInput.max = outstanding > 0 ? String(outstanding) : "";
+      };
+      cardSelect.addEventListener("change", updatePayment);
+      qsa("input[name='payment_mode']", form).forEach((input) => input.addEventListener("change", updatePayment));
+      updatePayment();
+      return;
+    }
+    if (type === "liability") {
+      const form = qs("#dynamicForm");
+      const updateLiabilityType = () => {
+        const isCard = form.elements.liability_type.value === "CreditCard";
+        const field = qs("[data-monthly-payment-field]", form);
+        field.hidden = isCard;
+        form.elements.monthly_payment.disabled = isCard;
+        if (isCard) form.elements.monthly_payment.value = "0";
+      };
+      form.elements.liability_type.addEventListener("change", updateLiabilityType);
+      updateLiabilityType();
+      return;
+    }
     if (type === "investment") {
       const form = qs("#dynamicForm");
       const targetSelect = form.elements.investment_target;
@@ -1365,9 +1646,14 @@
       const expenseItem = qs("#dynamicForm input[name='item_name']");
       const generalCategoryField = qs("#dynamicForm [data-general-category-field]");
       const generalCategory = qs("#dynamicForm [data-general-category-field] input[name='category']");
-      const showFrom = selected === "expense" || selected === "transfer";
-      const showTo = selected === "income" || selected === "transfer";
+      const paymentMethodField = qs("#dynamicForm [data-payment-method-field]");
+      const paymentMethod = qs("#dynamicForm select[name='payment_method']");
+      const creditCardField = qs("#dynamicForm [data-credit-card-field]");
+      const creditCard = qs("#dynamicForm select[name='credit_card']");
       const isExpense = selected === "expense";
+      const usesCreditCard = isExpense && paymentMethod.value === "CreditCard";
+      const showFrom = selected === "transfer" || (isExpense && !usesCreditCard);
+      const showTo = selected === "income" || selected === "transfer";
 
       fromField.hidden = !showFrom;
       toField.hidden = !showTo;
@@ -1384,12 +1670,19 @@
       generalCategoryField.hidden = isExpense;
       generalCategory.disabled = isExpense;
       generalCategory.required = !isExpense;
+      paymentMethodField.hidden = !isExpense;
+      paymentMethod.disabled = !isExpense;
+      paymentMethod.required = isExpense;
+      creditCardField.hidden = !usesCreditCard;
+      creditCard.disabled = !usesCreditCard;
+      creditCard.required = usesCreditCard;
       qs("#dynamicForm [data-account-from-label]").textContent = selected === "expense" ? "จ่ายจากบัญชี" : "จากบัญชี";
       qs("#dynamicForm [data-account-to-label]").textContent = selected === "income" ? "เงินเข้าบัญชี" : "เข้าบัญชี";
       accountFields.style.gridTemplateColumns = selected === "transfer" ? "repeat(2, minmax(0, 1fr))" : "1fr";
     };
     qsa("#dynamicForm input[name='type']").forEach((input) => input.addEventListener("change", update));
     qs("#dynamicForm [data-expense-category]").addEventListener("change", update);
+    qs("#dynamicForm select[name='payment_method']").addEventListener("change", update);
     update();
   }
 
@@ -1423,8 +1716,20 @@
         showToast("จำนวนเงินต้องมากกว่า 0 บาท", "error");
         return;
       }
-      if (normalized === "income") values.account_from = "";
-      if (normalized === "expense") values.account_to = "";
+      if (normalized === "income") {
+        values.account_from = "";
+        values.payment_method = "Account";
+        values.credit_card = "";
+      }
+      if (normalized === "expense") {
+        values.account_to = "";
+        if (values.payment_method === "CreditCard") values.account_from = "";
+        else values.credit_card = "";
+      }
+      if (normalized === "transfer") {
+        values.payment_method = "Account";
+        values.credit_card = "";
+      }
       if (normalized === "expense" && !String(values.item_name || "").trim()) {
         showToast("กรุณาเลือกรายจ่ายและพิมพ์ชื่อรายการ", "error");
         return;
@@ -1433,6 +1738,28 @@
         showToast("บัญชีต้นทางและปลายทางต้องเป็นคนละบัญชี", "error");
         return;
       }
+    }
+    if (type === "creditCardPayment") {
+      const card = (state.data?.liabilities || []).find((row) => {
+        return String(row.liability_name || "") === values.credit_card && store.isCreditCardLiability(row);
+      });
+      if (!card) {
+        showToast("กรุณาเลือกบัตรเครดิต", "error");
+        return;
+      }
+      const outstanding = analytics.toNumber(card.total_amount);
+      values.amount = values.payment_mode === "Full" ? outstanding : analytics.toNumber(values.amount);
+      values.item_name = `ชำระ ${card.liability_name}`;
+      values.category = "ชำระบัตรเครดิต";
+      if (!(values.amount > 0)) {
+        showToast(outstanding > 0 ? "กรุณาระบุยอดชำระ" : "บัตรนี้ไม่มียอดหนี้ที่ต้องชำระ", "error");
+        return;
+      }
+      if (values.amount > outstanding) {
+        showToast("ยอดชำระมากกว่ายอดหนี้บัตร", "error");
+        return;
+      }
+      delete values.payment_mode;
     }
     if (type === "goal") {
       if (values.goal_type === "Financial") {
@@ -1464,6 +1791,8 @@
         );
       } else if (type === "transaction") {
         await store.appendTransactionWithAccountEffects(values);
+      } else if (type === "creditCardPayment") {
+        await store.payCreditCard(values);
       } else if (type === "account" && state.activeRecord?._rowNumber) {
         await store.updateAccountRecord(
           state.activeRecord._rowNumber,
@@ -1482,6 +1811,10 @@
         await store.appendGoal(values);
       } else if (type === "investment") {
         await store.addInvestmentContribution(values);
+      } else if (type === "liability" && state.activeRecord?._rowNumber) {
+        await store.updateLiabilityRecord(state.activeRecord._rowNumber, state.activeRecord, values);
+      } else if (type === "liability") {
+        await store.appendLiability(values);
       } else if (state.activeRecord?._rowNumber) {
         await store.update(meta.sheet, state.activeRecord._rowNumber, { ...state.activeRecord, ...values });
       } else {

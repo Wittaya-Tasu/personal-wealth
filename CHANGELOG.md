@@ -6,6 +6,62 @@
 
 - ยังไม่มีรายการ
 
+## [2.6.0] - 2026-09-19
+
+### Added
+
+- Tab `ขอบคุณวันนี้` ในเมนูหลัก รองรับ iPhone และ Desktop
+- บันทึกสิ่งที่อยากขอบคุณวันละ 1–3 เรื่อง
+- หมวด คน, สัตว์, สิ่งของ, สถานที่, เหตุการณ์ และอื่น ๆ
+- ตัวเลือกวันที่ ปุ่มวันก่อนหน้า/วันถัดไป และประวัติวันที่เคยบันทึก
+- ชีตใหม่ `Gratitude` และคู่มือ `GRATITUDE_MIGRATION.md`
+
+### Changed
+
+- รวมความสามารถ Credit Card Liabilities จาก v2.5.0 ไว้ใน ZIP v2.6.0 เพื่อ Deploy ครั้งเดียว
+- Bottom Navigation ปรับเป็น 6 ช่อง พร้อม Tab ขอบคุณ
+- Static Assets และ Service Worker cache เปลี่ยนเป็น v2.6.0
+
+### Fixed
+
+- หากยังไม่มีชีต Gratitude ระบบการเงินยังโหลดและซิงก์ได้ตามปกติ
+- การแก้วันเดิมอัปเดต Slot เดิม และการล้างช่องลบเฉพาะ Slot นั้น
+- ป้องกันวันที่/Slot/หมวดหมู่ผิดรูปแบบและข้อความเกิน 500 ตัวอักษร
+
+### Known limitations
+
+- การบันทึกหลาย Slot ใช้หลายคำสั่ง Google Sheets API และไม่มี Atomic transaction ข้ามแถว
+- ยังไม่มี Reminder, Streak หรือกราฟสถิติ Gratitude ในรุ่นนี้
+
+## [2.5.0] - 2026-09-19
+
+### Added
+
+- บัตรเครดิตใน Liabilities ด้วย `liability_type = CreditCard`
+- ช่องทางจ่าย Expense แบบ Account หรือ Credit Card
+- ปุ่มจ่ายบัตรแบบเต็มจำนวนหรือระบุยอด พร้อมเลือก Account ต้นทาง
+- ปุ่มลบบัตรออกจากระบบพร้อมการยืนยันสองชั้น
+- Header `payment_method`, `credit_card` ใน Transactions และ `liability_type` ใน Liabilities
+- คู่มือ `CREDIT_CARD_MIGRATION.md`
+
+### Changed
+
+- Expense ผ่านบัตรเพิ่มยอดหนี้ระยะสั้นโดยไม่ลด Account
+- การชำระบัตรลดทั้ง Account และยอดหนี้ แต่ไม่ถูกนับเป็น Expense ซ้ำ
+- ยอดซื้อผ่านบัตรใช้หมวดรายจ่ายจริง จึงแสดงใน Cash Flow และกราฟสัดส่วนรายจ่าย
+- Static Assets และ Service Worker cache เปลี่ยนเป็น v2.5.0
+
+### Fixed
+
+- การแก้หรือลบ Expense ผ่านบัตรย้อนยอดหนี้เดิมก่อน
+- การลบรายการชำระบัตรคืนผลต่อ Account และยอดหนี้
+- ป้องกันการชำระเกินยอดหนี้และป้องกัน Account ติดลบ
+
+### Known limitations
+
+- Google Sheets API ไม่มี Atomic transaction ข้าม Transactions, Accounts และ Liabilities; ระบบมี Rollback แต่หาก Rollback ล้มเหลวต้อง Reconcile ด้วยตนเอง
+- การลบบัตรเก็บประวัติ Transaction เดิมไว้ หากจะลบ/แก้รายการบัตรย้อนหลังต้องสร้างบัตรชื่อเดิมกลับมาก่อน
+
 ## [2.4.0] - 2026-08-30
 
 ### Added

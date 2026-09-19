@@ -1,4 +1,4 @@
-const APP_VERSION = "2.4.0";
+const APP_VERSION = "2.6.0";
 const CACHE_NAME = `personal-wealth-shell-v${APP_VERSION}`;
 const STATIC_ASSETS = [
   "./",

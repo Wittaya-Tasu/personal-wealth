@@ -79,7 +79,7 @@
 | UI Theme | Dark Emerald + Gold |
 | Font | Sarabun |
 | อุปกรณ์หลัก | iPhone 16+ และ Desktop |
-| เวอร์ชันล่าสุด | v2.4.0 — Expense Categories & Simple Investment Contributions |
+| เวอร์ชันล่าสุด | v2.6.0 — Credit Card Liabilities + Daily Gratitude |
 
 ค่าจริงของ OAuth Client ID และ Spreadsheet ID ให้ตรวจจาก `config.js` ล่าสุด ห้ามคัดลอกค่าจากข้อความเก่ามาเขียนทับ
 
@@ -144,6 +144,8 @@ iPhone / Browser
 | `GOALS_MIGRATION.md` | วิธีเพิ่ม Header Goal รุ่น v2.2.0 |
 | `INVESTMENTS_MIGRATION.md` | วิธีเพิ่ม Header เงินลงทุนรุ่น v2.3.0 |
 | `TRANSACTIONS_MIGRATION.md` | วิธีเพิ่ม Header ชื่อรายการรายจ่ายรุ่น v2.4.0 |
+| `CREDIT_CARD_MIGRATION.md` | วิธีเพิ่ม Header และตั้งค่าบัตรเครดิตรุ่น v2.5.0 |
+| `GRATITUDE_MIGRATION.md` | วิธีสร้างชีตขอบคุณวันนี้รุ่น v2.6.0 |
 | `icons/` | ไอคอน WebApp/PWA |
 
 ไฟล์ `script.js` แบบเดิมไม่ถูกใช้งานแล้ว ห้ามนำกลับมาเชื่อมกับ `index.html`
@@ -157,14 +159,15 @@ iPhone / Browser
 | Sheet | Headers ตามลำดับ |
 |---|---|
 | `Accounts` | `account_id`, `account_name`, `currency`, `balance`, `type`, `note` |
-| `Transactions` | `tx_id`, `date`, `type`, `category`, `account_from`, `account_to`, `amount`, `note`, `item_name` |
+| `Transactions` | `tx_id`, `date`, `type`, `category`, `account_from`, `account_to`, `amount`, `note`, `item_name`, `payment_method`, `credit_card` |
 | `Investments` | `investment_id`, `asset_name`, `category`, `units`, `avg_cost`, `current_price`, `current_value`, `tax_deductible`, `note`, `account_from`, `funded_amount` |
 | `Assets` | `asset_id`, `asset_name`, `category`, `purchase_price`, `estimated_value`, `note` |
-| `Liabilities` | `liability_id`, `liability_name`, `total_amount`, `monthly_payment`, `note` |
+| `Liabilities` | `liability_id`, `liability_name`, `total_amount`, `monthly_payment`, `note`, `liability_type` |
 | `Goals` | `goal_id`, `goal_name`, `target_amount`, `current_amount`, `deadline`, `note`, `goal_type`, `progress_source`, `linked_account`, `status` |
 | `Categories` | `category_id`, `category_name`, `type`, `note` |
 | `MonthlySnapshots` | `snapshot_month`, `total_assets`, `total_liabilities`, `net_worth`, `monthly_cashflow`, `savings_rate`, `note` |
 | `Settings` | `key`, `value`, `description` |
+| `Gratitude` | `gratitude_id`, `date`, `slot`, `category`, `gratitude_text`, `created_at`, `updated_at` |
 
 ID ที่ลงท้าย `_id` ถูกสร้างอัตโนมัติเมื่อเพิ่มแถวใหม่
 
@@ -204,6 +207,7 @@ Net Worth = Total Assets − Liabilities
 | `Income` | เงินใหม่ที่ได้รับ เช่น เงินเดือน | เป็นรายรับ |
 | `Expense` | เงินที่ใช้บริโภคหรือเป็นค่าใช้จ่าย | เป็นรายจ่าย |
 | `Transfer` | การย้ายเงินระหว่างบัญชีหรือไปลงทุน | ไม่นับเป็นรายรับ/รายจ่าย |
+| `CreditCardPayment` | การชำระหนี้บัตรจาก Account | ไม่นับเป็นรายรับ/รายจ่าย |
 
 การลงทุน RMF, ETF, หุ้น หรือการย้ายเงินไปบัญชีลงทุน ไม่ควรเป็น Expense เพราะเป็นการเปลี่ยนรูปสินทรัพย์ ไม่ใช่การสูญเสีย Net Worth
 
@@ -270,18 +274,21 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 
 ---
 
-### 8. ความสามารถและข้อจำกัดปัจจุบันของ v2.4.0
+### 8. ความสามารถและข้อจำกัดปัจจุบันของ v2.6.0
 
 | การกระทำ | สิ่งที่ระบบทำ | ข้อจำกัด |
 |---|---|---|
 | Income | เพิ่ม `account_to` และนับรายรับ | รายการเก่าก่อน v2.1.0 ไม่ Replay |
 | Expense | เลือก category ก่อนกรอก `item_name`, ลด `account_from` และนับรายจ่าย | ยอดไม่พอต้องไม่บันทึก |
+| Expense ผ่านบัตร | เพิ่ม Liabilities และนับรายจ่ายเดือนที่ซื้อ | ต้องเลือกบัตร `CreditCard` |
+| จ่ายบัตร | ลด Account และ Liabilities; จ่ายเต็ม/บางส่วนได้ | ห้ามจ่ายเกินหนี้หรือยอดบัญชี |
 | Transfer | ลดต้นทาง เพิ่มปลายทาง ไม่นับ Cash Flow | ปลายทางต้องเป็น Account |
 | Goal Manual | ใช้ `current_amount` | ผู้ใช้ต้องอัปเดตเอง |
 | Goal Account | อ่าน `Accounts.balance` | ผูกได้หนึ่ง Account และอ้างอิงด้วยชื่อ |
 | Goal Milestone | ติดตามสถานะ 3 ระดับ | ไม่มี Checklist ย่อย |
 | Investment Contribution | เลือกสินทรัพย์เดิม/ชื่อใหม่ หักเงินรอบใหม่ และเพิ่ม `current_value`/`funded_amount` | หนึ่งสินทรัพย์ใช้ Account ต้นทางเดิมและไม่ใช่ Ledger ซื้อ–ขาย |
 | RMF/ETF/PVD | เก็บมูลค่าใน Investments | ไม่มี InvestmentTransactions/ราคาตลาด |
+| ขอบคุณวันนี้ | บันทึก 1–3 เรื่อง แยก 6 หมวด และเลือกวันที่ได้ | ยังไม่มี Reminder/Streak/กราฟสถิติ |
 
 ยอด Accounts ตอนเริ่มใช้ v2.1.0 เป็น Opening Balance ห้ามนำ Transactions เก่ามาคำนวณย้อนกลับ
 
@@ -302,10 +309,12 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 | Cash Flow year/Expense breakdown v2.3.0 Mock | ผ่าน |
 | Expense category/item_name v2.4.0 Mock | ผ่าน |
 | Investment contribution v2.4.0 Mock | ผ่าน |
+| Credit Card Expense/Payment v2.5.0 Mock | ผ่าน |
+| Daily Gratitude v2.6.0 Mock | ผ่าน |
 | Refresh หลัง Archive GAS | ผ่าน |
 | GAS Active deployment | ไม่มี |
 | iPhone Safe Area / Dynamic Island | แก้แล้วและผู้ใช้ยืนยัน |
-| PWA cache base | `personal-wealth-shell-v2.4.0` |
+| PWA cache base | `personal-wealth-shell-v2.6.0` |
 
 เคยทดสอบด้วยรายการรายรับ 1 บาท หมวด `ทดสอบระบบ` และลบออกสำเร็จแล้ว ห้ามถือรายการดังกล่าวว่าเป็นข้อมูลจริงหรือสร้างซ้ำ
 
@@ -505,6 +514,8 @@ Net Worth ไม่ควรเปลี่ยนจากการโอนเ�
 | จำเป็นเมื่อใช้ v2.2.0+ | `GOALS_MIGRATION.md` |
 | จำเป็นเมื่อใช้ v2.3.0+ | `INVESTMENTS_MIGRATION.md` |
 | จำเป็นเมื่อใช้ v2.4.0+ | `TRANSACTIONS_MIGRATION.md` |
+| จำเป็นเมื่อใช้ v2.5.0+ | `CREDIT_CARD_MIGRATION.md` |
+| จำเป็นเมื่อใช้ v2.6.0+ | `GRATITUDE_MIGRATION.md` |
 | แนะนำ | Google Sheet Template `.xlsx` |
 | แนะนำ | `PROJECT_STATE.md` และ `CHANGELOG.md` เมื่อสร้างแล้ว |
 | ไม่จำเป็นต่อการวิเคราะห์ Code | ไฟล์ PNG ใน `icons/` |

@@ -1,9 +1,9 @@
 # Personal Wealth — Project State
 
-> อัปเดต: 30 สิงหาคม 2569 (2026-08-30), Asia/Bangkok  
-> รุ่นพัฒนา: **v2.4.0 — Expense Categories & Simple Investment Contributions**  
-> รุ่นที่ผู้ใช้ยืนยันว่า Deploy และใช้งานได้: **v2.3.0**  
-> สถานะ v2.4.0: ผ่าน Static/Mock tests; ต้อง Migration Transactions, Deploy และทดสอบกับ Google Sheet จริง
+> อัปเดต: 19 กันยายน 2569 (2026-09-19), Asia/Bangkok  
+> รุ่นพัฒนา: **v2.6.0 — Credit Card Liabilities + Daily Gratitude**  
+> รุ่นที่ผู้ใช้ยืนยันว่า Deploy และใช้งานได้: **v2.4.0**  
+> สถานะ v2.6.0: รวม v2.5.0 แล้วและผ่าน Syntax/Static/Mock tests; ต้อง Migration บัตรเครดิต/Gratitude, Deploy และทดสอบกับ Google Sheet จริง
 
 ## 1. สรุปโครงการ
 
@@ -21,43 +21,50 @@
 | UI | ภาษาไทย, Dark Emerald + Gold, Sarabun |
 | อุปกรณ์หลัก | iPhone โดยเฉพาะหน้าจอประมาณ 390–430px และ Desktop |
 
-## 2. การเปลี่ยนแปลง v2.4.0
+## 2. การเปลี่ยนแปลง v2.6.0
 
 | งาน | ผลลัพธ์ |
 |---|---|
-| หมวดรายจ่าย | เลือกจากหมวดมาตรฐานและ Categories sheet |
-| ชื่อรายการรายจ่าย | เพิ่ม `item_name`; เลือกหมวดก่อนจึงพิมพ์ได้ |
-| รายการเดิม | ผู้ใช้แก้ category และ item_name ใน Google Sheet ได้เอง |
-| กราฟสัดส่วนรายจ่าย | ตัด category `บัตรเครดิต` ออกทั้งยอดและตัวหารเปอร์เซ็นต์ |
-| เปอร์เซ็นต์กลุ่มเล็ก | ต่ำกว่า 10% แสดงทศนิยม 1 ตำแหน่ง |
-| Investment form | เลือกสินทรัพย์เดิม/ชื่อใหม่ + Account + เงินลงทุนรอบนี้ |
-| เติม Investment เดิม | เพิ่ม `current_value` และ `funded_amount` ในแถวเดิม |
-| Account ต้นทาง | สินทรัพย์ที่เชื่อมแล้วบังคับใช้ Account เดิม |
-| PWA | Versioned assets และ cache เป็น v2.4.0 |
+| รูดบัตร | Expense เพิ่มหนี้บัตร โดยไม่ลด Account |
+| Cash Flow | นับยอดซื้อในเดือนที่ซื้อผ่านบัตร |
+| จ่ายบัตร | เลือกเต็มจำนวน/ระบุยอดและ Account ต้นทาง |
+| ป้องกันนับซ้ำ | CreditCardPayment ไม่เป็น Income/Expense |
+| แก้/ลบรายการ | ย้อนทั้ง Account และ Liabilities ตามผลเดิม |
+| ลบบัตร | ลบออกจากระบบหลังยืนยันสองชั้น แต่เก็บประวัติ Expense |
+| ขอบคุณวันนี้ | บันทึกได้วันละ 1–3 เรื่อง แยก 6 หมวด |
+| วันที่และประวัติ | เลือกย้อนหลัง แก้ ล้าง และเปิดวันที่เคยบันทึกได้ |
+| แยกข้อมูล | Gratitude ไม่กระทบยอดหรือ Analytics การเงิน |
+| Graceful migration | ไม่มี Gratitude ก็ยังโหลดหน้าการเงินได้ |
+| PWA | Versioned assets และ cache เป็น v2.6.0 |
 
 ## 3. โครงสร้าง Google Sheet
 
 | Sheet | Headers |
 |---|---|
 | `Accounts` | `account_id`, `account_name`, `currency`, `balance`, `type`, `note` |
-| `Transactions` | `tx_id`, `date`, `type`, `category`, `account_from`, `account_to`, `amount`, `note`, `item_name` |
+| `Transactions` | `tx_id`, `date`, `type`, `category`, `account_from`, `account_to`, `amount`, `note`, `item_name`, `payment_method`, `credit_card` |
 | `Investments` | `investment_id`, `asset_name`, `category`, `units`, `avg_cost`, `current_price`, `current_value`, `tax_deductible`, `note`, `account_from`, `funded_amount` |
 | `Assets` | `asset_id`, `asset_name`, `category`, `purchase_price`, `estimated_value`, `note` |
-| `Liabilities` | `liability_id`, `liability_name`, `total_amount`, `monthly_payment`, `note` |
+| `Liabilities` | `liability_id`, `liability_name`, `total_amount`, `monthly_payment`, `note`, `liability_type` |
 | `Goals` | `goal_id`, `goal_name`, `target_amount`, `current_amount`, `deadline`, `note`, `goal_type`, `progress_source`, `linked_account`, `status` |
 | `Categories` | `category_id`, `category_name`, `type`, `note` |
 | `MonthlySnapshots` | `snapshot_month`, `total_assets`, `total_liabilities`, `net_worth`, `monthly_cashflow`, `savings_rate`, `note` |
 | `Settings` | `key`, `value`, `description` |
+| `Gratitude` | `gratitude_id`, `date`, `slot`, `category`, `gratitude_text`, `created_at`, `updated_at` |
 
-### Migration v2.4.0
+### Migration รวม v2.5.0 + v2.6.0
 
-เพิ่มต่อท้ายชีต `Transactions` เท่านั้น:
+เพิ่มต่อท้ายตารางเท่านั้น:
 
 | Cell | Header |
 |---|---|
-| I1 | `item_name` |
+| Transactions J1 | `payment_method` |
+| Transactions K1 | `credit_card` |
+| Liabilities F1 | `liability_type` |
 
-อ่านขั้นตอนและวิธีจัดข้อมูลเดิมใน `TRANSACTIONS_MIGRATION.md` ห้ามแทรกคอลัมน์กลางตาราง
+อ่านขั้นตอนใน `CREDIT_CARD_MIGRATION.md` ห้ามแทรกคอลัมน์กลางตาราง
+
+สร้างชีตใหม่ `Gratitude` และเพิ่ม A1:G1 ตาม `GRATITUDE_MIGRATION.md` โดยไม่แก้ชีตการเงินเดิม
 
 ## 4. กติกา Expense
 
@@ -101,16 +108,17 @@
 
 | ไฟล์ | การเปลี่ยนแปลง |
 |---|---|
-| `index.html` | คำอธิบาย Quick Add, Search placeholder และ Version URL |
-| `style.css` | แสดงสถานะช่องที่ถูกปิดจนกว่าจะเลือกข้อมูลก่อน |
-| `analytics.js` | ตัดหมวดบัตรเครดิตจาก expense breakdown |
-| `api.js` | Schema item_name, validation และ Investment contribution/rollback |
-| `app.js` | ฟอร์ม Expense/Investment, เปอร์เซ็นต์ และการแสดงรายการ |
-| `sw.js` | Cache v2.4.0 |
+| `index.html` | Quick Add จ่ายบัตรและ Version URL |
+| `style.css` | ปุ่มรายการบัตร, Tab/การ์ด Gratitude และ Mobile layout |
+| `analytics.js` | รู้จัก CreditCardPayment โดยไม่รวมใน Cash Flow |
+| `api.js` | ระบบบัตรเครดิตและ CRUD Gratitude แบบ Optional sheet |
+| `app.js` | ระบบบัตรเครดิต, Tab ขอบคุณ, วันที่, 3 Slot และประวัติ |
+| `sw.js` | Cache v2.6.0 |
 | `README.md` | คู่มือระบบและ Deploy |
 | `PROJECT_STATE.md` | สถานะล่าสุด |
-| `CHANGELOG.md` | ประวัติ v2.4.0 |
-| `TRANSACTIONS_MIGRATION.md` | วิธีเพิ่ม I1 และจัดข้อมูลเดิม |
+| `CHANGELOG.md` | ประวัติ v2.5.0–v2.6.0 |
+| `CREDIT_CARD_MIGRATION.md` | วิธีเพิ่ม J1/K1/F1 และสร้างบัตร |
+| `GRATITUDE_MIGRATION.md` | วิธีสร้างชีตและ Header Gratitude |
 
 `style.css` เพิ่มสถานะ disabled ให้ช่องที่ยังกรอกไม่ได้โดยไม่เปลี่ยนโครง Theme; `config.js`, `manifest.json`, OAuth Client ID, Spreadsheet ID และชื่อชีตไม่เปลี่ยน
 
@@ -119,45 +127,51 @@
 | การทดสอบ | ผล |
 |---|---|
 | JavaScript syntax: analytics/api/app/sw | ผ่าน |
-| ตัด category บัตรเครดิตจากยอดรวม/เปอร์เซ็นต์ | ผ่าน |
-| กลุ่มรายจ่ายต่ำกว่า 10% | ผ่านข้อมูลคำนวณและ Static rendering check |
-| Expense มี category + item_name | ผ่าน |
-| ขาด Header item_name | Block การเพิ่ม/แก้ Expense พร้อมข้อความ |
-| ลบ/ย้อน Expense เก่าที่ไม่มี item_name | ผ่าน |
-| เติม RMF เดิม | current_value/funded_amount เพิ่มถูกต้อง |
-| Account ลดเฉพาะเงินลงทุนรอบใหม่ | ผ่าน |
-| เพิ่มสินทรัพย์ชื่อใหม่ | ผ่าน |
-| ชื่อสินทรัพย์ซ้ำ | Block |
-| เขียน Investment ล้มเหลว | Rollback Account ผ่าน |
+| รูดบัตรไม่ลด Account และเพิ่มหนี้ | ผ่าน |
+| รูดบัตรปรากฏใน Cash Flow/Expense Breakdown | ผ่าน |
+| แก้ยอดรูดบัตรย้อนของเดิมก่อน | ผ่าน |
+| จ่ายบางส่วนลด Account และหนี้ | ผ่าน |
+| จ่ายบัตรไม่ถูกนับเป็น Expense ซ้ำ | ผ่าน |
+| จ่ายเกินยอดหนี้ | Block |
+| ลบรายการชำระคืน Account/หนี้ | ผ่าน |
+| ลบ Expense ผ่านบัตรย้อนหนี้ | ผ่าน |
+| ลบบัตรออกจาก Liabilities | ผ่าน |
+| บันทึก Gratitude 1–3 เรื่อง | ผ่าน |
+| แก้ Slot เดิม/เพิ่ม Slot ใหม่ | ผ่าน |
+| ล้าง Slot แล้วลบเฉพาะแถวนั้น | ผ่าน |
+| หมวดหรือ Header ไม่ถูกต้อง | Block |
+| ไม่มีชีต Gratitude | หน้าการเงินยังโหลดได้ |
 | PWA Version URLs | ผ่าน Static check |
 
 ## 9. สิ่งที่ต้องทดสอบกับ Google Sheet จริง
 
-1. เพิ่ม I1 `item_name` ใน Transactions
-2. Deploy v2.4.0 และปิด–เปิด PWA ใหม่
-3. เพิ่ม Expense ทดสอบ 1 บาท: เลือกหมวดก่อน แล้วพิมพ์รายการ
-4. ตรวจ D = category, I = item_name และ Account ลด 1 บาท
-5. ลบ Expense และตรวจ Account กลับเท่าเดิม
-6. สร้าง/แก้รายการหมวด `บัตรเครดิต` แล้วตรวจว่าไม่ปรากฏในกราฟสัดส่วน
-7. เพิ่ม RMF 1 บาทจาก Account เดิม ตรวจ Account ลด 1 และ RMF เพิ่ม 1
-8. เพิ่มชื่อสินทรัพย์ใหม่ 1 บาท ตรวจว่าเกิดแถวใหม่
-9. ลบรายการทดสอบและ Reconcile Account
+1. ทำ `CREDIT_CARD_MIGRATION.md` และ `GRATITUDE_MIGRATION.md`
+2. Deploy v2.6.0 และปิด–เปิด PWA ใหม่
+3. สร้างบัตรเครดิต KTC ยอด 0
+4. บันทึก Expense 1 บาทผ่าน KTC ตรวจกราฟเพิ่ม 1, Account ไม่ลด, หนี้เพิ่ม 1
+5. จ่ายบัตรเต็มจำนวน ตรวจ Account ลด 1, หนี้เป็น 0, กราฟไม่เพิ่มซ้ำ
+6. ทดสอบจ่ายบางส่วนและ Block ยอดเกินหนี้
+7. บันทึก Gratitude 1 เรื่อง แล้วเพิ่มเป็น 2 เรื่อง ตรวจว่าไม่มีแถวซ้ำ
+8. ล้าง Gratitude ทดสอบ และ Reconcile Accounts/Liabilities
 
 ## 10. Deploy
 
 1. สำรอง Google Sheet และ Repository
-2. ทำ `TRANSACTIONS_MIGRATION.md`
-3. Replace ไฟล์จาก `personal-wealth-v2.4.0.zip` ที่ Root
-4. Commit: `feat: add expense categories and investment contributions`
-5. รอ GitHub Pages workflow เป็นสีเขียว
-6. ปิด PWA เดิม เปิดใหม่ และ Refresh
+2. ทำ `CREDIT_CARD_MIGRATION.md`
+3. ทำ `GRATITUDE_MIGRATION.md`
+4. Replace ไฟล์จาก `personal-wealth-v2.6.0.zip` ที่ Root
+5. Commit: `feat: add credit cards and daily gratitude`
+6. รอ GitHub Pages workflow เป็นสีเขียว
+7. ปิด PWA เดิม เปิดใหม่ และ Refresh
 
 ## 11. Rollback และข้อจำกัด
 
-- ย้อน Code เป็น v2.3.0 ได้ และคงคอลัมน์ `item_name` ไว้ได้
-- Code rollback ไม่ย้อนยอด Account ที่ v2.4.0 เขียนแล้ว ต้อง Reconcile จากข้อมูลจริง
+- ย้อน Code เป็นรุ่นที่ Deploy อยู่ก่อนหน้าได้ และคง Header/ชีตใหม่ไว้ได้
+- Code rollback ไม่ย้อนยอด Accounts/Liabilities หรือแถว Gratitude ที่เขียนแล้ว
 - Google Sheets API ไม่มี Atomic transaction ข้ามชีต; ระบบทำ compensating rollback เมื่อเขียนล้มเหลว
 - หนึ่งสินทรัพย์ที่รวมในแถวเดิมรองรับหนึ่ง Account ต้นทาง
 - ไม่มี Contribution ledger, Sale, Dividend, Fee, Tax, Reinvest หรือราคาตลาดอัตโนมัติ
 - Legacy Transactions/Investments ไม่ถูกนำไปปรับ Opening Balance ย้อนหลัง
+- ลบบัตรแล้วประวัติ Expense ยังคงอยู่; หากแก้/ลบย้อนหลังต้องสร้างบัตรชื่อเดิมก่อน
 - ไม่มี Refresh Token และไม่มี Multi-user concurrency control
+- การบันทึก Gratitude หลาย Slot ไม่เป็น Atomic transaction ข้ามแถว

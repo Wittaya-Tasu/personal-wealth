@@ -719,6 +719,8 @@ svg {
 .row-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
@@ -748,6 +750,14 @@ svg {
 .edit-button:hover {
   background: var(--gold-soft);
   color: var(--gold);
+}
+
+.edit-button.danger {
+  color: var(--red);
+}
+
+.edit-button.danger:hover {
+  background: var(--red-soft);
 }
 
 .goal-row {
@@ -970,7 +980,7 @@ svg {
   left: 0;
   display: grid;
   height: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom));
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   align-items: start;
   padding:
     8px max(8px, env(safe-area-inset-right))
@@ -979,6 +989,180 @@ svg {
   background: rgba(11, 29, 24, 0.96);
   border-top: 1px solid var(--line);
   backdrop-filter: blur(20px);
+}
+
+.view-intro {
+  max-width: 520px;
+  margin: 6px 0 0;
+  color: var(--muted-2);
+  font-size: 13px;
+}
+
+.gratitude-header {
+  align-items: flex-end;
+}
+
+.gratitude-progress {
+  display: grid;
+  min-width: 58px;
+  height: 42px;
+  place-items: center;
+  background: var(--gold-soft);
+  border: 1px solid rgba(226, 196, 109, 0.22);
+  border-radius: 14px;
+  color: var(--gold);
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.gratitude-progress.is-complete {
+  background: rgba(69, 209, 139, 0.12);
+  border-color: rgba(69, 209, 139, 0.25);
+  color: var(--green);
+}
+
+.gratitude-migration,
+.gratitude-editor,
+.gratitude-history-panel {
+  margin-top: 14px;
+  padding: 18px;
+}
+
+.gratitude-migration {
+  border-color: rgba(226, 196, 109, 0.3);
+}
+
+.gratitude-migration strong {
+  color: var(--gold);
+}
+
+.gratitude-migration p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.gratitude-date-nav {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  align-items: end;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.gratitude-date-nav > .icon-button {
+  margin-bottom: 1px;
+  border-color: var(--line);
+  font-size: 26px;
+}
+
+.gratitude-date-field {
+  margin: 0;
+}
+
+.gratitude-form {
+  display: grid;
+  gap: 12px;
+}
+
+.gratitude-card {
+  padding: 15px;
+  background: rgba(7, 20, 16, 0.34);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+
+.gratitude-card-heading {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+}
+
+.gratitude-number {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  background: var(--gold-soft);
+  border-radius: 50%;
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.gratitude-card .field + .field {
+  margin-top: 10px;
+}
+
+.gratitude-card textarea {
+  min-height: 94px;
+  resize: vertical;
+}
+
+.gratitude-history {
+  display: grid;
+  gap: 8px;
+}
+
+.gratitude-history-item {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 12px;
+  background: rgba(7, 20, 16, 0.28);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--text);
+  text-align: left;
+}
+
+.gratitude-history-item:hover {
+  background: var(--surface-raised);
+  border-color: var(--line-strong);
+}
+
+.gratitude-history-copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.gratitude-history-copy small {
+  overflow: hidden;
+  color: var(--muted-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gratitude-history-count {
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (min-width: 760px) {
+  .gratitude-form {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .gratitude-form > .full-width,
+  .gratitude-form > .security-note {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 430px) {
+  .nav-item {
+    font-size: 9px;
+  }
+
+  .nav-item svg {
+    width: 19px;
+    height: 19px;
+  }
 }
 
 .nav-item {

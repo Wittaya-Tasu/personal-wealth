@@ -4,10 +4,16 @@
   const SESSION_TOKEN_KEY = "personalWealthGoogleToken";
   const SHEETS_API_BASE = "https://sheets.googleapis.com/v4/spreadsheets";
   const LINKED_TRANSACTION_PREFIX = "v21-";
+  const CREDIT_CARD_EXPENSE_PREFIX = "v25-cc-";
+  const CREDIT_CARD_PAYMENT_PREFIX = "v25-pay-";
   const MONEY_PRECISION = 100;
   const GOAL_METADATA_HEADERS = ["goal_type", "progress_source", "linked_account", "status"];
   const INVESTMENT_FUNDING_HEADERS = ["account_from", "funded_amount"];
   const TRANSACTION_ITEM_HEADERS = ["item_name"];
+  const CREDIT_CARD_TRANSACTION_HEADERS = ["payment_method", "credit_card"];
+  const LIABILITY_TYPE_HEADERS = ["liability_type"];
+  const GRATITUDE_HEADERS = ["gratitude_id", "date", "slot", "category", "gratitude_text", "created_at", "updated_at"];
+  const GRATITUDE_CATEGORIES = new Set(["คน", "สัตว์", "สิ่งของ", "สถานที่", "เหตุการณ์", "อื่น ๆ"]);
 
   function waitFor(predicate, timeoutMs = 15000) {
     return new Promise((resolve, reject) => {
@@ -69,7 +75,20 @@
     if (["income", "รายรับ"].includes(type)) return "income";
     if (["expense", "รายจ่าย"].includes(type)) return "expense";
     if (["transfer", "โอน", "โอนเงิน"].includes(type)) return "transfer";
+    if (["creditcardpayment", "credit_card_payment", "ชำระบัตรเครดิต"].includes(type)) return "credit_card_payment";
     return "";
+  }
+
+  function normalizePaymentMethod(value) {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    return ["creditcard", "credit_card", "บัตรเครดิต"].includes(normalized) ? "CreditCard" : "Account";
+  }
+
+  function normalizeLiabilityType(value, name = "") {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    if (["creditcard", "credit_card", "บัตรเครดิต"].includes(normalized)) return "CreditCard";
+    if (/บัตรเครดิต|credit\s*card/i.test(String(name || ""))) return "CreditCard";
+    return "Loan";
   }
 
   function investmentValue(record) {
@@ -119,6 +138,7 @@
       this.sheetIds = {};
       this.initialized = false;
       this.currentData = null;
+      this.gratitudeLoadError = null;
     }
 
     async init() {
@@ -237,7 +257,7 @@
     }
 
     async loadAll() {
-      const entries = Object.entries(this.config.SHEETS);
+      const entries = Object.entries(this.config.SHEETS).filter(([key]) => key !== "gratitude");
       const ranges = entries.map(([, sheetName]) => `${quoteSheet(sheetName)}!A:Z`);
       const response = await this.request("/values:batchGet", {
         query: {
@@ -268,6 +288,34 @@
           .filter((record) => headers.some((header) => header && record[header] !== ""));
       });
 
+      const gratitudeSheet = this.getGratitudeSheetName();
+      try {
+        const gratitudeResponse = await this.request("/values:batchGet", {
+          query: {
+            ranges: [`${quoteSheet(gratitudeSheet)}!A:G`],
+            majorDimension: "ROWS",
+            valueRenderOption: "UNFORMATTED_VALUE",
+            dateTimeRenderOption: "FORMATTED_STRING"
+          }
+        });
+        const values = gratitudeResponse.valueRanges?.[0]?.values || [];
+        const headers = (values[0] || []).map((value) => String(value || "").trim());
+        this.headers[gratitudeSheet] = headers;
+        data.gratitude = values.slice(1).map((row, rowIndex) => {
+          const record = { _rowNumber: rowIndex + 2 };
+          headers.forEach((header, columnIndex) => {
+            if (header) record[header] = row[columnIndex] ?? "";
+          });
+          return record;
+        }).filter((record) => headers.some((header) => header && record[header] !== ""));
+        this.gratitudeLoadError = null;
+      } catch (error) {
+        if (error?.status !== 400) throw error;
+        this.headers[gratitudeSheet] = [];
+        data.gratitude = [];
+        this.gratitudeLoadError = error;
+      }
+
       this.currentData = data;
       return data;
     }
@@ -293,6 +341,34 @@
 
     getMissingTransactionItemHeaders() {
       return this.getMissingHeaders(this.config.SHEETS.transactions, TRANSACTION_ITEM_HEADERS);
+    }
+
+    getMissingCreditCardTransactionHeaders() {
+      return this.getMissingHeaders(this.config.SHEETS.transactions, CREDIT_CARD_TRANSACTION_HEADERS);
+    }
+
+    getMissingLiabilityTypeHeaders() {
+      return this.getMissingHeaders(this.config.SHEETS.liabilities, LIABILITY_TYPE_HEADERS);
+    }
+
+    getMissingCreditCardHeaders() {
+      return [
+        ...this.getMissingCreditCardTransactionHeaders().map((header) => `Transactions.${header}`),
+        ...this.getMissingLiabilityTypeHeaders().map((header) => `Liabilities.${header}`)
+      ];
+    }
+
+    getGratitudeSheetName() {
+      return this.config.SHEETS.gratitude || "Gratitude";
+    }
+
+    getMissingGratitudeHeaders() {
+      const headers = this.headers[this.getGratitudeSheetName()] || [];
+      return GRATITUDE_HEADERS.filter((header) => !headers.includes(header));
+    }
+
+    isGratitudeSheetReady() {
+      return !this.gratitudeLoadError && this.getMissingGratitudeHeaders().length === 0;
     }
 
     buildRow(sheetName, record) {
@@ -483,6 +559,194 @@
         throw error;
       }
       return this.delete(this.config.SHEETS.accounts, rowNumber);
+    }
+
+    getLiabilityRows() {
+      if (!this.currentData) throw new Error("ยังไม่ได้โหลดข้อมูลล่าสุดจาก Google Sheet");
+      return this.currentData.liabilities || [];
+    }
+
+    isCreditCardLiability(record) {
+      return normalizeLiabilityType(record?.liability_type, record?.liability_name) === "CreditCard";
+    }
+
+    buildLiabilityIndex({ creditCardsOnly = false } = {}) {
+      const index = new Map();
+      this.getLiabilityRows().forEach((liability) => {
+        if (creditCardsOnly && !this.isCreditCardLiability(liability)) return;
+        const name = normalizeName(liability.liability_name);
+        if (!name) return;
+        const key = accountKey(name);
+        if (index.has(key)) {
+          const error = new Error(`พบชื่อหนี้สินซ้ำ “${name}” กรุณาแก้ชื่อในชีต Liabilities ให้ไม่ซ้ำก่อนทำรายการ`);
+          error.code = "DUPLICATE_LIABILITY_NAME";
+          throw error;
+        }
+        index.set(key, liability);
+      });
+      return index;
+    }
+
+    getCreditCardRows() {
+      return this.getLiabilityRows().filter((row) => this.isCreditCardLiability(row));
+    }
+
+    findCreditCardByName(name) {
+      const normalized = normalizeName(name);
+      const card = this.buildLiabilityIndex({ creditCardsOnly: true }).get(accountKey(normalized));
+      if (!card) {
+        const error = new Error(`ไม่พบบัตรเครดิต “${normalized || "ไม่ระบุชื่อ"}” ในชีต Liabilities`);
+        error.code = "CREDIT_CARD_NOT_FOUND";
+        throw error;
+      }
+      return card;
+    }
+
+    isLiabilityReferencedByTransaction(name) {
+      const key = accountKey(name);
+      return (this.currentData?.transactions || []).some((transaction) => {
+        return accountKey(transaction.credit_card) === key;
+      });
+    }
+
+    validateLiabilityRecord(record, existingRecord = null) {
+      const missingHeaders = this.getMissingLiabilityTypeHeaders();
+      if (missingHeaders.length) {
+        const error = new Error(
+          `ชีต Liabilities ยังขาด Header: ${missingHeaders.join(", ")} `
+          + "กรุณาเพิ่ม Header ต่อท้ายแถวที่ 1 ก่อนบันทึกหนี้สินรุ่นนี้"
+        );
+        error.code = "LIABILITY_SCHEMA_MIGRATION_REQUIRED";
+        error.missingHeaders = missingHeaders;
+        throw error;
+      }
+
+      const name = normalizeName(record?.liability_name);
+      if (!name) throw new Error("กรุณาระบุชื่อหนี้สิน");
+      const duplicate = this.getLiabilityRows().find((row) => {
+        return row._rowNumber !== existingRecord?._rowNumber
+          && accountKey(row.liability_name) === accountKey(name);
+      });
+      if (duplicate) {
+        const error = new Error(`มีหนี้สินชื่อ “${name}” อยู่แล้ว ชื่อต้องไม่ซ้ำกัน`);
+        error.code = "DUPLICATE_LIABILITY_NAME";
+        throw error;
+      }
+
+      const oldName = normalizeName(existingRecord?.liability_name);
+      if (oldName && accountKey(oldName) !== accountKey(name) && this.isLiabilityReferencedByTransaction(oldName)) {
+        const error = new Error(`เปลี่ยนชื่อ “${oldName}” ไม่ได้ เพราะมี Transaction บัตรเครดิตอ้างถึงชื่อนี้อยู่`);
+        error.code = "LIABILITY_NAME_REFERENCED";
+        throw error;
+      }
+
+      const liabilityType = normalizeLiabilityType(record?.liability_type, name);
+      const totalAmount = roundMoney(record?.total_amount);
+      const monthlyPayment = liabilityType === "CreditCard" ? 0 : roundMoney(record?.monthly_payment);
+      if (totalAmount < 0 || monthlyPayment < 0) throw new Error("ยอดหนี้และค่างวดต้องไม่ติดลบ");
+      return {
+        ...record,
+        liability_name: name,
+        liability_type: liabilityType,
+        total_amount: totalAmount,
+        monthly_payment: monthlyPayment
+      };
+    }
+
+    async appendLiability(record) {
+      return this.append(this.config.SHEETS.liabilities, this.validateLiabilityRecord(record));
+    }
+
+    async updateLiabilityRecord(rowNumber, existingRecord, record) {
+      const validated = this.validateLiabilityRecord({ ...existingRecord, ...record }, existingRecord);
+      return this.update(this.config.SHEETS.liabilities, rowNumber, validated);
+    }
+
+    async deleteCreditCard(rowNumber) {
+      const card = this.getCreditCardRows().find((row) => row._rowNumber === rowNumber);
+      if (!card) throw new Error("ไม่พบบัตรเครดิตที่ต้องการลบ");
+      return this.delete(this.config.SHEETS.liabilities, rowNumber);
+    }
+
+    getGratitudeRows() {
+      return this.currentData?.gratitude || [];
+    }
+
+    validateGratitudeEntry(record) {
+      const date = normalizeName(record?.date);
+      const slot = Number(record?.slot);
+      const category = normalizeName(record?.category);
+      const gratitudeText = normalizeName(record?.gratitude_text);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("วันที่บันทึกคำขอบคุณไม่ถูกต้อง");
+      if (![1, 2, 3].includes(slot)) throw new Error("ลำดับคำขอบคุณต้องอยู่ระหว่าง 1–3");
+      if (!GRATITUDE_CATEGORIES.has(category)) throw new Error(`หมวดหมู่คำขอบคุณ “${category}” ไม่ถูกต้อง`);
+      if (!gratitudeText) throw new Error(`กรุณาระบุข้อความขอบคุณเรื่องที่ ${slot}`);
+      if (gratitudeText.length > 500) throw new Error("ข้อความขอบคุณแต่ละเรื่องยาวได้ไม่เกิน 500 ตัวอักษร");
+      return { ...record, date, slot, category, gratitude_text: gratitudeText };
+    }
+
+    async saveDailyGratitude(dateValue, entries) {
+      const missingHeaders = this.getMissingGratitudeHeaders();
+      if (missingHeaders.length || this.gratitudeLoadError) {
+        const error = new Error(
+          `ระบบขอบคุณวันนี้ยังไม่พร้อม กรุณาสร้างชีต Gratitude และ Header: ${GRATITUDE_HEADERS.join(", ")}`
+        );
+        error.code = "GRATITUDE_SCHEMA_MIGRATION_REQUIRED";
+        error.missingHeaders = missingHeaders;
+        throw error;
+      }
+
+      const date = normalizeName(dateValue);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("กรุณาเลือกวันที่");
+      const normalizedEntries = (entries || []).map((entry) => ({
+        slot: Number(entry?.slot),
+        category: normalizeName(entry?.category),
+        gratitude_text: normalizeName(entry?.gratitude_text)
+      }));
+      const filledEntries = normalizedEntries
+        .filter((entry) => entry.category || entry.gratitude_text)
+        .map((entry) => this.validateGratitudeEntry({ ...entry, date }));
+      const slots = new Set(filledEntries.map((entry) => entry.slot));
+      if (slots.size !== filledEntries.length) throw new Error("พบลำดับคำขอบคุณซ้ำ");
+
+      const existingRows = this.getGratitudeRows().filter((row) => normalizeName(row.date) === date);
+      const existingBySlot = new Map();
+      existingRows.forEach((row) => {
+        const slot = Number(row.slot);
+        if (existingBySlot.has(slot)) {
+          const error = new Error(`พบข้อมูลขอบคุณวันที่ ${date} เรื่องที่ ${slot} ซ้ำ กรุณาแก้ใน Google Sheet ก่อน`);
+          error.code = "DUPLICATE_GRATITUDE_SLOT";
+          throw error;
+        }
+        existingBySlot.set(slot, row);
+      });
+      if (!filledEntries.length && !existingRows.length) throw new Error("กรุณาบันทึกสิ่งที่อยากขอบคุณอย่างน้อย 1 เรื่อง");
+
+      const now = new Date().toISOString();
+      const sheetName = this.getGratitudeSheetName();
+      const updates = [];
+      const appends = [];
+      filledEntries.forEach((entry) => {
+        const existing = existingBySlot.get(entry.slot);
+        const record = {
+          ...(existing || {}),
+          ...entry,
+          gratitude_id: existing?.gratitude_id || `grat-${date.replace(/-/g, "")}-${entry.slot}`,
+          created_at: existing?.created_at || now,
+          updated_at: now
+        };
+        if (existing?._rowNumber) updates.push({ rowNumber: existing._rowNumber, record });
+        else appends.push(record);
+      });
+      const filledSlots = new Set(filledEntries.map((entry) => entry.slot));
+      const deletes = existingRows
+        .filter((row) => !filledSlots.has(Number(row.slot)))
+        .sort((a, b) => b._rowNumber - a._rowNumber);
+
+      for (const item of updates) await this.update(sheetName, item.rowNumber, item.record);
+      for (const record of appends) await this.append(sheetName, record);
+      for (const row of deletes) await this.delete(sheetName, row._rowNumber);
+      return { saved: filledEntries.length, deleted: deletes.length };
     }
 
     validateGoalRecord(record) {
@@ -745,7 +1009,7 @@
 
       const type = normalizeTransactionType(record?.type);
       if (!type) {
-        const error = new Error("ประเภทรายการต้องเป็น Income, Expense หรือ Transfer");
+        const error = new Error("ประเภทรายการไม่ถูกต้อง");
         error.code = "INVALID_TRANSACTION_TYPE";
         throw error;
       }
@@ -756,6 +1020,8 @@
         validated.type = "Income";
         validated.account_from = "";
         validated.account_to = normalizeName(accountTo.account_name);
+        validated.payment_method = "Account";
+        validated.credit_card = "";
       } else if (type === "expense") {
         if (requireExpenseItem) {
           const missingHeaders = this.getMissingTransactionItemHeaders();
@@ -773,11 +1039,30 @@
           if (!validated.category) throw new Error("กรุณาเลือกหมวดหมู่รายจ่าย");
           if (!validated.item_name) throw new Error("กรุณาระบุรายการรายจ่าย");
         }
-        const accountFrom = this.findAccountByName(record.account_from);
         validated.type = "Expense";
-        validated.account_from = normalizeName(accountFrom.account_name);
         validated.account_to = "";
-      } else {
+        const paymentMethod = normalizePaymentMethod(record.payment_method);
+        if (paymentMethod === "CreditCard") {
+          const missingHeaders = this.getMissingCreditCardHeaders();
+          if (missingHeaders.length) {
+            const error = new Error(
+              `ระบบบัตรเครดิตยังขาด Header: ${missingHeaders.join(", ")} กรุณาทำ Migration v2.5.0 ก่อน`
+            );
+            error.code = "CREDIT_CARD_SCHEMA_MIGRATION_REQUIRED";
+            error.missingHeaders = missingHeaders;
+            throw error;
+          }
+          const card = this.findCreditCardByName(record.credit_card);
+          validated.payment_method = "CreditCard";
+          validated.credit_card = normalizeName(card.liability_name);
+          validated.account_from = "";
+        } else {
+          const accountFrom = this.findAccountByName(record.account_from);
+          validated.payment_method = "Account";
+          validated.credit_card = "";
+          validated.account_from = normalizeName(accountFrom.account_name);
+        }
+      } else if (type === "transfer") {
         const accountFrom = this.findAccountByName(record.account_from);
         const accountTo = this.findAccountByName(record.account_to);
         if (accountKey(accountFrom.account_name) === accountKey(accountTo.account_name)) {
@@ -788,8 +1073,38 @@
         validated.type = "Transfer";
         validated.account_from = normalizeName(accountFrom.account_name);
         validated.account_to = normalizeName(accountTo.account_name);
+        validated.payment_method = "Account";
+        validated.credit_card = "";
+      } else {
+        const missingHeaders = this.getMissingCreditCardHeaders();
+        if (missingHeaders.length) {
+          const error = new Error(
+            `ระบบบัตรเครดิตยังขาด Header: ${missingHeaders.join(", ")} กรุณาทำ Migration v2.5.0 ก่อน`
+          );
+          error.code = "CREDIT_CARD_SCHEMA_MIGRATION_REQUIRED";
+          error.missingHeaders = missingHeaders;
+          throw error;
+        }
+        const accountFrom = this.findAccountByName(record.account_from);
+        const card = this.findCreditCardByName(record.credit_card);
+        const outstanding = roundMoney(card.total_amount);
+        if (requireExpenseItem && amount > outstanding) {
+          const error = new Error(
+            `ยอดชำระ ${amount.toLocaleString("th-TH")} บาท มากกว่ายอดหนี้ของ “${card.liability_name}” `
+            + `${outstanding.toLocaleString("th-TH")} บาท`
+          );
+          error.code = "PAYMENT_EXCEEDS_CARD_BALANCE";
+          throw error;
+        }
+        validated.type = "CreditCardPayment";
+        validated.category = "ชำระบัตรเครดิต";
+        validated.item_name = normalizeName(record.item_name) || `ชำระ ${card.liability_name}`;
+        validated.account_from = normalizeName(accountFrom.account_name);
+        validated.account_to = "";
+        validated.payment_method = "Account";
+        validated.credit_card = normalizeName(card.liability_name);
       }
-      if (type !== "expense") validated.item_name = "";
+      if (type === "income" || type === "transfer") validated.item_name = "";
       return validated;
     }
 
@@ -798,15 +1113,123 @@
       const amount = roundMoney(transaction.amount * multiplier);
       const type = normalizeTransactionType(transaction.type);
       if (type === "income") {
-        return [{ accountName: transaction.account_to, delta: amount }];
+        return [{ target: "account", name: transaction.account_to, delta: amount }];
       }
       if (type === "expense") {
-        return [{ accountName: transaction.account_from, delta: -amount }];
+        if (normalizePaymentMethod(transaction.payment_method) === "CreditCard") {
+          return [{ target: "liability", name: transaction.credit_card, delta: amount }];
+        }
+        return [{ target: "account", name: transaction.account_from, delta: -amount }];
+      }
+      if (type === "credit_card_payment") {
+        return [
+          { target: "account", name: transaction.account_from, delta: -amount },
+          { target: "liability", name: transaction.credit_card, delta: -amount }
+        ];
       }
       return [
-        { accountName: transaction.account_from, delta: -amount },
-        { accountName: transaction.account_to, delta: amount }
+        { target: "account", name: transaction.account_from, delta: -amount },
+        { target: "account", name: transaction.account_to, delta: amount }
       ];
+    }
+
+    prepareFinancialChanges(effects) {
+      const accountIndex = this.buildAccountIndex();
+      const liabilityIndex = this.buildLiabilityIndex({ creditCardsOnly: true });
+      const totals = new Map();
+      (effects || []).forEach((effect) => {
+        const target = effect.target === "liability" ? "liability" : "account";
+        const key = accountKey(effect.name);
+        const mapKey = `${target}:${key}`;
+        totals.set(mapKey, {
+          target,
+          key,
+          delta: roundMoney((totals.get(mapKey)?.delta || 0) + toMoney(effect.delta))
+        });
+      });
+
+      const changes = [];
+      totals.forEach(({ target, key, delta }) => {
+        if (!delta) return;
+        if (target === "account") {
+          const row = accountIndex.get(key);
+          if (!row) throw new Error(`ไม่พบบัญชี “${key}” ในชีต Accounts`);
+          const before = roundMoney(row.balance);
+          const after = roundMoney(before + delta);
+          if (after < 0) {
+            const error = new Error(
+              `ยอดเงินในบัญชี “${row.account_name}” ไม่เพียงพอ `
+              + `(คงเหลือ ${before.toLocaleString("th-TH")} บาท)`
+            );
+            error.code = "INSUFFICIENT_ACCOUNT_BALANCE";
+            throw error;
+          }
+          changes.push({ target, row, before, after });
+          return;
+        }
+
+        const row = liabilityIndex.get(key);
+        if (!row) throw new Error(`ไม่พบบัตรเครดิต “${key}” ในชีต Liabilities`);
+        const before = roundMoney(row.total_amount);
+        const after = roundMoney(before + delta);
+        if (after < 0) {
+          const error = new Error(`ยอดหนี้ของ “${row.liability_name}” ต่ำกว่ายอดที่ต้องย้อนหรือชำระ กรุณาตรวจรายการบัตรก่อน`);
+          error.code = "NEGATIVE_CREDIT_CARD_BALANCE";
+          throw error;
+        }
+        changes.push({ target, row, before, after });
+      });
+      return changes;
+    }
+
+    async writeFinancialChanges(changes, targetKey = "after") {
+      if (!changes?.length) return;
+      const accountHeaders = this.getHeaders(this.config.SHEETS.accounts);
+      const liabilityHeaders = this.getHeaders(this.config.SHEETS.liabilities);
+      const accountColumn = columnLetter(accountHeaders.indexOf("balance") + 1);
+      const liabilityColumn = columnLetter(liabilityHeaders.indexOf("total_amount") + 1);
+      if (!accountColumn) throw new Error("ไม่พบ Header balance ในชีต Accounts");
+      if (!liabilityColumn) throw new Error("ไม่พบ Header total_amount ในชีต Liabilities");
+      const data = changes.map((change) => {
+        const isAccount = change.target === "account";
+        const sheetName = isAccount ? this.config.SHEETS.accounts : this.config.SHEETS.liabilities;
+        const column = isAccount ? accountColumn : liabilityColumn;
+        return {
+          range: `${quoteSheet(sheetName)}!${column}${change.row._rowNumber}`,
+          majorDimension: "ROWS",
+          values: [[roundMoney(change[targetKey])]]
+        };
+      });
+      await this.request("/values:batchUpdate", {
+        method: "POST",
+        body: { valueInputOption: "USER_ENTERED", data }
+      });
+      changes.forEach((change) => {
+        if (change.target === "account") change.row.balance = roundMoney(change[targetKey]);
+        else change.row.total_amount = roundMoney(change[targetKey]);
+      });
+    }
+
+    async applyFinancialEffects(effects) {
+      const changes = this.prepareFinancialChanges(effects);
+      await this.writeFinancialChanges(changes);
+      return changes;
+    }
+
+    async rollbackFinancialChanges(changes, primaryError, actionLabel) {
+      try {
+        await this.writeFinancialChanges(changes, "before");
+      } catch (rollbackError) {
+        const error = new Error(
+          `${actionLabel}ไม่สำเร็จ และย้อนยอดบัญชี/บัตรเครดิตไม่สำเร็จ `
+          + "กรุณาหยุดทำรายการและ Reconcile กับข้อมูลจริงก่อน"
+        );
+        error.code = "ROLLBACK_FAILED";
+        error.primaryError = primaryError;
+        error.rollbackError = rollbackError;
+        throw error;
+      }
+      throw primaryError;
     }
 
     prepareAccountBalanceChanges(effects) {
@@ -878,11 +1301,11 @@
     }
 
     async applyTransactionEffects(record) {
-      return this.applyAccountEffects(this.getTransactionEffects(record));
+      return this.applyFinancialEffects(this.getTransactionEffects(record));
     }
 
     async reverseTransactionEffects(record) {
-      return this.applyAccountEffects(this.getTransactionEffects(record, -1));
+      return this.applyFinancialEffects(this.getTransactionEffects(record, -1));
     }
 
     async rollbackAccountChanges(changes, primaryError, actionLabel) {
@@ -902,21 +1325,31 @@
     }
 
     isAccountLinkedTransaction(record) {
-      return String(record?.tx_id || "").startsWith(LINKED_TRANSACTION_PREFIX);
+      const id = String(record?.tx_id || "");
+      return id.startsWith(LINKED_TRANSACTION_PREFIX)
+        || id.startsWith(CREDIT_CARD_EXPENSE_PREFIX)
+        || id.startsWith(CREDIT_CARD_PAYMENT_PREFIX);
     }
 
     async appendTransactionWithAccountEffects(record) {
-      const transaction = this.validateTransactionAccounts({
-        ...record,
-        tx_id: `${LINKED_TRANSACTION_PREFIX}${createShortId()}`
-      });
+      const rawType = normalizeTransactionType(record?.type);
+      const prefix = rawType === "credit_card_payment"
+        ? CREDIT_CARD_PAYMENT_PREFIX
+        : rawType === "expense" && normalizePaymentMethod(record?.payment_method) === "CreditCard"
+          ? CREDIT_CARD_EXPENSE_PREFIX
+          : LINKED_TRANSACTION_PREFIX;
+      const transaction = this.validateTransactionAccounts({ ...record, tx_id: `${prefix}${createShortId()}` });
       const changes = await this.applyTransactionEffects(transaction);
       try {
         const result = await this.append(this.config.SHEETS.transactions, transaction);
         return { ...result, transaction };
       } catch (error) {
-        return this.rollbackAccountChanges(changes, error, "การเพิ่ม Transaction");
+        return this.rollbackFinancialChanges(changes, error, "การเพิ่ม Transaction");
       }
+    }
+
+    async payCreditCard(record) {
+      return this.appendTransactionWithAccountEffects({ ...record, type: "CreditCardPayment" });
     }
 
     async updateTransactionWithAccountEffects(rowNumber, existingRecord, record) {
@@ -936,11 +1369,11 @@
         ...this.getTransactionEffects(existingRecord, -1),
         ...this.getTransactionEffects(transaction)
       ];
-      const changes = await this.applyAccountEffects(effects);
+      const changes = await this.applyFinancialEffects(effects);
       try {
         return await this.update(this.config.SHEETS.transactions, rowNumber, transaction);
       } catch (error) {
-        return this.rollbackAccountChanges(changes, error, "การแก้ไข Transaction");
+        return this.rollbackFinancialChanges(changes, error, "การแก้ไข Transaction");
       }
     }
 
@@ -956,7 +1389,7 @@
       try {
         return await this.delete(this.config.SHEETS.transactions, record._rowNumber);
       } catch (error) {
-        return this.rollbackAccountChanges(changes, error, "การลบ Transaction");
+        return this.rollbackFinancialChanges(changes, error, "การลบ Transaction");
       }
     }
 

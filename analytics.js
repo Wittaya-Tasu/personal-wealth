@@ -4,6 +4,7 @@
   const INCOME_TYPES = new Set(["income", "รายรับ"]);
   const EXPENSE_TYPES = new Set(["expense", "รายจ่าย"]);
   const TRANSFER_TYPES = new Set(["transfer", "โอน", "โอนเงิน"]);
+  const CREDIT_CARD_PAYMENT_TYPES = new Set(["creditcardpayment", "credit_card_payment", "ชำระบัตรเครดิต"]);
   const COLORS = ["#45d18b", "#e2c46d", "#68a7ff", "#b594f6", "#f4a65a", "#ff746f", "#91a49b"];
   const MONTHLY_SPENDING_ACCOUNT_NAME = "บัญชีใช้จ่ายรายเดือน";
   const FINANCIAL_GOAL_TYPES = new Set(["financial", "finance", "การเงิน"]);
@@ -54,6 +55,7 @@
     if (INCOME_TYPES.has(normalized)) return "income";
     if (EXPENSE_TYPES.has(normalized)) return "expense";
     if (TRANSFER_TYPES.has(normalized)) return "transfer";
+    if (CREDIT_CARD_PAYMENT_TYPES.has(normalized)) return "credit_card_payment";
     return normalized || "other";
   }
 
