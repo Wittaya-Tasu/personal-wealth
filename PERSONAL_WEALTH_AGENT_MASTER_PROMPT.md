@@ -79,7 +79,7 @@
 | UI Theme | Dark Emerald + Gold |
 | Font | Sarabun |
 | อุปกรณ์หลัก | iPhone 16+ และ Desktop |
-| เวอร์ชันล่าสุด | v2.6.0 — Credit Card Liabilities + Daily Gratitude |
+| เวอร์ชันล่าสุด | v2.7.0 — Today Hub + Automatic Month-end Snapshot |
 
 ค่าจริงของ OAuth Client ID และ Spreadsheet ID ให้ตรวจจาก `config.js` ล่าสุด ห้ามคัดลอกค่าจากข้อความเก่ามาเขียนทับ
 
@@ -105,7 +105,7 @@ iPhone / Browser
 - ใช้ Bearer Access Token เรียก Google Sheets REST API
 - Access Token เก็บใน `sessionStorage` และมีอายุจำกัด
 - ไม่มี Client Secret ใน Frontend
-- ไม่ใช้ Google Apps Script เป็น Backend อีกแล้ว
+- ไม่ใช้ Google Apps Script เป็น Backend ของหน้าเว็บ; v2.7.0 ใช้ Apps Script เฉพาะ Scheduled Snapshot สิ้นเดือน
 - GAS Web App Deployment เดิมถูก Archive จนไม่มี Active deployment
 - Google Sheet เป็น Private/Restricted
 - Repository เป็น Public ได้ เพราะไม่มีข้อมูลการเงินจริงหรือ Secret อยู่ใน Code
@@ -146,6 +146,9 @@ iPhone / Browser
 | `TRANSACTIONS_MIGRATION.md` | วิธีเพิ่ม Header ชื่อรายการรายจ่ายรุ่น v2.4.0 |
 | `CREDIT_CARD_MIGRATION.md` | วิธีเพิ่ม Header และตั้งค่าบัตรเครดิตรุ่น v2.5.0 |
 | `GRATITUDE_MIGRATION.md` | วิธีสร้างชีตขอบคุณวันนี้รุ่น v2.6.0 |
+| `TODAY_MIGRATION.md` | วิธีสร้าง Todos, Habits และ HabitLogs รุ่น v2.7.0 |
+| `SNAPSHOT_AUTOMATION.md` | วิธีติดตั้ง Snapshot สิ้นเดือนอัตโนมัติ |
+| `MONTH_END_SNAPSHOT.gs` | Google Apps Script สำหรับ Scheduled Snapshot |
 | `icons/` | ไอคอน WebApp/PWA |
 
 ไฟล์ `script.js` แบบเดิมไม่ถูกใช้งานแล้ว ห้ามนำกลับมาเชื่อมกับ `index.html`
@@ -168,6 +171,9 @@ iPhone / Browser
 | `MonthlySnapshots` | `snapshot_month`, `total_assets`, `total_liabilities`, `net_worth`, `monthly_cashflow`, `savings_rate`, `note` |
 | `Settings` | `key`, `value`, `description` |
 | `Gratitude` | `gratitude_id`, `date`, `slot`, `category`, `gratitude_text`, `created_at`, `updated_at` |
+| `Todos` | `todo_id`, `date`, `category`, `task_text`, `is_important`, `is_completed`, `completed_at`, `created_at`, `updated_at` |
+| `Habits` | `habit_id`, `habit_name`, `frequency`, `active`, `created_at`, `updated_at` |
+| `HabitLogs` | `habit_log_id`, `habit_id`, `period_key`, `completed_date`, `completed_at`, `created_at`, `updated_at` |
 
 ID ที่ลงท้าย `_id` ถูกสร้างอัตโนมัติเมื่อเพิ่มแถวใหม่
 
@@ -274,7 +280,7 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 
 ---
 
-### 8. ความสามารถและข้อจำกัดปัจจุบันของ v2.6.0
+### 8. ความสามารถและข้อจำกัดปัจจุบันของ v2.7.0
 
 | การกระทำ | สิ่งที่ระบบทำ | ข้อจำกัด |
 |---|---|---|
@@ -288,7 +294,9 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 | Goal Milestone | ติดตามสถานะ 3 ระดับ | ไม่มี Checklist ย่อย |
 | Investment Contribution | เลือกสินทรัพย์เดิม/ชื่อใหม่ หักเงินรอบใหม่ และเพิ่ม `current_value`/`funded_amount` | หนึ่งสินทรัพย์ใช้ Account ต้นทางเดิมและไม่ใช่ Ledger ซื้อ–ขาย |
 | RMF/ETF/PVD | เก็บมูลค่าใน Investments | ไม่มี InvestmentTransactions/ราคาตลาด |
-| ขอบคุณวันนี้ | บันทึก 1–3 เรื่อง แยก 6 หมวด และเลือกวันที่ได้ | ยังไม่มี Reminder/Streak/กราฟสถิติ |
+| วันนี้ | Todo, Habit และ Gratitude ใน Tab เดียว; Todo มีดาว/ขีดฆ่า; Habit 4 ความถี่ | ยังไม่มี Reminder หรือ Streak |
+| ขอบคุณวันนี้ | บันทึก 1–3 เรื่อง แยก 8 หมวด และเลือกวันที่ได้ | ยังไม่มีกราฟสถิติ |
+| Snapshot อัตโนมัติ | Apps Script บันทึกวันสุดท้ายของเดือนแม้ปิดแอป | Trigger ทำงานในช่วงเวลาโดยประมาณ |
 
 ยอด Accounts ตอนเริ่มใช้ v2.1.0 เป็น Opening Balance ห้ามนำ Transactions เก่ามาคำนวณย้อนกลับ
 
@@ -314,7 +322,7 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 | Refresh หลัง Archive GAS | ผ่าน |
 | GAS Active deployment | ไม่มี |
 | iPhone Safe Area / Dynamic Island | แก้แล้วและผู้ใช้ยืนยัน |
-| PWA cache base | `personal-wealth-shell-v2.6.0` |
+| PWA cache base | `personal-wealth-shell-v2.7.0` |
 
 เคยทดสอบด้วยรายการรายรับ 1 บาท หมวด `ทดสอบระบบ` และลบออกสำเร็จแล้ว ห้ามถือรายการดังกล่าวว่าเป็นข้อมูลจริงหรือสร้างซ้ำ
 
@@ -516,6 +524,7 @@ Net Worth ไม่ควรเปลี่ยนจากการโอนเ�
 | จำเป็นเมื่อใช้ v2.4.0+ | `TRANSACTIONS_MIGRATION.md` |
 | จำเป็นเมื่อใช้ v2.5.0+ | `CREDIT_CARD_MIGRATION.md` |
 | จำเป็นเมื่อใช้ v2.6.0+ | `GRATITUDE_MIGRATION.md` |
+| จำเป็นเมื่อใช้ v2.7.0+ | `TODAY_MIGRATION.md`, `SNAPSHOT_AUTOMATION.md` |
 | แนะนำ | Google Sheet Template `.xlsx` |
 | แนะนำ | `PROJECT_STATE.md` และ `CHANGELOG.md` เมื่อสร้างแล้ว |
 | ไม่จำเป็นต่อการวิเคราะห์ Code | ไฟล์ PNG ใน `icons/` |

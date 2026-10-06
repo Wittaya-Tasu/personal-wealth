@@ -998,6 +998,212 @@ svg {
   font-size: 13px;
 }
 
+.today-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 14px;
+}
+
+.today-date-nav {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  align-items: end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.today-date-nav > .icon-button {
+  margin-bottom: 1px;
+  border-color: var(--line);
+  font-size: 26px;
+}
+
+.today-date-field {
+  margin: 0;
+}
+
+.today-panel {
+  margin-top: 14px;
+}
+
+.today-editor,
+.today-list-panel {
+  padding: 18px;
+}
+
+.todo-add-form,
+.habit-add-form {
+  display: grid;
+  align-items: end;
+  gap: 10px;
+}
+
+.star-toggle {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
+  background: rgba(7, 20, 16, 0.34);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--muted-2);
+  cursor: pointer;
+}
+
+.star-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.star-toggle span {
+  color: var(--muted-2);
+  font-size: 21px;
+}
+
+.star-toggle input:checked + span {
+  color: var(--gold);
+  filter: drop-shadow(0 0 7px rgba(226, 196, 109, 0.35));
+}
+
+.today-summary {
+  display: grid;
+  min-width: 50px;
+  height: 34px;
+  place-items: center;
+  background: var(--gold-soft);
+  border-radius: 12px;
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.todo-list,
+.habit-list,
+.habit-group {
+  display: grid;
+  gap: 8px;
+}
+
+.todo-item,
+.habit-item {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 12px;
+  background: rgba(7, 20, 16, 0.28);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.todo-item.is-important {
+  border-color: rgba(226, 196, 109, 0.32);
+}
+
+.todo-checkbox,
+.habit-checkbox {
+  width: 21px;
+  height: 21px;
+  accent-color: var(--green);
+}
+
+.todo-star {
+  padding: 4px;
+  background: transparent;
+  border: 0;
+  color: var(--muted-2);
+  font-size: 21px;
+}
+
+.todo-star.is-active {
+  color: var(--gold);
+}
+
+.todo-copy,
+.habit-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.todo-copy small,
+.habit-copy small {
+  color: var(--muted-2);
+  font-size: 11px;
+}
+
+.todo-item.is-completed .todo-task,
+.habit-item.is-completed .habit-copy strong {
+  color: var(--muted-2);
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+
+.todo-actions {
+  display: flex;
+  gap: 3px;
+}
+
+.text-button.danger {
+  color: var(--red);
+}
+
+.habit-list {
+  gap: 14px;
+}
+
+.habit-group-title {
+  margin: 0 0 2px;
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.habit-item {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.gratitude-section-heading {
+  margin-bottom: 14px;
+}
+
+@media (min-width: 760px) {
+  .todo-add-form {
+    grid-template-columns: 160px minmax(0, 1fr) 100px auto;
+  }
+
+  .habit-add-form {
+    grid-template-columns: minmax(0, 1fr) 180px auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .todo-add-form,
+  .habit-add-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .todo-text-field,
+  .habit-name-field {
+    grid-column: 1 / -1;
+  }
+
+  .todo-item {
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+
+  .todo-actions {
+    grid-column: 3;
+    justify-content: flex-end;
+  }
+}
+
 .gratitude-header {
   align-items: flex-end;
 }

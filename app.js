@@ -12,12 +12,16 @@
     activeSheet: null,
     activeFormType: null,
     activeRecord: null,
-    gratitudeDate: localIsoDate(),
+    todayDate: localIsoDate(),
+    todayTab: "todos",
     goalSchemaMissingHeaders: [],
     investmentSchemaMissingHeaders: [],
     transactionSchemaMissingHeaders: [],
     creditCardSchemaMissingHeaders: [],
     gratitudeSchemaMissingHeaders: [],
+    todoSchemaMissingHeaders: [],
+    habitSchemaMissingHeaders: [],
+    habitLogSchemaMissingHeaders: [],
     charts: {
       netWorth: null,
       cashflow: null,
@@ -31,7 +35,7 @@
     transactions: "รายรับ–รายจ่าย",
     wealth: "ความมั่งคั่ง",
     goals: "เป้าหมาย",
-    gratitude: "ขอบคุณวันนี้"
+    today: "วันนี้"
   };
 
   const formMeta = {
@@ -129,7 +133,7 @@
   function setLoading(isLoading) {
     qs("#syncButton").classList.toggle("is-spinning", isLoading);
     qsa("button[type='submit']").forEach((button) => {
-      if (button.closest(".data-form, .gratitude-form")) button.disabled = isLoading;
+      if (button.closest(".data-form, .gratitude-form, .todo-add-form, .habit-add-form")) button.disabled = isLoading;
     });
   }
 
@@ -152,7 +156,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js?v=2.6.0").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.7.0").catch(() => {});
     }
   }
 
@@ -207,12 +211,24 @@
     qs("#transactionList").addEventListener("click", handleListAction);
     qs("#wealthList").addEventListener("click", handleListAction);
     qs("#goalList").addEventListener("click", handleListAction);
-    qs("#gratitudeDate").addEventListener("change", (event) => {
-      state.gratitudeDate = event.target.value || localIsoDate();
-      renderGratitude();
+    qsa(".today-tabs button").forEach((button) => {
+      button.addEventListener("click", () => {
+        state.todayTab = button.dataset.todayTab;
+        renderTodayTabs();
+      });
     });
-    qs("#gratitudePreviousDay").addEventListener("click", () => changeGratitudeDate(-1));
-    qs("#gratitudeNextDay").addEventListener("click", () => changeGratitudeDate(1));
+    qs("#todayDate").addEventListener("change", (event) => {
+      state.todayDate = event.target.value || localIsoDate();
+      renderToday();
+    });
+    qs("#todayPreviousDay").addEventListener("click", () => changeTodayDate(-1));
+    qs("#todayNextDay").addEventListener("click", () => changeTodayDate(1));
+    qs("#todoForm").addEventListener("submit", submitTodo);
+    qs("#todoList").addEventListener("change", handleTodoChange);
+    qs("#todoList").addEventListener("click", handleTodoAction);
+    qs("#habitForm").addEventListener("submit", submitHabit);
+    qs("#habitList").addEventListener("change", handleHabitChange);
+    qs("#habitList").addEventListener("click", handleHabitAction);
     qs("#gratitudeForm").addEventListener("submit", submitGratitude);
     qs("#gratitudeForm").addEventListener("input", updateGratitudeProgressFromForm);
     qs("#gratitudeForm").addEventListener("click", (event) => {
@@ -226,8 +242,8 @@
     qs("#gratitudeHistory").addEventListener("click", (event) => {
       const button = event.target.closest("[data-gratitude-date]");
       if (!button) return;
-      state.gratitudeDate = button.dataset.gratitudeDate;
-      renderGratitude();
+      state.todayDate = button.dataset.gratitudeDate;
+      renderToday();
       global.scrollTo({ top: 0, behavior: "smooth" });
     });
 
@@ -283,6 +299,9 @@
       state.transactionSchemaMissingHeaders = store.getMissingTransactionItemHeaders();
       state.creditCardSchemaMissingHeaders = store.getMissingCreditCardHeaders();
       state.gratitudeSchemaMissingHeaders = store.getMissingGratitudeHeaders();
+      state.todoSchemaMissingHeaders = store.getMissingTodoHeaders();
+      state.habitSchemaMissingHeaders = store.getMissingHabitHeaders();
+      state.habitLogSchemaMissingHeaders = store.getMissingHabitLogHeaders();
       state.viewModel = analytics.buildViewModel(data, config.DEFAULTS);
       populateChartFilters();
       renderAll();
@@ -306,11 +325,11 @@
     ].forEach((id) => setText(id, id === "emergencyMonthsValue" ? "— เดือน" : "฿—"));
     setText("netWorthStatus", "รอเชื่อมต่อ");
     setText("netWorthChange", "เชื่อมต่อ Google เพื่อดูข้อมูลจริง");
-    ["recentTransactions", "transactionList", "wealthList", "goalPreview", "goalList"].forEach((id) => {
+    ["recentTransactions", "transactionList", "wealthList", "goalPreview", "goalList", "todoList", "habitList"].forEach((id) => {
       const container = document.getElementById(id);
       container.replaceChildren(emptyState());
     });
-    renderGratitude();
+    renderToday();
     qs("#expenseBreakdownLegend").replaceChildren();
     destroyCharts();
   }
@@ -320,7 +339,7 @@
     renderTransactions();
     renderWealth();
     renderGoals();
-    renderGratitude();
+    renderToday();
   }
 
   function populateChartFilters() {
@@ -888,12 +907,299 @@
     return date ? localIsoDate(date) : String(value || "").slice(0, 10);
   }
 
-  function changeGratitudeDate(dayDelta) {
-    const parts = String(state.gratitudeDate || localIsoDate()).split("-").map(Number);
+  function changeTodayDate(dayDelta) {
+    const parts = String(state.todayDate || localIsoDate()).split("-").map(Number);
     const date = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
     date.setDate(date.getDate() + dayDelta);
-    state.gratitudeDate = localIsoDate(date);
+    state.todayDate = localIsoDate(date);
+    renderToday();
+  }
+
+  function valueIsYes(value) {
+    if (typeof value === "boolean") return value;
+    return ["yes", "true", "1", "on", "ใช่"].includes(String(value ?? "").trim().toLowerCase());
+  }
+
+  function renderTodayTabs() {
+    qsa(".today-tabs button").forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.todayTab === state.todayTab);
+    });
+    qsa("[data-today-panel]").forEach((panel) => {
+      const active = panel.dataset.todayPanel === state.todayTab;
+      panel.hidden = !active;
+      panel.classList.toggle("is-active", active);
+    });
+  }
+
+  function renderToday() {
+    const dateKey = state.todayDate || localIsoDate();
+    state.todayDate = dateKey;
+    qs("#todayDate").value = dateKey;
+    renderTodayTabs();
+    renderTodos();
+    renderHabits();
     renderGratitude();
+  }
+
+  function todoRowsForDate(dateKey) {
+    return (state.data?.todos || [])
+      .filter((row) => String(row.date || "").slice(0, 10) === dateKey)
+      .sort((a, b) => {
+        const completedDifference = Number(valueIsYes(a.is_completed)) - Number(valueIsYes(b.is_completed));
+        if (completedDifference) return completedDifference;
+        const importantDifference = Number(valueIsYes(b.is_important)) - Number(valueIsYes(a.is_important));
+        if (importantDifference) return importantDifference;
+        return Number(a._rowNumber || 0) - Number(b._rowNumber || 0);
+      });
+  }
+
+  function renderTodos() {
+    const ready = store.isTodoSheetReady();
+    qs("#todoMigration").hidden = ready;
+    qsa("input, select, button", qs("#todoForm")).forEach((field) => { field.disabled = !ready; });
+    const container = qs("#todoList");
+    container.replaceChildren();
+    const rows = todoRowsForDate(state.todayDate);
+    const completedCount = rows.filter((row) => valueIsYes(row.is_completed)).length;
+    setText("todoSummary", `${completedCount}/${rows.length}`);
+    if (!ready) {
+      const empty = emptyState();
+      qs("strong", empty).textContent = "Todo ยังไม่พร้อม";
+      qs("p", empty).textContent = "สร้างชีต Todos ตาม TODAY_MIGRATION.md";
+      container.appendChild(empty);
+      return;
+    }
+    if (!rows.length) {
+      const empty = emptyState();
+      qs("strong", empty).textContent = "ยังไม่มีสิ่งที่ต้องทำ";
+      qs("p", empty).textContent = "เพิ่มงานหรือเรื่องส่วนตัวของวันที่เลือกด้านบน";
+      container.appendChild(empty);
+      return;
+    }
+    rows.forEach((row) => {
+      const completed = valueIsYes(row.is_completed);
+      const important = valueIsYes(row.is_important);
+      const item = createElement("article", `todo-item${completed ? " is-completed" : ""}${important ? " is-important" : ""}`);
+      const check = document.createElement("input");
+      check.type = "checkbox";
+      check.className = "todo-checkbox";
+      check.checked = completed;
+      check.dataset.todoRow = row._rowNumber;
+      check.setAttribute("aria-label", completed ? "ยกเลิกการทำเสร็จ" : "ทำเครื่องหมายว่าเสร็จแล้ว");
+      const star = createElement("button", `todo-star${important ? " is-active" : ""}`, "★");
+      star.type = "button";
+      star.dataset.todoStarRow = row._rowNumber;
+      star.setAttribute("aria-label", important ? "ยกเลิกดาวความสำคัญ" : "ใส่ดาวความสำคัญ");
+      const copy = createElement("div", "todo-copy");
+      copy.append(createElement("strong", "todo-task", row.task_text), createElement("small", "", row.category));
+      const actions = createElement("div", "todo-actions");
+      const edit = createElement("button", "text-button", "แก้");
+      edit.type = "button";
+      edit.dataset.todoEditRow = row._rowNumber;
+      const remove = createElement("button", "text-button danger", "ลบ");
+      remove.type = "button";
+      remove.dataset.todoDeleteRow = row._rowNumber;
+      actions.append(edit, remove);
+      item.append(check, star, copy, actions);
+      container.appendChild(item);
+    });
+  }
+
+  async function submitTodo(event) {
+    event.preventDefault();
+    if (!ensureCanWrite()) return;
+    const form = event.currentTarget;
+    try {
+      setLoading(true);
+      await store.appendTodo({
+        date: state.todayDate,
+        category: form.elements.category.value,
+        task_text: form.elements.task_text.value,
+        is_important: form.elements.is_important.checked ? "Yes" : "No",
+        is_completed: "No"
+      });
+      form.elements.task_text.value = "";
+      form.elements.is_important.checked = false;
+      await refreshData();
+      showToast("เพิ่มสิ่งที่ต้องทำแล้ว");
+    } catch (error) {
+      handleError(error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function updateTodoRow(rowNumber, patch, successMessage) {
+    const row = (state.data?.todos || []).find((item) => item._rowNumber === rowNumber);
+    if (!row) return;
+    try {
+      setLoading(true);
+      await store.updateTodoRecord(rowNumber, row, patch);
+      await refreshData();
+      if (successMessage) showToast(successMessage);
+    } catch (error) {
+      handleError(error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleTodoChange(event) {
+    const checkbox = event.target.closest("[data-todo-row]");
+    if (!checkbox) return;
+    const completed = checkbox.checked;
+    updateTodoRow(Number(checkbox.dataset.todoRow), {
+      is_completed: completed ? "Yes" : "No",
+      completed_at: completed ? new Date().toISOString() : ""
+    }, completed ? "ทำรายการนี้เสร็จแล้ว" : "ย้ายกลับเป็นงานที่ยังไม่เสร็จ");
+  }
+
+  async function handleTodoAction(event) {
+    const star = event.target.closest("[data-todo-star-row]");
+    const edit = event.target.closest("[data-todo-edit-row]");
+    const remove = event.target.closest("[data-todo-delete-row]");
+    const rowNumber = Number(star?.dataset.todoStarRow || edit?.dataset.todoEditRow || remove?.dataset.todoDeleteRow);
+    if (!rowNumber) return;
+    const row = (state.data?.todos || []).find((item) => item._rowNumber === rowNumber);
+    if (!row) return;
+    if (star) {
+      await updateTodoRow(rowNumber, { is_important: valueIsYes(row.is_important) ? "No" : "Yes" });
+      return;
+    }
+    if (edit) {
+      const value = global.prompt("แก้ไขสิ่งที่ต้องทำ", row.task_text || "");
+      if (value === null || !value.trim() || value.trim() === row.task_text) return;
+      await updateTodoRow(rowNumber, { task_text: value.trim() }, "แก้ไข Todo แล้ว");
+      return;
+    }
+    if (!global.confirm(`ลบ “${row.task_text}” หรือไม่?`)) return;
+    try {
+      setLoading(true);
+      await store.deleteTodo(rowNumber);
+      await refreshData();
+      showToast("ลบ Todo แล้ว");
+    } catch (error) {
+      handleError(error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const HABIT_FREQUENCY_LABELS = {
+    Daily: "ทุกวัน",
+    Weekly: "ทุกสัปดาห์",
+    Monthly: "ทุกเดือน",
+    Yearly: "ทุกปี"
+  };
+
+  function renderHabits() {
+    const ready = store.isHabitSheetReady();
+    qs("#habitMigration").hidden = ready;
+    qsa("input, select, button", qs("#habitForm")).forEach((field) => { field.disabled = !ready; });
+    const container = qs("#habitList");
+    container.replaceChildren();
+    const rows = (state.data?.habits || []).filter((row) => {
+      return (row.active === "" || valueIsYes(row.active)) && HABIT_FREQUENCY_LABELS[row.frequency];
+    });
+    const logs = state.data?.habitLogs || [];
+    let completedCount = 0;
+    const rendered = rows.map((habit) => {
+      const periodKey = store.habitPeriodKey(state.todayDate, habit.frequency);
+      const completed = logs.some((log) => String(log.habit_id || "").trim() === String(habit.habit_id || "").trim()
+        && String(log.period_key || "").trim() === periodKey);
+      if (completed) completedCount += 1;
+      return { habit, periodKey, completed };
+    });
+    setText("habitSummary", `${completedCount}/${rows.length}`);
+    if (!ready) {
+      const empty = emptyState();
+      qs("strong", empty).textContent = "Habit ยังไม่พร้อม";
+      qs("p", empty).textContent = "สร้างชีต Habits และ HabitLogs ตาม TODAY_MIGRATION.md";
+      container.appendChild(empty);
+      return;
+    }
+    if (!rows.length) {
+      const empty = emptyState();
+      qs("strong", empty).textContent = "ยังไม่มี Habit";
+      qs("p", empty).textContent = "เพิ่มกิจวัตรที่ต้องการทำเป็นประจำด้านบน";
+      container.appendChild(empty);
+      return;
+    }
+    Object.keys(HABIT_FREQUENCY_LABELS).forEach((frequency) => {
+      const groupRows = rendered.filter((item) => item.habit.frequency === frequency);
+      if (!groupRows.length) return;
+      const group = createElement("section", "habit-group");
+      group.appendChild(createElement("h3", "habit-group-title", HABIT_FREQUENCY_LABELS[frequency]));
+      groupRows.forEach(({ habit, completed }) => {
+        const item = createElement("article", `habit-item${completed ? " is-completed" : ""}`);
+        const check = document.createElement("input");
+        check.type = "checkbox";
+        check.className = "habit-checkbox";
+        check.checked = completed;
+        check.dataset.habitRow = habit._rowNumber;
+        const copy = createElement("div", "habit-copy");
+        copy.append(createElement("strong", "", habit.habit_name), createElement("small", "", completed ? "ทำแล้วในรอบนี้" : `รอบ ${HABIT_FREQUENCY_LABELS[frequency]}`));
+        const archive = createElement("button", "text-button", "พัก");
+        archive.type = "button";
+        archive.dataset.habitArchiveRow = habit._rowNumber;
+        item.append(check, copy, archive);
+        group.appendChild(item);
+      });
+      container.appendChild(group);
+    });
+  }
+
+  async function submitHabit(event) {
+    event.preventDefault();
+    if (!ensureCanWrite()) return;
+    const form = event.currentTarget;
+    try {
+      setLoading(true);
+      await store.appendHabit({ habit_name: form.elements.habit_name.value, frequency: form.elements.frequency.value, active: "Yes" });
+      form.elements.habit_name.value = "";
+      await refreshData();
+      showToast("เพิ่ม Habit แล้ว");
+    } catch (error) {
+      handleError(error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleHabitChange(event) {
+    const checkbox = event.target.closest("[data-habit-row]");
+    if (!checkbox) return;
+    const rowNumber = Number(checkbox.dataset.habitRow);
+    const habit = (state.data?.habits || []).find((item) => item._rowNumber === rowNumber);
+    if (!habit) return;
+    try {
+      setLoading(true);
+      await store.setHabitCompletion(habit, state.todayDate, checkbox.checked);
+      await refreshData();
+      showToast(checkbox.checked ? "บันทึกว่า Habit รอบนี้ทำแล้ว" : "ยกเลิกสถานะ Habit รอบนี้");
+    } catch (error) {
+      handleError(error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleHabitAction(event) {
+    const button = event.target.closest("[data-habit-archive-row]");
+    if (!button) return;
+    const rowNumber = Number(button.dataset.habitArchiveRow);
+    const habit = (state.data?.habits || []).find((item) => item._rowNumber === rowNumber);
+    if (!habit || !global.confirm(`พัก Habit “${habit.habit_name}” หรือไม่?\nประวัติที่ทำไว้จะยังคงอยู่`)) return;
+    try {
+      setLoading(true);
+      await store.archiveHabit(rowNumber, habit);
+      await refreshData();
+      showToast("พัก Habit แล้ว");
+    } catch (error) {
+      handleError(error);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function gratitudeRowsForDate(dateKey) {
@@ -916,9 +1222,7 @@
   function renderGratitude() {
     const form = qs("#gratitudeForm");
     if (!form) return;
-    const dateKey = state.gratitudeDate || localIsoDate();
-    state.gratitudeDate = dateKey;
-    qs("#gratitudeDate").value = dateKey;
+    const dateKey = state.todayDate || localIsoDate();
     const ready = store.isGratitudeSheetReady();
     qs("#gratitudeMigration").hidden = ready;
     qsa("select, textarea, button[type='submit']", form).forEach((field) => {
@@ -992,12 +1296,12 @@
       entries.push({ slot, category, gratitude_text: gratitudeText });
     }
     const filled = entries.filter((entry) => entry.gratitude_text).length;
-    if (!filled && gratitudeRowsForDate(state.gratitudeDate).length) {
+    if (!filled && gratitudeRowsForDate(state.todayDate).length) {
       if (!global.confirm("ลบคำขอบคุณทั้งหมดของวันที่เลือกหรือไม่?")) return;
     }
     try {
       setLoading(true);
-      await store.saveDailyGratitude(state.gratitudeDate, entries);
+      await store.saveDailyGratitude(state.todayDate, entries);
       await refreshData();
       showToast(filled ? `บันทึกคำขอบคุณ ${filled}/3 เรื่องแล้ว` : "ลบคำขอบคุณของวันที่เลือกแล้ว");
     } catch (error) {

@@ -1,9 +1,9 @@
 # Personal Wealth — Project State
 
-> อัปเดต: 19 กันยายน 2569 (2026-09-19), Asia/Bangkok  
-> รุ่นพัฒนา: **v2.6.0 — Credit Card Liabilities + Daily Gratitude**  
-> รุ่นที่ผู้ใช้ยืนยันว่า Deploy และใช้งานได้: **v2.4.0**  
-> สถานะ v2.6.0: รวม v2.5.0 แล้วและผ่าน Syntax/Static/Mock tests; ต้อง Migration บัตรเครดิต/Gratitude, Deploy และทดสอบกับ Google Sheet จริง
+> อัปเดต: 5 ตุลาคม 2569 (2026-10-05), Asia/Bangkok  
+> รุ่นพัฒนา: **v2.7.0 — Today Hub + Automatic Month-end Snapshot**  
+> รุ่นที่ผู้ใช้ยืนยันว่า Deploy และใช้งานได้: **v2.6.0**  
+> สถานะ v2.7.0: ผ่าน Syntax/Static/API mock tests; ต้องสร้าง Todos/Habits/HabitLogs, ติดตั้ง Apps Script, Deploy และทดสอบกับ Google Sheet จริง
 
 ## 1. สรุปโครงการ
 
@@ -17,25 +17,21 @@
 | Database | Google Sheet แบบ Private/Restricted |
 | Auth | Google OAuth Token Model |
 | API | Google Sheets API v4 โดยตรง |
-| Backend | ไม่มี; GAS deployments เดิม Archived |
+| Backend | ไม่มีสำหรับ WebApp; มี Apps Script เฉพาะ Scheduled Snapshot |
 | UI | ภาษาไทย, Dark Emerald + Gold, Sarabun |
 | อุปกรณ์หลัก | iPhone โดยเฉพาะหน้าจอประมาณ 390–430px และ Desktop |
 
-## 2. การเปลี่ยนแปลง v2.6.0
+## 2. การเปลี่ยนแปลง v2.7.0
 
 | งาน | ผลลัพธ์ |
 |---|---|
-| รูดบัตร | Expense เพิ่มหนี้บัตร โดยไม่ลด Account |
-| Cash Flow | นับยอดซื้อในเดือนที่ซื้อผ่านบัตร |
-| จ่ายบัตร | เลือกเต็มจำนวน/ระบุยอดและ Account ต้นทาง |
-| ป้องกันนับซ้ำ | CreditCardPayment ไม่เป็น Income/Expense |
-| แก้/ลบรายการ | ย้อนทั้ง Account และ Liabilities ตามผลเดิม |
-| ลบบัตร | ลบออกจากระบบหลังยืนยันสองชั้น แต่เก็บประวัติ Expense |
-| ขอบคุณวันนี้ | บันทึกได้วันละ 1–3 เรื่อง แยก 6 หมวด |
-| วันที่และประวัติ | เลือกย้อนหลัง แก้ ล้าง และเปิดวันที่เคยบันทึกได้ |
-| แยกข้อมูล | Gratitude ไม่กระทบยอดหรือ Analytics การเงิน |
-| Graceful migration | ไม่มี Gratitude ก็ยังโหลดหน้าการเงินได้ |
-| PWA | Versioned assets และ cache เป็น v2.6.0 |
+| Snapshot สิ้นเดือน | Apps Script ทำงานแม้ปิดแอป และ Upsert เดือนเดิม |
+| Todo | เรื่องงาน/เรื่องส่วนตัว, ดาว, ติ๊กและขีดฆ่า |
+| Habit | ทุกวัน/สัปดาห์/เดือน/ปี และบันทึกหนึ่งครั้งต่อรอบ |
+| เมนูมือถือ | รวม Todo, Habit, Gratitude ไว้ใน Tab `วันนี้` |
+| ขอบคุณวันนี้ | เพิ่มหมวด `ตัวเอง` และ `ประสบการณ์` รวมเป็น 8 หมวด |
+| Graceful migration | ไม่มีชีตใหม่ หน้าการเงินเดิมยังโหลดได้ |
+| PWA | Versioned assets และ cache เป็น v2.7.0 |
 
 ## 3. โครงสร้าง Google Sheet
 
@@ -51,8 +47,11 @@
 | `MonthlySnapshots` | `snapshot_month`, `total_assets`, `total_liabilities`, `net_worth`, `monthly_cashflow`, `savings_rate`, `note` |
 | `Settings` | `key`, `value`, `description` |
 | `Gratitude` | `gratitude_id`, `date`, `slot`, `category`, `gratitude_text`, `created_at`, `updated_at` |
+| `Todos` | `todo_id`, `date`, `category`, `task_text`, `is_important`, `is_completed`, `completed_at`, `created_at`, `updated_at` |
+| `Habits` | `habit_id`, `habit_name`, `frequency`, `active`, `created_at`, `updated_at` |
+| `HabitLogs` | `habit_log_id`, `habit_id`, `period_key`, `completed_date`, `completed_at`, `created_at`, `updated_at` |
 
-### Migration รวม v2.5.0 + v2.6.0
+### Migration v2.7.0
 
 เพิ่มต่อท้ายตารางเท่านั้น:
 
@@ -64,7 +63,7 @@
 
 อ่านขั้นตอนใน `CREDIT_CARD_MIGRATION.md` ห้ามแทรกคอลัมน์กลางตาราง
 
-สร้างชีตใหม่ `Gratitude` และเพิ่ม A1:G1 ตาม `GRATITUDE_MIGRATION.md` โดยไม่แก้ชีตการเงินเดิม
+สร้างชีต `Todos`, `Habits`, `HabitLogs` ตาม `TODAY_MIGRATION.md`, ตรวจหมวด Gratitude ตาม `GRATITUDE_MIGRATION.md` และติดตั้ง Trigger ตาม `SNAPSHOT_AUTOMATION.md`
 
 ## 4. กติกา Expense
 
@@ -108,17 +107,18 @@
 
 | ไฟล์ | การเปลี่ยนแปลง |
 |---|---|
-| `index.html` | Quick Add จ่ายบัตรและ Version URL |
-| `style.css` | ปุ่มรายการบัตร, Tab/การ์ด Gratitude และ Mobile layout |
-| `analytics.js` | รู้จัก CreditCardPayment โดยไม่รวมใน Cash Flow |
-| `api.js` | ระบบบัตรเครดิตและ CRUD Gratitude แบบ Optional sheet |
-| `app.js` | ระบบบัตรเครดิต, Tab ขอบคุณ, วันที่, 3 Slot และประวัติ |
-| `sw.js` | Cache v2.6.0 |
+| `index.html` | Tab วันนี้, ฟอร์ม Todo/Habit, หมวด Gratitude และ Version URL |
+| `style.css` | Mobile layout, ดาว, Checkbox, ขีดฆ่า และ Habit groups |
+| `api.js` | Optional sheets และ CRUD Todo/Habit/HabitLogs |
+| `app.js` | การแสดงผล/บันทึกหน้า วันนี้ และคำนวณรอบ Habit |
+| `sw.js` | Cache v2.7.0 |
 | `README.md` | คู่มือระบบและ Deploy |
 | `PROJECT_STATE.md` | สถานะล่าสุด |
-| `CHANGELOG.md` | ประวัติ v2.5.0–v2.6.0 |
-| `CREDIT_CARD_MIGRATION.md` | วิธีเพิ่ม J1/K1/F1 และสร้างบัตร |
-| `GRATITUDE_MIGRATION.md` | วิธีสร้างชีตและ Header Gratitude |
+| `CHANGELOG.md` | ประวัติ v2.7.0 |
+| `GRATITUDE_MIGRATION.md` | เพิ่มหมวดตัวเองและประสบการณ์ |
+| `TODAY_MIGRATION.md` | วิธีสร้าง Todos, Habits, HabitLogs |
+| `MONTH_END_SNAPSHOT.gs` | Scheduled Snapshot สิ้นเดือน |
+| `SNAPSHOT_AUTOMATION.md` | วิธีติดตั้ง Trigger และทดสอบ |
 
 `style.css` เพิ่มสถานะ disabled ให้ช่องที่ยังกรอกไม่ได้โดยไม่เปลี่ยนโครง Theme; `config.js`, `manifest.json`, OAuth Client ID, Spreadsheet ID และชื่อชีตไม่เปลี่ยน
 
@@ -141,28 +141,32 @@
 | ล้าง Slot แล้วลบเฉพาะแถวนั้น | ผ่าน |
 | หมวดหรือ Header ไม่ถูกต้อง | Block |
 | ไม่มีชีต Gratitude | หน้าการเงินยังโหลดได้ |
+| Todo validation/ดาว/สถานะเสร็จ | ผ่าน API Mock |
+| Habit period key วัน/สัปดาห์/เดือน/ปี | ผ่าน API Mock |
+| ไม่มี Todos/Habits/HabitLogs | หน้าการเงินยังโหลดได้ |
+| Apps Script syntax | ผ่าน |
 | PWA Version URLs | ผ่าน Static check |
 
 ## 9. สิ่งที่ต้องทดสอบกับ Google Sheet จริง
 
-1. ทำ `CREDIT_CARD_MIGRATION.md` และ `GRATITUDE_MIGRATION.md`
-2. Deploy v2.6.0 และปิด–เปิด PWA ใหม่
-3. สร้างบัตรเครดิต KTC ยอด 0
-4. บันทึก Expense 1 บาทผ่าน KTC ตรวจกราฟเพิ่ม 1, Account ไม่ลด, หนี้เพิ่ม 1
-5. จ่ายบัตรเต็มจำนวน ตรวจ Account ลด 1, หนี้เป็น 0, กราฟไม่เพิ่มซ้ำ
-6. ทดสอบจ่ายบางส่วนและ Block ยอดเกินหนี้
-7. บันทึก Gratitude 1 เรื่อง แล้วเพิ่มเป็น 2 เรื่อง ตรวจว่าไม่มีแถวซ้ำ
-8. ล้าง Gratitude ทดสอบ และ Reconcile Accounts/Liabilities
+1. ทำ `TODAY_MIGRATION.md` และตรวจ `GRATITUDE_MIGRATION.md`
+2. ติดตั้ง `MONTH_END_SNAPSHOT.gs` ตาม `SNAPSHOT_AUTOMATION.md`
+3. Deploy v2.7.0 และปิด–เปิด PWA ใหม่
+4. ทดสอบ Todo: เพิ่ม ใส่ดาว ติ๊ก เอาติ๊กออก แก้ และลบ
+5. ทดสอบ Habit ทุกความถี่ และตรวจว่าในรอบเดียวกันไม่สร้าง Log ซ้ำ
+6. ทดสอบ Gratitude หมวดตัวเองและประสบการณ์
+7. Run `testMonthEndSnapshotNow` แล้วตรวจ MonthlySnapshots
 
 ## 10. Deploy
 
 1. สำรอง Google Sheet และ Repository
-2. ทำ `CREDIT_CARD_MIGRATION.md`
-3. ทำ `GRATITUDE_MIGRATION.md`
-4. Replace ไฟล์จาก `personal-wealth-v2.6.0.zip` ที่ Root
-5. Commit: `feat: add credit cards and daily gratitude`
-6. รอ GitHub Pages workflow เป็นสีเขียว
-7. ปิด PWA เดิม เปิดใหม่ และ Refresh
+2. ทำ `TODAY_MIGRATION.md`
+3. ตรวจ `GRATITUDE_MIGRATION.md`
+4. ติดตั้ง `SNAPSHOT_AUTOMATION.md`
+5. Replace ไฟล์จาก `personal-wealth-v2.7.0.zip` ที่ Root
+6. Commit: `feat: add today hub and automatic snapshots`
+7. รอ GitHub Pages workflow เป็นสีเขียว
+8. ปิด PWA เดิม เปิดใหม่ และ Refresh
 
 ## 11. Rollback และข้อจำกัด
 
@@ -175,3 +179,5 @@
 - ลบบัตรแล้วประวัติ Expense ยังคงอยู่; หากแก้/ลบย้อนหลังต้องสร้างบัตรชื่อเดิมก่อน
 - ไม่มี Refresh Token และไม่มี Multi-user concurrency control
 - การบันทึก Gratitude หลาย Slot ไม่เป็น Atomic transaction ข้ามแถว
+- Todo ไม่ย้ายงานค้างไปวันถัดไปอัตโนมัติ
+- Apps Script Trigger ทำงานในช่วงเวลาโดยประมาณ ไม่รับประกันวินาทีที่แน่นอน

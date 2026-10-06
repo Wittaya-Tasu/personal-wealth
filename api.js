@@ -13,7 +13,12 @@
   const CREDIT_CARD_TRANSACTION_HEADERS = ["payment_method", "credit_card"];
   const LIABILITY_TYPE_HEADERS = ["liability_type"];
   const GRATITUDE_HEADERS = ["gratitude_id", "date", "slot", "category", "gratitude_text", "created_at", "updated_at"];
-  const GRATITUDE_CATEGORIES = new Set(["คน", "สัตว์", "สิ่งของ", "สถานที่", "เหตุการณ์", "อื่น ๆ"]);
+  const TODO_HEADERS = ["todo_id", "date", "category", "task_text", "is_important", "is_completed", "completed_at", "created_at", "updated_at"];
+  const HABIT_HEADERS = ["habit_id", "habit_name", "frequency", "active", "created_at", "updated_at"];
+  const HABIT_LOG_HEADERS = ["habit_log_id", "habit_id", "period_key", "completed_date", "completed_at", "created_at", "updated_at"];
+  const GRATITUDE_CATEGORIES = new Set(["คน", "ตัวเอง", "สัตว์", "สิ่งของ", "สถานที่", "เหตุการณ์", "ประสบการณ์", "อื่น ๆ"]);
+  const TODO_CATEGORIES = new Set(["เรื่องงาน", "เรื่องส่วนตัว"]);
+  const HABIT_FREQUENCIES = new Set(["Daily", "Weekly", "Monthly", "Yearly"]);
 
   function waitFor(predicate, timeoutMs = 15000) {
     return new Promise((resolve, reject) => {
@@ -129,6 +134,30 @@
     return value;
   }
 
+  function isYes(value) {
+    if (typeof value === "boolean") return value;
+    return ["yes", "true", "1", "on", "ใช่"].includes(String(value ?? "").trim().toLowerCase());
+  }
+
+  function habitPeriodKey(dateValue, frequency) {
+    const match = String(dateValue || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) throw new Error("วันที่ Habit ไม่ถูกต้อง");
+    if (!HABIT_FREQUENCIES.has(frequency)) throw new Error("ความถี่ Habit ไม่ถูกต้อง");
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    if (frequency === "Daily") return `${match[1]}-${match[2]}-${match[3]}`;
+    if (frequency === "Monthly") return `${match[1]}-${match[2]}`;
+    if (frequency === "Yearly") return match[1];
+    const date = new Date(Date.UTC(year, month - 1, day));
+    const weekday = date.getUTCDay() || 7;
+    date.setUTCDate(date.getUTCDate() + 4 - weekday);
+    const isoYear = date.getUTCFullYear();
+    const yearStart = new Date(Date.UTC(isoYear, 0, 1));
+    const week = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+    return `${isoYear}-W${String(week).padStart(2, "0")}`;
+  }
+
   class GoogleSheetsStore {
     constructor(config) {
       this.config = config;
@@ -139,6 +168,9 @@
       this.initialized = false;
       this.currentData = null;
       this.gratitudeLoadError = null;
+      this.todoLoadError = null;
+      this.habitLoadError = null;
+      this.habitLogLoadError = null;
     }
 
     async init() {
@@ -256,8 +288,38 @@
       return payload || {};
     }
 
+    async loadOptionalSheet(data, key, sheetName, endColumn, errorProperty) {
+      try {
+        const response = await this.request("/values:batchGet", {
+          query: {
+            ranges: [`${quoteSheet(sheetName)}!A:${endColumn}`],
+            majorDimension: "ROWS",
+            valueRenderOption: "UNFORMATTED_VALUE",
+            dateTimeRenderOption: "FORMATTED_STRING"
+          }
+        });
+        const values = response.valueRanges?.[0]?.values || [];
+        const headers = (values[0] || []).map((value) => String(value || "").trim());
+        this.headers[sheetName] = headers;
+        data[key] = values.slice(1).map((row, rowIndex) => {
+          const record = { _rowNumber: rowIndex + 2 };
+          headers.forEach((header, columnIndex) => {
+            if (header) record[header] = row[columnIndex] ?? "";
+          });
+          return record;
+        }).filter((record) => headers.some((header) => header && record[header] !== ""));
+        this[errorProperty] = null;
+      } catch (error) {
+        if (error?.status !== 400) throw error;
+        this.headers[sheetName] = [];
+        data[key] = [];
+        this[errorProperty] = error;
+      }
+    }
+
     async loadAll() {
-      const entries = Object.entries(this.config.SHEETS).filter(([key]) => key !== "gratitude");
+      const optionalKeys = new Set(["gratitude", "todos", "habits", "habitLogs"]);
+      const entries = Object.entries(this.config.SHEETS).filter(([key]) => !optionalKeys.has(key));
       const ranges = entries.map(([, sheetName]) => `${quoteSheet(sheetName)}!A:Z`);
       const response = await this.request("/values:batchGet", {
         query: {
@@ -288,33 +350,10 @@
           .filter((record) => headers.some((header) => header && record[header] !== ""));
       });
 
-      const gratitudeSheet = this.getGratitudeSheetName();
-      try {
-        const gratitudeResponse = await this.request("/values:batchGet", {
-          query: {
-            ranges: [`${quoteSheet(gratitudeSheet)}!A:G`],
-            majorDimension: "ROWS",
-            valueRenderOption: "UNFORMATTED_VALUE",
-            dateTimeRenderOption: "FORMATTED_STRING"
-          }
-        });
-        const values = gratitudeResponse.valueRanges?.[0]?.values || [];
-        const headers = (values[0] || []).map((value) => String(value || "").trim());
-        this.headers[gratitudeSheet] = headers;
-        data.gratitude = values.slice(1).map((row, rowIndex) => {
-          const record = { _rowNumber: rowIndex + 2 };
-          headers.forEach((header, columnIndex) => {
-            if (header) record[header] = row[columnIndex] ?? "";
-          });
-          return record;
-        }).filter((record) => headers.some((header) => header && record[header] !== ""));
-        this.gratitudeLoadError = null;
-      } catch (error) {
-        if (error?.status !== 400) throw error;
-        this.headers[gratitudeSheet] = [];
-        data.gratitude = [];
-        this.gratitudeLoadError = error;
-      }
+      await this.loadOptionalSheet(data, "gratitude", this.getGratitudeSheetName(), "G", "gratitudeLoadError");
+      await this.loadOptionalSheet(data, "todos", this.getTodoSheetName(), "I", "todoLoadError");
+      await this.loadOptionalSheet(data, "habits", this.getHabitSheetName(), "F", "habitLoadError");
+      await this.loadOptionalSheet(data, "habitLogs", this.getHabitLogSheetName(), "G", "habitLogLoadError");
 
       this.currentData = data;
       return data;
@@ -369,6 +408,44 @@
 
     isGratitudeSheetReady() {
       return !this.gratitudeLoadError && this.getMissingGratitudeHeaders().length === 0;
+    }
+
+    getTodoSheetName() {
+      return this.config.SHEETS.todos || "Todos";
+    }
+
+    getHabitSheetName() {
+      return this.config.SHEETS.habits || "Habits";
+    }
+
+    getHabitLogSheetName() {
+      return this.config.SHEETS.habitLogs || "HabitLogs";
+    }
+
+    getMissingTodoHeaders() {
+      const headers = this.headers[this.getTodoSheetName()] || [];
+      return TODO_HEADERS.filter((header) => !headers.includes(header));
+    }
+
+    getMissingHabitHeaders() {
+      const headers = this.headers[this.getHabitSheetName()] || [];
+      return HABIT_HEADERS.filter((header) => !headers.includes(header));
+    }
+
+    getMissingHabitLogHeaders() {
+      const headers = this.headers[this.getHabitLogSheetName()] || [];
+      return HABIT_LOG_HEADERS.filter((header) => !headers.includes(header));
+    }
+
+    isTodoSheetReady() {
+      return !this.todoLoadError && this.getMissingTodoHeaders().length === 0;
+    }
+
+    isHabitSheetReady() {
+      return !this.habitLoadError
+        && !this.habitLogLoadError
+        && this.getMissingHabitHeaders().length === 0
+        && this.getMissingHabitLogHeaders().length === 0;
     }
 
     buildRow(sheetName, record) {
@@ -747,6 +824,136 @@
       for (const record of appends) await this.append(sheetName, record);
       for (const row of deletes) await this.delete(sheetName, row._rowNumber);
       return { saved: filledEntries.length, deleted: deletes.length };
+    }
+
+    getTodoRows() {
+      return this.currentData?.todos || [];
+    }
+
+    validateTodoRecord(record, existingRecord = null) {
+      if (!this.isTodoSheetReady()) {
+        const error = new Error(`ระบบ Todo ยังไม่พร้อม กรุณาสร้างชีต Todos และ Header: ${TODO_HEADERS.join(", ")}`);
+        error.code = "TODO_SCHEMA_MIGRATION_REQUIRED";
+        error.missingHeaders = this.getMissingTodoHeaders();
+        throw error;
+      }
+      const date = normalizeName(record?.date);
+      const category = normalizeName(record?.category);
+      const taskText = normalizeName(record?.task_text);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("วันที่ Todo ไม่ถูกต้อง");
+      if (!TODO_CATEGORIES.has(category)) throw new Error("กรุณาเลือกประเภท Todo");
+      if (!taskText) throw new Error("กรุณาระบุสิ่งที่ต้องทำ");
+      if (taskText.length > 300) throw new Error("ข้อความ Todo ยาวได้ไม่เกิน 300 ตัวอักษร");
+      const now = new Date().toISOString();
+      const completed = isYes(record?.is_completed);
+      return {
+        ...(existingRecord || {}),
+        ...record,
+        todo_id: existingRecord?.todo_id || record?.todo_id || `todo-${date.replace(/-/g, "")}-${createShortId()}`,
+        date,
+        category,
+        task_text: taskText,
+        is_important: isYes(record?.is_important) ? "Yes" : "No",
+        is_completed: completed ? "Yes" : "No",
+        completed_at: completed ? (record?.completed_at || now) : "",
+        created_at: existingRecord?.created_at || record?.created_at || now,
+        updated_at: now
+      };
+    }
+
+    async appendTodo(record) {
+      return this.append(this.getTodoSheetName(), this.validateTodoRecord(record));
+    }
+
+    async updateTodoRecord(rowNumber, existingRecord, patch) {
+      return this.update(
+        this.getTodoSheetName(),
+        rowNumber,
+        this.validateTodoRecord({ ...existingRecord, ...patch }, existingRecord)
+      );
+    }
+
+    async deleteTodo(rowNumber) {
+      return this.delete(this.getTodoSheetName(), rowNumber);
+    }
+
+    getHabitRows() {
+      return this.currentData?.habits || [];
+    }
+
+    getHabitLogRows() {
+      return this.currentData?.habitLogs || [];
+    }
+
+    validateHabitRecord(record, existingRecord = null) {
+      if (!this.isHabitSheetReady()) {
+        const error = new Error("ระบบ Habit ยังไม่พร้อม กรุณาสร้างชีต Habits และ HabitLogs ตาม TODAY_MIGRATION.md");
+        error.code = "HABIT_SCHEMA_MIGRATION_REQUIRED";
+        throw error;
+      }
+      const habitName = normalizeName(record?.habit_name);
+      const frequency = normalizeName(record?.frequency);
+      if (!habitName) throw new Error("กรุณาระบุชื่อ Habit");
+      if (habitName.length > 200) throw new Error("ชื่อ Habit ยาวได้ไม่เกิน 200 ตัวอักษร");
+      if (!HABIT_FREQUENCIES.has(frequency)) throw new Error("ความถี่ Habit ไม่ถูกต้อง");
+      const now = new Date().toISOString();
+      return {
+        ...(existingRecord || {}),
+        ...record,
+        habit_id: existingRecord?.habit_id || record?.habit_id || `habit-${createShortId()}`,
+        habit_name: habitName,
+        frequency,
+        active: record?.active === undefined || record?.active === "" || isYes(record?.active) ? "Yes" : "No",
+        created_at: existingRecord?.created_at || record?.created_at || now,
+        updated_at: now
+      };
+    }
+
+    async appendHabit(record) {
+      return this.append(this.getHabitSheetName(), this.validateHabitRecord(record));
+    }
+
+    async archiveHabit(rowNumber, existingRecord) {
+      if (!existingRecord) throw new Error("ไม่พบ Habit ที่ต้องการพัก");
+      return this.update(this.getHabitSheetName(), rowNumber, {
+        ...existingRecord,
+        active: "No",
+        updated_at: new Date().toISOString()
+      });
+    }
+
+    habitPeriodKey(dateValue, frequency) {
+      return habitPeriodKey(dateValue, frequency);
+    }
+
+    async setHabitCompletion(habit, dateValue, completed) {
+      if (!this.isHabitSheetReady()) throw new Error("ระบบ Habit ยังไม่พร้อม กรุณาทำ TODAY_MIGRATION.md ก่อน");
+      const habitId = normalizeName(habit?.habit_id);
+      if (!habitId) throw new Error("Habit ไม่มี habit_id");
+      const date = normalizeName(dateValue);
+      const periodKey = habitPeriodKey(date, normalizeName(habit?.frequency));
+      const duplicates = this.getHabitLogRows().filter((row) => {
+        return normalizeName(row.habit_id) === habitId && normalizeName(row.period_key) === periodKey;
+      });
+      if (duplicates.length > 1) throw new Error(`พบ HabitLogs ซ้ำสำหรับรอบ ${periodKey} กรุณาแก้ใน Google Sheet`);
+      const existing = duplicates[0];
+      if (!completed) {
+        if (existing?._rowNumber) return this.delete(this.getHabitLogSheetName(), existing._rowNumber);
+        return { skipped: true };
+      }
+      const now = new Date().toISOString();
+      const record = {
+        ...(existing || {}),
+        habit_log_id: existing?.habit_log_id || `hlog-${createShortId()}`,
+        habit_id: habitId,
+        period_key: periodKey,
+        completed_date: date,
+        completed_at: now,
+        created_at: existing?.created_at || now,
+        updated_at: now
+      };
+      if (existing?._rowNumber) return this.update(this.getHabitLogSheetName(), existing._rowNumber, record);
+      return this.append(this.getHabitLogSheetName(), record);
     }
 
     validateGoalRecord(record) {

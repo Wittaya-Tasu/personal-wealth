@@ -1,13 +1,17 @@
-# Personal Wealth v2.6.0
+# Personal Wealth v2.7.0
 
-**Credit Card Liabilities + Daily Gratitude** — WebApp/PWA ส่วนตัวสำหรับบันทึกการเงิน เป้าหมายชีวิต และสิ่งที่อยากขอบคุณในแต่ละวัน โดยใช้ GitHub Pages เป็น Frontend และอ่าน–เขียน Google Sheet แบบ Private ผ่าน Google OAuth และ Google Sheets API v4 โดยตรง
+**Today Hub + Automatic Month-end Snapshot** — WebApp/PWA ส่วนตัวสำหรับบันทึกการเงิน เป้าหมายชีวิต Todo, Habit และสิ่งที่อยากขอบคุณ โดยใช้ GitHub Pages เป็น Frontend และอ่าน–เขียน Google Sheet แบบ Private ผ่าน Google OAuth และ Google Sheets API v4 โดยตรง พร้อม Google Apps Script เฉพาะงาน Snapshot ตามเวลา
 
 ## ความสามารถหลัก
 
 - Income, Expense และ Transfer ปรับ `Accounts.balance` อัตโนมัติ
 - Expense ผ่านบัตรเครดิตเพิ่มหนี้ระยะสั้นและแสดงในกราฟรายเดือน โดยไม่หัก Account ทันที
 - จ่ายบัตรเต็มจำนวนหรือระบุยอดได้ ระบบลด Account และหนี้บัตรโดยไม่สร้าง Expense ซ้ำ
-- Tab `ขอบคุณวันนี้` บันทึกได้วันละ 1–3 เรื่อง แยกหมวด คน สัตว์ สิ่งของ สถานที่ เหตุการณ์ และอื่น ๆ
+- Tab `วันนี้` รวม Todo, Habit และขอบคุณวันนี้ไว้ในหน้าที่เหมาะกับมือถือ
+- Todo แยกเรื่องงาน/เรื่องส่วนตัว ใส่ดาว ติ๊กเสร็จและแสดงข้อความขีดฆ่าได้
+- Habit รองรับทุกวัน ทุกสัปดาห์ ทุกเดือน และทุกปี พร้อมประวัติการทำแยกตามรอบ
+- ขอบคุณวันนี้บันทึกได้วันละ 1–3 เรื่อง และเพิ่มหมวด `ตัวเอง` กับ `ประสบการณ์`
+- Snapshot วันสุดท้ายของเดือนทำงานอัตโนมัติแม้ไม่ได้เปิด WebApp หลังติดตั้ง Trigger หนึ่งครั้ง
 - เลือกวันที่ย้อนหลัง แก้ไข ล้างรายการ และเปิดดูประวัติวันที่เคยบันทึกได้
 - การแก้หรือลบ Transaction ที่สร้างตั้งแต่ v2.1.0 ย้อนผลเดิมก่อนใช้ผลใหม่
 - การ์ด `เงินใช้จ่ายคงเหลือ` อ่านยอดจริงจาก Account ชื่อ `บัญชีใช้จ่ายรายเดือน`
@@ -21,7 +25,7 @@
 - กราฟ Cash Flow เลือก 6/12 เดือนและปี พ.ศ. ได้ แกน X แสดงชื่อเดือน แกน Y แสดงจำนวนเต็ม
 - กราฟสัดส่วนรายจ่ายแยกตามหมวดหมู่และเลือกเดือนได้ โดยไม่นับหมวด `บัตรเครดิต`
 - ป้องกันการเปลี่ยนชื่อหรือลบ Account ที่ Transaction, Goal หรือ Investment ยังอ้างถึง
-- Static Asset ใช้ Version URL `v=2.6.0` ลดปัญหา PWA โหลด HTML และ JavaScript คนละรุ่น
+- Static Asset ใช้ Version URL `v=2.7.0` ลดปัญหา PWA โหลด HTML และ JavaScript คนละรุ่น
 - รักษา Quick Reconnect, PWA, iPhone Safe Area และ Theme เดิม
 
 ## สถาปัตยกรรม
@@ -33,9 +37,10 @@ iPhone / Browser
       +-- Google Identity Services: OAuth Token Model
       +-- Google Sheets API v4
       +-- Google Sheet แบบ Private/Restricted
+      +-- Google Apps Script: Month-end Snapshot Trigger
 ```
 
-- ไม่มี Backend ของแอปและไม่ใช้ Google Apps Script
+- ไม่มี Backend สำหรับการใช้งานหน้าเว็บ; Google Apps Script ใช้เฉพาะ Snapshot ตามเวลา
 - ไม่มี Client Secret หรือ Refresh Token
 - Access Token เก็บใน `sessionStorage` เท่านั้น
 - Service Worker Cache เฉพาะ Static Assets และไม่ Cache Google API response
@@ -60,6 +65,9 @@ iPhone / Browser
 ├── TRANSACTIONS_MIGRATION.md
 ├── CREDIT_CARD_MIGRATION.md
 ├── GRATITUDE_MIGRATION.md
+├── TODAY_MIGRATION.md
+├── SNAPSHOT_AUTOMATION.md
+├── MONTH_END_SNAPSHOT.gs
 └── icons/
 ```
 
@@ -67,7 +75,7 @@ iPhone / Browser
 
 ## โครงสร้าง Google Sheet
 
-v2.6.0 รวม Migration บัตรเครดิต v2.5.0 และเพิ่มชีต Gratitude แยกจากข้อมูลการเงิน ข้อมูลเดิมไม่ถูกลบหรือเปลี่ยนชื่อ
+v2.7.0 เพิ่มชีต Todos, Habits และ HabitLogs โดยไม่แก้ Header ของชีตการเงินเดิม
 
 | Sheet | Headers ตามลำดับ |
 |---|---|
@@ -81,8 +89,11 @@ v2.6.0 รวม Migration บัตรเครดิต v2.5.0 และเพ
 | `MonthlySnapshots` | `snapshot_month`, `total_assets`, `total_liabilities`, `net_worth`, `monthly_cashflow`, `savings_rate`, `note` |
 | `Settings` | `key`, `value`, `description` |
 | `Gratitude` | `gratitude_id`, `date`, `slot`, `category`, `gratitude_text`, `created_at`, `updated_at` |
+| `Todos` | `todo_id`, `date`, `category`, `task_text`, `is_important`, `is_completed`, `completed_at`, `created_at`, `updated_at` |
+| `Habits` | `habit_id`, `habit_name`, `frequency`, `active`, `created_at`, `updated_at` |
+| `HabitLogs` | `habit_log_id`, `habit_id`, `period_key`, `completed_date`, `completed_at`, `created_at`, `updated_at` |
 
-ก่อน Deploy ให้ทำ [CREDIT_CARD_MIGRATION.md](CREDIT_CARD_MIGRATION.md), [GRATITUDE_MIGRATION.md](GRATITUDE_MIGRATION.md) และตรวจ Migration เดิมทั้งหมด หากยังไม่มี Gratitude หน้าการเงินยังทำงานได้ แต่ Tab ขอบคุณจะบันทึกไม่ได้
+ก่อน Deploy ให้ทำ [TODAY_MIGRATION.md](TODAY_MIGRATION.md), ตรวจ [GRATITUDE_MIGRATION.md](GRATITUDE_MIGRATION.md) และติดตั้งตาม [SNAPSHOT_AUTOMATION.md](SNAPSHOT_AUTOMATION.md) หากยังไม่มีชีตใหม่ หน้าการเงินยังทำงานได้ แต่ส่วนนั้นจะบันทึกไม่ได้
 
 ชื่อ `account_name` ต้องไม่ซ้ำ เพราะ Transactions, Goals และ Investments ยังเก็บชื่อบัญชีตามโครงสร้างเดิม
 
@@ -186,18 +197,30 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 
 ## ขอบคุณวันนี้
 
-Tab `ขอบคุณ` เป็นพื้นที่บันทึกสิ่งดี ๆ แยกจากระบบการเงินโดยสมบูรณ์
+ส่วน `ขอบคุณวันนี้` อยู่ใน Tab `วันนี้` และแยกจากระบบการเงินโดยสมบูรณ์
 
 | ความสามารถ | กติกา |
 |---|---|
 | จำนวนต่อวัน | สูงสุด 3 เรื่อง และบันทึกก่อนได้ตั้งแต่ 1 เรื่อง |
-| หมวดหมู่ | คน, สัตว์, สิ่งของ, สถานที่, เหตุการณ์, อื่น ๆ |
+| หมวดหมู่ | คน, ตัวเอง, สัตว์, สิ่งของ, สถานที่, เหตุการณ์, ประสบการณ์, อื่น ๆ |
 | วันที่ | ค่าเริ่มต้นเป็นวันนี้ และเลือกย้อนหลัง/วันอื่นได้ |
 | แก้ไข | เปิดวันที่เดิมแล้วแก้ข้อความหรือหมวด จากนั้นบันทึก |
 | ลบ | ล้างช่องที่ต้องการแล้วกดบันทึก |
 | ประวัติ | เรียงวันที่ล่าสุดก่อน แตะเพื่อเปิดบันทึกวันนั้น |
 
 หนึ่งเรื่องเก็บหนึ่งแถวในชีต Gratitude โดยใช้ `date + slot` เป็นตำแหน่งของเรื่อง ระบบไม่ส่งข้อมูลนี้เข้า Analytics และไม่เปลี่ยนยอดทางการเงิน
+
+## Todo และ Habit
+
+- Todo ผูกกับวันที่ แยก `เรื่องงาน` และ `เรื่องส่วนตัว`
+- ดาวเป็นเครื่องหมายความสำคัญ; ติ๊กแล้วขีดฆ่าและเอาติ๊กออกได้
+- งานค้างไม่ถูกย้ายวันอัตโนมัติ เพื่อรักษาประวัติวันที่ตามจริง
+- Habit ใช้รอบ Daily, Weekly (จันทร์–อาทิตย์), Monthly และ Yearly
+- หนึ่ง Habit มีได้หนึ่งสถานะเสร็จต่อหนึ่งรอบ และปุ่ม `พัก` จะไม่ลบประวัติเดิม
+
+## Snapshot สิ้นเดือนอัตโนมัติ
+
+ติดตั้ง `MONTH_END_SNAPSHOT.gs` ตาม `SNAPSHOT_AUTOMATION.md` หนึ่งครั้ง Script จะตรวจทุกวันประมาณ 23:30 น. ตามเวลาไทย และ Upsert `MonthlySnapshots` เฉพาะวันสุดท้ายของเดือน ปุ่ม Snapshot แบบเดิมยังคงใช้เป็นทางเลือกสำรอง
 
 ## หมวดหมู่และชื่อรายการรายจ่าย
 
@@ -248,7 +271,7 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 - ใช้ `prompt` ว่างในการเชื่อมต่อทั่วไปเพื่อลด consent ซ้ำ
 - เมื่อ Token หมดอายุจะแสดง `แตะเพื่อเชื่อมต่อ Google`
 - ไม่มี Refresh Token และไม่มี PIN แทน Google OAuth
-- ไม่ต้องเปลี่ยน Google Cloud configuration สำหรับ v2.6.0
+- ไม่ต้องเปลี่ยน Google Cloud OAuth configuration สำหรับ v2.7.0
 
 ## ความปลอดภัย
 
@@ -256,7 +279,7 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 - ห้ามใส่ Client Secret, Access Token, Password หรือข้อมูลการเงินจริงใน Repository
 - `GOOGLE_CLIENT_ID` และ `SPREADSHEET_ID` ไม่เปลี่ยน
 - Service Worker ไม่ Cache Google Sheets API
-- GAS deployments เดิมต้องคง Archived
+- Apps Script สำหรับ Snapshot ต้องผูกกับ Google Sheet นี้และไม่ควรเผยแพร่เป็น Web App
 - Goal ที่ผูกบัญชีเป็นเพียงการอ่านยอดจากข้อมูลที่ OAuth อนุญาตอยู่แล้ว
 
 ## วิธี Deploy
@@ -267,22 +290,24 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 4. ทำ Migration ชีต Transactions ตาม `TRANSACTIONS_MIGRATION.md`
 5. ทำ Migration บัตรเครดิตตาม `CREDIT_CARD_MIGRATION.md`
 6. สร้างชีต Gratitude ตาม `GRATITUDE_MIGRATION.md`
-7. ดาวน์โหลด `personal-wealth-v2.6.0.zip`
-8. แตก ZIP แล้ว Replace ไฟล์ใน Root ของ Repository
-9. Commit:
+7. สร้าง Todos, Habits และ HabitLogs ตาม `TODAY_MIGRATION.md`
+8. ติดตั้ง Trigger ตาม `SNAPSHOT_AUTOMATION.md`
+9. ดาวน์โหลด `personal-wealth-v2.7.0.zip`
+10. แตก ZIP แล้ว Replace ไฟล์ใน Root ของ Repository
+11. Commit:
 
 ```text
-feat: add credit cards and daily gratitude
+feat: add today hub and automatic snapshots
 ```
 
-10. รอ GitHub Actions `pages build and deployment` เป็นสีเขียว
-11. ปิด WebApp/PWA ทุกหน้าต่าง แล้วเปิดใหม่
-12. กด Refresh และทดสอบตามคู่มือ Migration ทั้งสองไฟล์
+12. รอ GitHub Actions `pages build and deployment` เป็นสีเขียว
+13. ปิด WebApp/PWA ทุกหน้าต่าง แล้วเปิดใหม่
+14. กด Refresh และทดสอบ Todo, Habit, Gratitude และ Snapshot
 
 ## วิธี Rollback
 
 1. หยุดบันทึก Transaction และ Investment ชั่วคราว
-2. Revert Commit v2.6.0 หรือ Replace Code ด้วย Backup รุ่นที่ใช้งานอยู่ก่อน Deploy
+2. Revert Commit v2.7.0 หรือ Replace Code ด้วย Backup รุ่นที่ใช้งานอยู่ก่อน Deploy
 3. Header ใหม่ใน Goals, Investments และ Transactions สามารถคงไว้ได้ เพราะ Code เก่าจะเพิกเฉย
 4. รอ Deploy และเปิดแอปใหม่
 

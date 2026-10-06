@@ -6,6 +6,35 @@
 
 - ยังไม่มีรายการ
 
+## [2.7.0] - 2026-10-05
+
+### Added
+
+- Tab `วันนี้` รวม Todo, Habit และขอบคุณวันนี้สำหรับหน้าจอมือถือ
+- Todo แยกเรื่องงาน/เรื่องส่วนตัว รองรับดาว ติ๊กเสร็จ ขีดฆ่า แก้ไขและลบ
+- Habit ความถี่ Daily, Weekly, Monthly และ Yearly พร้อม HabitLogs แยกตามรอบ
+- ชีตใหม่ `Todos`, `Habits`, `HabitLogs` และคู่มือ `TODAY_MIGRATION.md`
+- `MONTH_END_SNAPSHOT.gs` และคู่มือติดตั้ง Trigger เพื่อบันทึก Snapshot วันสุดท้ายของเดือนแม้ไม่ได้เปิดแอป
+- หมวด Gratitude `ตัวเอง` และ `ประสบการณ์`
+
+### Changed
+
+- เมนูหลัก `ขอบคุณ` เปลี่ยนเป็น `วันนี้` โดยคงข้อมูล Gratitude เดิมทั้งหมด
+- Static Assets และ Service Worker cache เปลี่ยนเป็น v2.7.0
+- Optional sheet loader รองรับฟังก์ชันใหม่โดยไม่ทำให้หน้าการเงินล้มเมื่อยังไม่ได้ Migration
+
+### Fixed
+
+- Snapshot อัตโนมัติใช้ Upsert จึงไม่สร้างแถวซ้ำในเดือนเดียวกัน
+- Habit หนึ่งรายการสร้าง Completion ได้เพียงหนึ่งรายการต่อรอบ
+- Todo ที่ทำเสร็จคงอยู่ในวันเดิมและสามารถยกเลิกสถานะได้
+
+### Known limitations
+
+- Apps Script time trigger ทำงานในช่วงเวลาประมาณการ ไม่รับประกันเวลาระดับวินาที
+- Todo ไม่ย้ายงานค้างไปวันถัดไปอัตโนมัติ
+- การเพิ่ม/แก้/ลบแต่ละรายการใช้ Google Sheets API แยกคำสั่งและไม่มี Multi-user concurrency control
+
 ## [2.6.0] - 2026-09-19
 
 ### Added
