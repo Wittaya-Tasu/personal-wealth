@@ -1,4 +1,4 @@
-# Personal Wealth v2.7.0
+# Personal Wealth v2.7.1
 
 **Today Hub + Automatic Month-end Snapshot** — WebApp/PWA ส่วนตัวสำหรับบันทึกการเงิน เป้าหมายชีวิต Todo, Habit และสิ่งที่อยากขอบคุณ โดยใช้ GitHub Pages เป็น Frontend และอ่าน–เขียน Google Sheet แบบ Private ผ่าน Google OAuth และ Google Sheets API v4 โดยตรง พร้อม Google Apps Script เฉพาะงาน Snapshot ตามเวลา
 
@@ -8,7 +8,7 @@
 - Expense ผ่านบัตรเครดิตเพิ่มหนี้ระยะสั้นและแสดงในกราฟรายเดือน โดยไม่หัก Account ทันที
 - จ่ายบัตรเต็มจำนวนหรือระบุยอดได้ ระบบลด Account และหนี้บัตรโดยไม่สร้าง Expense ซ้ำ
 - Tab `วันนี้` รวม Todo, Habit และขอบคุณวันนี้ไว้ในหน้าที่เหมาะกับมือถือ
-- Todo แยกเรื่องงาน/เรื่องส่วนตัว ใส่ดาว ติ๊กเสร็จและแสดงข้อความขีดฆ่าได้
+- Todo แสดงแยกกลุ่ม `เรื่องงาน` ด้านบนและ `เรื่องส่วนตัว` ด้านล่าง พร้อมดาว ติ๊กเสร็จและข้อความขีดฆ่า
 - Habit รองรับทุกวัน ทุกสัปดาห์ ทุกเดือน และทุกปี พร้อมประวัติการทำแยกตามรอบ
 - ขอบคุณวันนี้บันทึกได้วันละ 1–3 เรื่อง และเพิ่มหมวด `ตัวเอง` กับ `ประสบการณ์`
 - Snapshot วันสุดท้ายของเดือนทำงานอัตโนมัติแม้ไม่ได้เปิด WebApp หลังติดตั้ง Trigger หนึ่งครั้ง
@@ -25,7 +25,7 @@
 - กราฟ Cash Flow เลือก 6/12 เดือนและปี พ.ศ. ได้ แกน X แสดงชื่อเดือน แกน Y แสดงจำนวนเต็ม
 - กราฟสัดส่วนรายจ่ายแยกตามหมวดหมู่และเลือกเดือนได้ โดยไม่นับหมวด `บัตรเครดิต`
 - ป้องกันการเปลี่ยนชื่อหรือลบ Account ที่ Transaction, Goal หรือ Investment ยังอ้างถึง
-- Static Asset ใช้ Version URL `v=2.7.0` ลดปัญหา PWA โหลด HTML และ JavaScript คนละรุ่น
+- Static Asset ใช้ Version URL `v=2.7.1` ลดปัญหา PWA โหลด HTML และ JavaScript คนละรุ่น
 - รักษา Quick Reconnect, PWA, iPhone Safe Area และ Theme เดิม
 
 ## สถาปัตยกรรม
@@ -75,7 +75,7 @@ iPhone / Browser
 
 ## โครงสร้าง Google Sheet
 
-v2.7.0 เพิ่มชีต Todos, Habits และ HabitLogs โดยไม่แก้ Header ของชีตการเงินเดิม
+v2.7.1 ใช้โครงสร้างชีตเดียวกับ v2.7.0 และไม่ต้องทำ Migration เพิ่ม
 
 | Sheet | Headers ตามลำดับ |
 |---|---|
@@ -271,7 +271,7 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 - ใช้ `prompt` ว่างในการเชื่อมต่อทั่วไปเพื่อลด consent ซ้ำ
 - เมื่อ Token หมดอายุจะแสดง `แตะเพื่อเชื่อมต่อ Google`
 - ไม่มี Refresh Token และไม่มี PIN แทน Google OAuth
-- ไม่ต้องเปลี่ยน Google Cloud OAuth configuration สำหรับ v2.7.0
+- ไม่ต้องเปลี่ยน Google Cloud OAuth configuration สำหรับ v2.7.1
 
 ## ความปลอดภัย
 
@@ -292,7 +292,7 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 6. สร้างชีต Gratitude ตาม `GRATITUDE_MIGRATION.md`
 7. สร้าง Todos, Habits และ HabitLogs ตาม `TODAY_MIGRATION.md`
 8. ติดตั้ง Trigger ตาม `SNAPSHOT_AUTOMATION.md`
-9. ดาวน์โหลด `personal-wealth-v2.7.0.zip`
+9. ดาวน์โหลด `personal-wealth-v2.7.1.zip`
 10. แตก ZIP แล้ว Replace ไฟล์ใน Root ของ Repository
 11. Commit:
 
@@ -307,7 +307,7 @@ feat: add today hub and automatic snapshots
 ## วิธี Rollback
 
 1. หยุดบันทึก Transaction และ Investment ชั่วคราว
-2. Revert Commit v2.7.0 หรือ Replace Code ด้วย Backup รุ่นที่ใช้งานอยู่ก่อน Deploy
+2. Revert Commit v2.7.1 หรือ Replace Code ด้วย Backup รุ่นที่ใช้งานอยู่ก่อน Deploy
 3. Header ใหม่ใน Goals, Investments และ Transactions สามารถคงไว้ได้ เพราะ Code เก่าจะเพิกเฉย
 4. รอ Deploy และเปิดแอปใหม่
 

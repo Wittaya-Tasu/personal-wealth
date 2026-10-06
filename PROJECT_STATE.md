@@ -1,9 +1,9 @@
 # Personal Wealth — Project State
 
 > อัปเดต: 5 ตุลาคม 2569 (2026-10-05), Asia/Bangkok  
-> รุ่นพัฒนา: **v2.7.0 — Today Hub + Automatic Month-end Snapshot**  
-> รุ่นที่ผู้ใช้ยืนยันว่า Deploy และใช้งานได้: **v2.6.0**  
-> สถานะ v2.7.0: ผ่าน Syntax/Static/API mock tests; ต้องสร้าง Todos/Habits/HabitLogs, ติดตั้ง Apps Script, Deploy และทดสอบกับ Google Sheet จริง
+> รุ่นพัฒนา: **v2.7.1 — Grouped Todo Lists**  
+> รุ่นที่ผู้ใช้ยืนยันว่า Deploy และใช้งานได้: **v2.7.0**  
+> สถานะ v2.7.1: Hotfix การแสดงผล Todo แยกกลุ่ม; ไม่เปลี่ยน Google Sheet หรือ Apps Script
 
 ## 1. สรุปโครงการ
 
@@ -21,17 +21,17 @@
 | UI | ภาษาไทย, Dark Emerald + Gold, Sarabun |
 | อุปกรณ์หลัก | iPhone โดยเฉพาะหน้าจอประมาณ 390–430px และ Desktop |
 
-## 2. การเปลี่ยนแปลง v2.7.0
+## 2. การเปลี่ยนแปลง v2.7.1
 
 | งาน | ผลลัพธ์ |
 |---|---|
 | Snapshot สิ้นเดือน | Apps Script ทำงานแม้ปิดแอป และ Upsert เดือนเดิม |
-| Todo | เรื่องงาน/เรื่องส่วนตัว, ดาว, ติ๊กและขีดฆ่า |
+| Todo | แยก `เรื่องงาน` ด้านบนและ `เรื่องส่วนตัว` ด้านล่าง พร้อมยอดสำเร็จของแต่ละกลุ่ม |
 | Habit | ทุกวัน/สัปดาห์/เดือน/ปี และบันทึกหนึ่งครั้งต่อรอบ |
 | เมนูมือถือ | รวม Todo, Habit, Gratitude ไว้ใน Tab `วันนี้` |
 | ขอบคุณวันนี้ | เพิ่มหมวด `ตัวเอง` และ `ประสบการณ์` รวมเป็น 8 หมวด |
 | Graceful migration | ไม่มีชีตใหม่ หน้าการเงินเดิมยังโหลดได้ |
-| PWA | Versioned assets และ cache เป็น v2.7.0 |
+| PWA | Versioned assets และ cache เป็น v2.7.1 |
 
 ## 3. โครงสร้าง Google Sheet
 
@@ -111,10 +111,10 @@
 | `style.css` | Mobile layout, ดาว, Checkbox, ขีดฆ่า และ Habit groups |
 | `api.js` | Optional sheets และ CRUD Todo/Habit/HabitLogs |
 | `app.js` | การแสดงผล/บันทึกหน้า วันนี้ และคำนวณรอบ Habit |
-| `sw.js` | Cache v2.7.0 |
+| `sw.js` | Cache v2.7.1 |
 | `README.md` | คู่มือระบบและ Deploy |
 | `PROJECT_STATE.md` | สถานะล่าสุด |
-| `CHANGELOG.md` | ประวัติ v2.7.0 |
+| `CHANGELOG.md` | ประวัติ v2.7.0–v2.7.1 |
 | `GRATITUDE_MIGRATION.md` | เพิ่มหมวดตัวเองและประสบการณ์ |
 | `TODAY_MIGRATION.md` | วิธีสร้าง Todos, Habits, HabitLogs |
 | `MONTH_END_SNAPSHOT.gs` | Scheduled Snapshot สิ้นเดือน |
@@ -151,7 +151,7 @@
 
 1. ทำ `TODAY_MIGRATION.md` และตรวจ `GRATITUDE_MIGRATION.md`
 2. ติดตั้ง `MONTH_END_SNAPSHOT.gs` ตาม `SNAPSHOT_AUTOMATION.md`
-3. Deploy v2.7.0 และปิด–เปิด PWA ใหม่
+3. Deploy v2.7.1 และปิด–เปิด PWA ใหม่
 4. ทดสอบ Todo: เพิ่ม ใส่ดาว ติ๊ก เอาติ๊กออก แก้ และลบ
 5. ทดสอบ Habit ทุกความถี่ และตรวจว่าในรอบเดียวกันไม่สร้าง Log ซ้ำ
 6. ทดสอบ Gratitude หมวดตัวเองและประสบการณ์
@@ -163,7 +163,7 @@
 2. ทำ `TODAY_MIGRATION.md`
 3. ตรวจ `GRATITUDE_MIGRATION.md`
 4. ติดตั้ง `SNAPSHOT_AUTOMATION.md`
-5. Replace ไฟล์จาก `personal-wealth-v2.7.0.zip` ที่ Root
+5. Replace ไฟล์จาก `personal-wealth-v2.7.1.zip` ที่ Root
 6. Commit: `feat: add today hub and automatic snapshots`
 7. รอ GitHub Pages workflow เป็นสีเขียว
 8. ปิด PWA เดิม เปิดใหม่ และ Refresh

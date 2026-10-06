@@ -1088,6 +1088,74 @@ svg {
   gap: 8px;
 }
 
+.todo-list {
+  gap: 18px;
+}
+
+.todo-group {
+  display: grid;
+  gap: 9px;
+}
+
+.todo-group + .todo-group {
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.todo-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.todo-group-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.todo-group-work .todo-group-title::before,
+.todo-group-personal .todo-group-title::before {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 50%;
+  content: "";
+}
+
+.todo-group-work .todo-group-title::before {
+  background: var(--gold);
+}
+
+.todo-group-personal .todo-group-title::before {
+  background: var(--green);
+}
+
+.todo-group-count {
+  color: var(--muted-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.todo-group-items {
+  display: grid;
+  gap: 8px;
+}
+
+.todo-group-empty {
+  margin: 0;
+  padding: 14px 12px;
+  background: rgba(7, 20, 16, 0.18);
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  color: var(--muted-2);
+  font-size: 12px;
+  text-align: center;
+}
+
 .todo-item,
 .habit-item {
   display: grid;

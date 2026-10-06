@@ -79,7 +79,7 @@
 | UI Theme | Dark Emerald + Gold |
 | Font | Sarabun |
 | อุปกรณ์หลัก | iPhone 16+ และ Desktop |
-| เวอร์ชันล่าสุด | v2.7.0 — Today Hub + Automatic Month-end Snapshot |
+| เวอร์ชันล่าสุด | v2.7.1 — Grouped Todo Lists |
 
 ค่าจริงของ OAuth Client ID และ Spreadsheet ID ให้ตรวจจาก `config.js` ล่าสุด ห้ามคัดลอกค่าจากข้อความเก่ามาเขียนทับ
 
@@ -280,7 +280,7 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 
 ---
 
-### 8. ความสามารถและข้อจำกัดปัจจุบันของ v2.7.0
+### 8. ความสามารถและข้อจำกัดปัจจุบันของ v2.7.1
 
 | การกระทำ | สิ่งที่ระบบทำ | ข้อจำกัด |
 |---|---|---|
@@ -294,7 +294,7 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 | Goal Milestone | ติดตามสถานะ 3 ระดับ | ไม่มี Checklist ย่อย |
 | Investment Contribution | เลือกสินทรัพย์เดิม/ชื่อใหม่ หักเงินรอบใหม่ และเพิ่ม `current_value`/`funded_amount` | หนึ่งสินทรัพย์ใช้ Account ต้นทางเดิมและไม่ใช่ Ledger ซื้อ–ขาย |
 | RMF/ETF/PVD | เก็บมูลค่าใน Investments | ไม่มี InvestmentTransactions/ราคาตลาด |
-| วันนี้ | Todo, Habit และ Gratitude ใน Tab เดียว; Todo มีดาว/ขีดฆ่า; Habit 4 ความถี่ | ยังไม่มี Reminder หรือ Streak |
+| วันนี้ | Todo แยกกลุ่มงาน/ส่วนตัว มีดาว/ขีดฆ่า; Habit 4 ความถี่; Gratitude ใน Tab เดียว | ยังไม่มี Reminder หรือ Streak |
 | ขอบคุณวันนี้ | บันทึก 1–3 เรื่อง แยก 8 หมวด และเลือกวันที่ได้ | ยังไม่มีกราฟสถิติ |
 | Snapshot อัตโนมัติ | Apps Script บันทึกวันสุดท้ายของเดือนแม้ปิดแอป | Trigger ทำงานในช่วงเวลาโดยประมาณ |
 
@@ -322,7 +322,7 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 | Refresh หลัง Archive GAS | ผ่าน |
 | GAS Active deployment | ไม่มี |
 | iPhone Safe Area / Dynamic Island | แก้แล้วและผู้ใช้ยืนยัน |
-| PWA cache base | `personal-wealth-shell-v2.7.0` |
+| PWA cache base | `personal-wealth-shell-v2.7.1` |
 
 เคยทดสอบด้วยรายการรายรับ 1 บาท หมวด `ทดสอบระบบ` และลบออกสำเร็จแล้ว ห้ามถือรายการดังกล่าวว่าเป็นข้อมูลจริงหรือสร้างซ้ำ
 

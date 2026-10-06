@@ -156,7 +156,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js?v=2.7.0").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.7.1").catch(() => {});
     }
   }
 
@@ -976,32 +976,54 @@
       container.appendChild(empty);
       return;
     }
-    rows.forEach((row) => {
-      const completed = valueIsYes(row.is_completed);
-      const important = valueIsYes(row.is_important);
-      const item = createElement("article", `todo-item${completed ? " is-completed" : ""}${important ? " is-important" : ""}`);
-      const check = document.createElement("input");
-      check.type = "checkbox";
-      check.className = "todo-checkbox";
-      check.checked = completed;
-      check.dataset.todoRow = row._rowNumber;
-      check.setAttribute("aria-label", completed ? "ยกเลิกการทำเสร็จ" : "ทำเครื่องหมายว่าเสร็จแล้ว");
-      const star = createElement("button", `todo-star${important ? " is-active" : ""}`, "★");
-      star.type = "button";
-      star.dataset.todoStarRow = row._rowNumber;
-      star.setAttribute("aria-label", important ? "ยกเลิกดาวความสำคัญ" : "ใส่ดาวความสำคัญ");
-      const copy = createElement("div", "todo-copy");
-      copy.append(createElement("strong", "todo-task", row.task_text), createElement("small", "", row.category));
-      const actions = createElement("div", "todo-actions");
-      const edit = createElement("button", "text-button", "แก้");
-      edit.type = "button";
-      edit.dataset.todoEditRow = row._rowNumber;
-      const remove = createElement("button", "text-button danger", "ลบ");
-      remove.type = "button";
-      remove.dataset.todoDeleteRow = row._rowNumber;
-      actions.append(edit, remove);
-      item.append(check, star, copy, actions);
-      container.appendChild(item);
+    [
+      { category: "เรื่องงาน", title: "เรื่องงาน", className: "work" },
+      { category: "เรื่องส่วนตัว", title: "เรื่องส่วนตัว", className: "personal" }
+    ].forEach((definition) => {
+      const groupRows = rows.filter((row) => row.category === definition.category);
+      const groupCompleted = groupRows.filter((row) => valueIsYes(row.is_completed)).length;
+      const group = createElement("section", `todo-group todo-group-${definition.className}`);
+      const heading = createElement("div", "todo-group-heading");
+      heading.append(
+        createElement("h3", "todo-group-title", definition.title),
+        createElement("span", "todo-group-count", `${groupCompleted}/${groupRows.length}`)
+      );
+      const list = createElement("div", "todo-group-items");
+
+      if (!groupRows.length) {
+        list.appendChild(createElement("p", "todo-group-empty", `ยังไม่มี${definition.title}ในวันนี้`));
+      }
+
+      groupRows.forEach((row) => {
+        const completed = valueIsYes(row.is_completed);
+        const important = valueIsYes(row.is_important);
+        const item = createElement("article", `todo-item${completed ? " is-completed" : ""}${important ? " is-important" : ""}`);
+        const check = document.createElement("input");
+        check.type = "checkbox";
+        check.className = "todo-checkbox";
+        check.checked = completed;
+        check.dataset.todoRow = row._rowNumber;
+        check.setAttribute("aria-label", completed ? "ยกเลิกการทำเสร็จ" : "ทำเครื่องหมายว่าเสร็จแล้ว");
+        const star = createElement("button", `todo-star${important ? " is-active" : ""}`, "★");
+        star.type = "button";
+        star.dataset.todoStarRow = row._rowNumber;
+        star.setAttribute("aria-label", important ? "ยกเลิกดาวความสำคัญ" : "ใส่ดาวความสำคัญ");
+        const copy = createElement("div", "todo-copy");
+        copy.append(createElement("strong", "todo-task", row.task_text));
+        const actions = createElement("div", "todo-actions");
+        const edit = createElement("button", "text-button", "แก้");
+        edit.type = "button";
+        edit.dataset.todoEditRow = row._rowNumber;
+        const remove = createElement("button", "text-button danger", "ลบ");
+        remove.type = "button";
+        remove.dataset.todoDeleteRow = row._rowNumber;
+        actions.append(edit, remove);
+        item.append(check, star, copy, actions);
+        list.appendChild(item);
+      });
+
+      group.append(heading, list);
+      container.appendChild(group);
     });
   }
 
