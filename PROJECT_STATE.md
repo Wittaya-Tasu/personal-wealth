@@ -1,9 +1,9 @@
-# Personal Wealth — Project State
+# TasuyaWay — Project State
 
-> อัปเดต: 5 ตุลาคม 2569 (2026-10-05), Asia/Bangkok  
-> รุ่นพัฒนา: **v2.7.1 — Grouped Todo Lists**  
-> รุ่นที่ผู้ใช้ยืนยันว่า Deploy และใช้งานได้: **v2.7.0**  
-> สถานะ v2.7.1: Hotfix การแสดงผล Todo แยกกลุ่ม; ไม่เปลี่ยน Google Sheet หรือ Apps Script
+> อัปเดต: 7 ตุลาคม 2569 (2026-10-07), Asia/Bangkok  
+> รุ่นพัฒนา: **v2.8.0 — TasuyaWay + Todo Carry-over + Cashflow Summary**  
+> รุ่นที่ตรวจพบว่า Deploy อยู่ก่อนเริ่มงาน: **v2.7.1**  
+> สถานะ v2.8.0: พร้อม Deploy; ไม่เปลี่ยน Google Sheet หรือ Apps Script
 
 ## 1. สรุปโครงการ
 
@@ -21,17 +21,17 @@
 | UI | ภาษาไทย, Dark Emerald + Gold, Sarabun |
 | อุปกรณ์หลัก | iPhone โดยเฉพาะหน้าจอประมาณ 390–430px และ Desktop |
 
-## 2. การเปลี่ยนแปลง v2.7.1
+## 2. การเปลี่ยนแปลง v2.8.0
 
 | งาน | ผลลัพธ์ |
 |---|---|
-| Snapshot สิ้นเดือน | Apps Script ทำงานแม้ปิดแอป และ Upsert เดือนเดิม |
-| Todo | แยก `เรื่องงาน` ด้านบนและ `เรื่องส่วนตัว` ด้านล่าง พร้อมยอดสำเร็จของแต่ละกลุ่ม |
-| Habit | ทุกวัน/สัปดาห์/เดือน/ปี และบันทึกหนึ่งครั้งต่อรอบ |
-| เมนูมือถือ | รวม Todo, Habit, Gratitude ไว้ใน Tab `วันนี้` |
-| ขอบคุณวันนี้ | เพิ่มหมวด `ตัวเอง` และ `ประสบการณ์` รวมเป็น 8 หมวด |
-| Graceful migration | ไม่มีชีตใหม่ หน้าการเงินเดิมยังโหลดได้ |
-| PWA | Versioned assets และ cache เป็น v2.7.1 |
+| Todo ค้าง | งานที่ยังไม่เสร็จแสดงต่อในวันถัดไปจนกว่าจะติ๊กเสร็จ โดยไม่สร้างแถวใหม่ |
+| ประวัติ Todo | เก็บวันเริ่มเดิม แสดง `ค้างจาก ...`; งานเสร็จหายจากวันหลังวันเสร็จ |
+| Branding | เปลี่ยนชื่อ WebApp/PWA เป็น `TasuyaWay` และเปลี่ยนไอคอนจาก W เป็น T |
+| Cashflow summary | เพิ่มตารางรายรับ รายจ่าย เงินออมใต้กราฟ โดยใช้เดือน/ปีชุดเดียวกับกราฟ |
+| โหมดตาราง | สลับแสดงเปอร์เซ็นต์หรือยอดเงินบาทได้ |
+| Migration | ไม่เพิ่ม Sheet/Header และไม่ต้องแก้ Apps Script |
+| PWA | Versioned assets และ cache เป็น v2.8.0 |
 
 ## 3. โครงสร้าง Google Sheet
 
@@ -107,20 +107,21 @@
 
 | ไฟล์ | การเปลี่ยนแปลง |
 |---|---|
-| `index.html` | Tab วันนี้, ฟอร์ม Todo/Habit, หมวด Gratitude และ Version URL |
-| `style.css` | Mobile layout, ดาว, Checkbox, ขีดฆ่า และ Habit groups |
-| `api.js` | Optional sheets และ CRUD Todo/Habit/HabitLogs |
-| `app.js` | การแสดงผล/บันทึกหน้า วันนี้ และคำนวณรอบ Habit |
-| `sw.js` | Cache v2.7.1 |
+| `index.html` | ชื่อ TasuyaWay, ตาราง Cashflow, Version URL |
+| `style.css` | ตาราง Cashflow แบบเลื่อนแนวนอนบนมือถือ และป้ายงานค้าง |
+| `app.js` | Todo carry-over และการคำนวณ/แสดงตาราง Cashflow |
+| `manifest.json` | ชื่อ คำอธิบาย และหมวดของ PWA |
+| `icons/*` | ไอคอน TasuyaWay ตัวอักษร T |
+| `sw.js` | Cache v2.8.0 |
 | `README.md` | คู่มือระบบและ Deploy |
 | `PROJECT_STATE.md` | สถานะล่าสุด |
-| `CHANGELOG.md` | ประวัติ v2.7.0–v2.7.1 |
+| `CHANGELOG.md` | ประวัติ v2.8.0 |
 | `GRATITUDE_MIGRATION.md` | เพิ่มหมวดตัวเองและประสบการณ์ |
 | `TODAY_MIGRATION.md` | วิธีสร้าง Todos, Habits, HabitLogs |
 | `MONTH_END_SNAPSHOT.gs` | Scheduled Snapshot สิ้นเดือน |
 | `SNAPSHOT_AUTOMATION.md` | วิธีติดตั้ง Trigger และทดสอบ |
 
-`style.css` เพิ่มสถานะ disabled ให้ช่องที่ยังกรอกไม่ได้โดยไม่เปลี่ยนโครง Theme; `config.js`, `manifest.json`, OAuth Client ID, Spreadsheet ID และชื่อชีตไม่เปลี่ยน
+`api.js`, `analytics.js`, `config.js`, OAuth Client ID, Spreadsheet ID, โครงสร้างชีต และ Apps Script ไม่เปลี่ยน
 
 ## 8. ผลทดสอบในสภาพแวดล้อมจำลอง
 
@@ -142,17 +143,21 @@
 | หมวดหรือ Header ไม่ถูกต้อง | Block |
 | ไม่มีชีต Gratitude | หน้าการเงินยังโหลดได้ |
 | Todo validation/ดาว/สถานะเสร็จ | ผ่าน API Mock |
+| Todo ค้างแสดงต่อวันถัดไปโดยไม่สร้างแถวซ้ำ | ผ่าน Logic Mock |
+| Todo เสร็จแสดงถึงวันเสร็จและหายจากวันถัดไป | ผ่าน Logic Mock |
 | Habit period key วัน/สัปดาห์/เดือน/ปี | ผ่าน API Mock |
 | ไม่มี Todos/Habits/HabitLogs | หน้าการเงินยังโหลดได้ |
 | Apps Script syntax | ผ่าน |
 | PWA Version URLs | ผ่าน Static check |
+| Cashflow table: % / ยอดเงิน / เงินออมติดลบ / ไม่มีรายรับ | ผ่าน Logic Mock |
+| Manifest และไอคอน 192/512 | ผ่าน Static/Image check |
 
 ## 9. สิ่งที่ต้องทดสอบกับ Google Sheet จริง
 
 1. ทำ `TODAY_MIGRATION.md` และตรวจ `GRATITUDE_MIGRATION.md`
 2. ติดตั้ง `MONTH_END_SNAPSHOT.gs` ตาม `SNAPSHOT_AUTOMATION.md`
-3. Deploy v2.7.1 และปิด–เปิด PWA ใหม่
-4. ทดสอบ Todo: เพิ่ม ใส่ดาว ติ๊ก เอาติ๊กออก แก้ และลบ
+3. Deploy v2.8.0 และปิด–เปิด PWA ใหม่
+4. ทดสอบ Todo: เพิ่มงานวันนี้ เปิดวันถัดไป ตรวจป้าย `ค้างจาก ...` แล้วติ๊กเสร็จ
 5. ทดสอบ Habit ทุกความถี่ และตรวจว่าในรอบเดียวกันไม่สร้าง Log ซ้ำ
 6. ทดสอบ Gratitude หมวดตัวเองและประสบการณ์
 7. Run `testMonthEndSnapshotNow` แล้วตรวจ MonthlySnapshots
@@ -163,8 +168,8 @@
 2. ทำ `TODAY_MIGRATION.md`
 3. ตรวจ `GRATITUDE_MIGRATION.md`
 4. ติดตั้ง `SNAPSHOT_AUTOMATION.md`
-5. Replace ไฟล์จาก `personal-wealth-v2.7.1.zip` ที่ Root
-6. Commit: `feat: add today hub and automatic snapshots`
+5. Replace ไฟล์จาก `tasuya-way-v2.8.0.zip` ที่ Root
+6. Commit: `feat: rebrand to TasuyaWay and add cashflow summary`
 7. รอ GitHub Pages workflow เป็นสีเขียว
 8. ปิด PWA เดิม เปิดใหม่ และ Refresh
 
@@ -179,5 +184,5 @@
 - ลบบัตรแล้วประวัติ Expense ยังคงอยู่; หากแก้/ลบย้อนหลังต้องสร้างบัตรชื่อเดิมก่อน
 - ไม่มี Refresh Token และไม่มี Multi-user concurrency control
 - การบันทึก Gratitude หลาย Slot ไม่เป็น Atomic transaction ข้ามแถว
-- Todo ไม่ย้ายงานค้างไปวันถัดไปอัตโนมัติ
+- Todo carry-over เป็นการแสดงแถวเดิมตามวัน ไม่ได้เปลี่ยน `date` หรือสร้างสำเนาใน Google Sheet
 - Apps Script Trigger ทำงานในช่วงเวลาโดยประมาณ ไม่รับประกันวินาทีที่แน่นอน

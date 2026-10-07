@@ -1,5 +1,5 @@
-const APP_VERSION = "2.7.1";
-const CACHE_NAME = `personal-wealth-shell-v${APP_VERSION}`;
+const APP_VERSION = "2.8.0";
+const CACHE_NAME = `tasuya-way-shell-v${APP_VERSION}`;
 const STATIC_ASSETS = [
   "./",
   "./index.html",

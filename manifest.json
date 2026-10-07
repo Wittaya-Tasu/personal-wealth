@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "Personal Wealth",
-  "short_name": "Wealth",
-  "description": "ติดตามกระแสเงินสด ทรัพย์สิน หนี้สิน การลงทุน และเป้าหมายทางการเงิน",
+  "name": "TasuyaWay",
+  "short_name": "TasuyaWay",
+  "description": "ระบบส่วนตัวสำหรับการเงิน เป้าหมาย Todo Habit และบันทึกขอบคุณวันนี้",
   "lang": "th",
   "dir": "ltr",
   "start_url": "./",
@@ -11,7 +11,7 @@
   "orientation": "portrait-primary",
   "background_color": "#071410",
   "theme_color": "#072e27",
-  "categories": ["finance", "productivity"],
+  "categories": ["finance", "productivity", "lifestyle"],
   "icons": [
     {
       "src": "icons/icon-192.png",

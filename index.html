@@ -6,17 +6,19 @@
   <meta name="theme-color" content="#072e27">
   <meta name="color-scheme" content="dark">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="TasuyaWay">
+  <meta name="application-name" content="TasuyaWay">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="แดชบอร์ดติดตามการเงินส่วนบุคคล เป้าหมายชีวิต Todo Habit และบันทึกขอบคุณวันนี้">
+  <meta name="description" content="TasuyaWay — ระบบส่วนตัวสำหรับการเงิน เป้าหมาย Todo Habit และบันทึกขอบคุณวันนี้">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://sheets.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; img-src 'self' data:; manifest-src 'self'; worker-src 'self'">
-  <title>Personal Wealth</title>
-  <link rel="manifest" href="manifest.json?v=2.7.1">
+  <title>TasuyaWay</title>
+  <link rel="manifest" href="manifest.json?v=2.8.0">
   <link rel="icon" href="icons/wealth-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.7.1">
+  <link rel="stylesheet" href="style.css?v=2.8.0">
 </head>
 <body>
   <svg class="svg-sprite" aria-hidden="true">
@@ -37,9 +39,9 @@
   <div id="app" class="app-shell">
     <header class="topbar">
       <div class="brand">
-        <span class="brand-mark" aria-hidden="true">W</span>
+        <span class="brand-mark" aria-hidden="true">T</span>
         <div>
-          <p class="eyebrow">PERSONAL WEALTH</p>
+          <p class="eyebrow">TASUYA WAY</p>
           <h1 id="pageTitle">ภาพรวม</h1>
         </div>
       </div>
@@ -120,6 +122,20 @@
               </div>
             </div>
             <div class="chart-medium"><canvas id="cashflowChart" aria-label="กราฟรายรับและรายจ่าย"></canvas></div>
+            <section class="cashflow-summary" aria-labelledby="cashflowSummaryTitle">
+              <div class="cashflow-summary-heading">
+                <div>
+                  <p class="eyebrow">MONTHLY SUMMARY</p>
+                  <h3 id="cashflowSummaryTitle">รายรับ รายจ่าย และเงินออม</h3>
+                </div>
+                <div class="segmented-control cashflow-table-mode" role="group" aria-label="รูปแบบข้อมูลตาราง">
+                  <button class="is-active" type="button" data-cashflow-table-mode="percent">%</button>
+                  <button type="button" data-cashflow-table-mode="amount">ยอดเงิน</button>
+                </div>
+              </div>
+              <div id="cashflowSummaryTable" class="cashflow-table-wrap"></div>
+              <p id="cashflowSummaryNote" class="cashflow-summary-note">รายรับเป็นฐาน 100% · รายจ่าย + เงินออม = 100%</p>
+            </section>
           </article>
 
           <article class="panel expense-breakdown-panel">
@@ -447,9 +463,9 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="config.js?v=2.7.1"></script>
-  <script src="analytics.js?v=2.7.1"></script>
-  <script src="api.js?v=2.7.1"></script>
-  <script src="app.js?v=2.7.1"></script>
+  <script src="config.js?v=2.8.0"></script>
+  <script src="analytics.js?v=2.8.0"></script>
+  <script src="api.js?v=2.8.0"></script>
+  <script src="app.js?v=2.8.0"></script>
 </body>
 </html>

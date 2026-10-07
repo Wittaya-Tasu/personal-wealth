@@ -14,6 +14,7 @@
     activeRecord: null,
     todayDate: localIsoDate(),
     todayTab: "todos",
+    cashflowTableMode: "percent",
     goalSchemaMissingHeaders: [],
     investmentSchemaMissingHeaders: [],
     transactionSchemaMissingHeaders: [],
@@ -156,7 +157,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js?v=2.7.1").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.8.0").catch(() => {});
     }
   }
 
@@ -196,6 +197,17 @@
 
     qs("#cashflowPeriod").addEventListener("change", renderCashflowChart);
     qs("#cashflowYear").addEventListener("change", renderCashflowChart);
+    qsa("[data-cashflow-table-mode]").forEach((button) => {
+      button.addEventListener("click", () => {
+        state.cashflowTableMode = button.dataset.cashflowTableMode;
+        qsa("[data-cashflow-table-mode]").forEach((item) => {
+          const active = item.dataset.cashflowTableMode === state.cashflowTableMode;
+          item.classList.toggle("is-active", active);
+          item.setAttribute("aria-pressed", active ? "true" : "false");
+        });
+        renderCashflowTable(getCashflowDisplayRows());
+      });
+    });
     qs("#expenseMonth").addEventListener("change", renderExpenseBreakdownChart);
     qs("#transactionSearch").addEventListener("input", renderTransactions);
     qs("#transactionTypeFilter").addEventListener("change", renderTransactions);
@@ -330,6 +342,7 @@
       container.replaceChildren(emptyState());
     });
     renderToday();
+    renderCashflowTable([]);
     qs("#expenseBreakdownLegend").replaceChildren();
     destroyCharts();
   }
@@ -549,10 +562,8 @@
     });
   }
 
-  function renderCashflowChart() {
-    state.charts.cashflow?.destroy();
-    state.charts.cashflow = null;
-    if (!state.viewModel || !global.Chart) return;
+  function getCashflowDisplayRows() {
+    if (!state.viewModel) return [];
     const count = Number(qs("#cashflowPeriod").value || 6);
     const selectedYear = Number(qs("#cashflowYear").value || new Date().getFullYear());
     const currentDate = new Date();
@@ -561,7 +572,86 @@
       : 11;
     const yearRows = analytics.buildYearCashflow(state.data?.transactions, selectedYear);
     const startMonthIndex = count === 12 ? 0 : Math.max(0, endMonthIndex - count + 1);
-    const rows = yearRows.slice(startMonthIndex, endMonthIndex + 1);
+    return yearRows.slice(startMonthIndex, endMonthIndex + 1);
+  }
+
+  function formatCashflowShare(value) {
+    if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+    const absolutePercent = Math.abs(value * 100);
+    return formatPercent(value, absolutePercent > 0 && absolutePercent < 10 ? 1 : 0);
+  }
+
+  function renderCashflowTable(rows) {
+    const container = qs("#cashflowSummaryTable");
+    if (!container) return;
+    container.replaceChildren();
+    if (!rows.length) {
+      container.appendChild(createElement("p", "cashflow-table-empty", "ยังไม่มีข้อมูลสำหรับแสดงในตาราง"));
+      return;
+    }
+
+    const table = createElement("table", "cashflow-summary-table");
+    const head = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    const corner = document.createElement("th");
+    corner.scope = "col";
+    corner.textContent = "รายการ";
+    headRow.appendChild(corner);
+    rows.forEach((row) => {
+      const cell = document.createElement("th");
+      cell.scope = "col";
+      cell.textContent = row.label;
+      headRow.appendChild(cell);
+    });
+    head.appendChild(headRow);
+
+    const body = document.createElement("tbody");
+    const definitions = [
+      { key: "income", label: "รายรับ", className: "income" },
+      { key: "expense", label: "รายจ่าย", className: "expense" },
+      { key: "cashflow", label: "เงินออม", className: "savings" }
+    ];
+    definitions.forEach((definition) => {
+      const tr = document.createElement("tr");
+      tr.className = `cashflow-row-${definition.className}`;
+      const label = document.createElement("th");
+      label.scope = "row";
+      label.textContent = definition.label;
+      tr.appendChild(label);
+      rows.forEach((row) => {
+        const value = row[definition.key];
+        const td = document.createElement("td");
+        if (state.cashflowTableMode === "amount") {
+          td.textContent = formatCurrency(value);
+        } else if (!(row.income > 0)) {
+          td.textContent = "—";
+        } else {
+          const share = definition.key === "income" ? 1 : value / row.income;
+          td.textContent = formatCashflowShare(share);
+        }
+        if (definition.key === "cashflow") td.classList.toggle("negative", value < 0);
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
+
+    table.append(head, body);
+    container.appendChild(table);
+    setText(
+      "cashflowSummaryNote",
+      state.cashflowTableMode === "percent"
+        ? "รายรับเป็นฐาน 100% · รายจ่าย + เงินออม = 100% · เดือนที่ไม่มีรายรับแสดง —"
+        : "เงินออม = รายรับ − รายจ่าย · ค่าติดลบหมายถึงรายจ่ายมากกว่ารายรับ"
+    );
+  }
+
+  function renderCashflowChart() {
+    state.charts.cashflow?.destroy();
+    state.charts.cashflow = null;
+    const rows = getCashflowDisplayRows();
+    renderCashflowTable(rows);
+    if (!state.viewModel || !global.Chart) return;
+    const count = Number(qs("#cashflowPeriod").value || 6);
     const options = baseChartOptions();
     options.layout = { padding: { top: 8, right: 10, bottom: 0, left: 4 } };
     options.plugins.legend = {
@@ -943,14 +1033,36 @@
 
   function todoRowsForDate(dateKey) {
     return (state.data?.todos || [])
-      .filter((row) => String(row.date || "").slice(0, 10) === dateKey)
+      .filter((row) => {
+        const startDate = String(row.date || "").slice(0, 10);
+        if (!startDate || startDate > dateKey) return false;
+        if (!valueIsYes(row.is_completed)) return true;
+        const completedDate = todoCompletedDate(row);
+        if (!completedDate) return startDate === dateKey;
+        return dateKey <= completedDate;
+      })
       .sort((a, b) => {
-        const completedDifference = Number(valueIsYes(a.is_completed)) - Number(valueIsYes(b.is_completed));
+        const completedDifference = Number(todoIsCompletedOnDate(a, dateKey)) - Number(todoIsCompletedOnDate(b, dateKey));
         if (completedDifference) return completedDifference;
         const importantDifference = Number(valueIsYes(b.is_important)) - Number(valueIsYes(a.is_important));
         if (importantDifference) return importantDifference;
+        const startDifference = String(a.date || "").slice(0, 10).localeCompare(String(b.date || "").slice(0, 10));
+        if (startDifference) return startDifference;
         return Number(a._rowNumber || 0) - Number(b._rowNumber || 0);
       });
+  }
+
+  function todoCompletedDate(row) {
+    if (!valueIsYes(row?.is_completed) || !row?.completed_at) return "";
+    const date = analytics.parseDate(row.completed_at);
+    return date ? localIsoDate(date) : String(row.completed_at).slice(0, 10);
+  }
+
+  function todoIsCompletedOnDate(row, dateKey) {
+    if (!valueIsYes(row?.is_completed)) return false;
+    const completedDate = todoCompletedDate(row);
+    if (completedDate) return completedDate === dateKey;
+    return String(row.date || "").slice(0, 10) === dateKey;
   }
 
   function renderTodos() {
@@ -960,7 +1072,7 @@
     const container = qs("#todoList");
     container.replaceChildren();
     const rows = todoRowsForDate(state.todayDate);
-    const completedCount = rows.filter((row) => valueIsYes(row.is_completed)).length;
+    const completedCount = rows.filter((row) => todoIsCompletedOnDate(row, state.todayDate)).length;
     setText("todoSummary", `${completedCount}/${rows.length}`);
     if (!ready) {
       const empty = emptyState();
@@ -981,7 +1093,7 @@
       { category: "เรื่องส่วนตัว", title: "เรื่องส่วนตัว", className: "personal" }
     ].forEach((definition) => {
       const groupRows = rows.filter((row) => row.category === definition.category);
-      const groupCompleted = groupRows.filter((row) => valueIsYes(row.is_completed)).length;
+      const groupCompleted = groupRows.filter((row) => todoIsCompletedOnDate(row, state.todayDate)).length;
       const group = createElement("section", `todo-group todo-group-${definition.className}`);
       const heading = createElement("div", "todo-group-heading");
       heading.append(
@@ -995,8 +1107,9 @@
       }
 
       groupRows.forEach((row) => {
-        const completed = valueIsYes(row.is_completed);
+        const completed = todoIsCompletedOnDate(row, state.todayDate);
         const important = valueIsYes(row.is_important);
+        const startDate = String(row.date || "").slice(0, 10);
         const item = createElement("article", `todo-item${completed ? " is-completed" : ""}${important ? " is-important" : ""}`);
         const check = document.createElement("input");
         check.type = "checkbox";
@@ -1010,6 +1123,14 @@
         star.setAttribute("aria-label", important ? "ยกเลิกดาวความสำคัญ" : "ใส่ดาวความสำคัญ");
         const copy = createElement("div", "todo-copy");
         copy.append(createElement("strong", "todo-task", row.task_text));
+        if (startDate && startDate < state.todayDate) {
+          const parsedStartDate = analytics.parseDate(startDate);
+          copy.append(createElement(
+            "small",
+            "todo-carryover",
+            `ค้างจาก ${formatDate(parsedStartDate, { day: "numeric", month: "short" })}`
+          ));
+        }
         const actions = createElement("div", "todo-actions");
         const edit = createElement("button", "text-button", "แก้");
         edit.type = "button";
@@ -2194,7 +2315,7 @@
       net_worth: vm.totals.netWorth,
       monthly_cashflow: vm.currentMonth.cashflow,
       savings_rate: vm.savingsRate === null ? "" : vm.savingsRate,
-      note: "บันทึกจาก Personal Wealth WebApp"
+      note: "บันทึกจาก TasuyaWay WebApp"
     };
     const action = existing ? "อัปเดต" : "บันทึก";
     if (!global.confirm(`${action} Snapshot ของเดือนนี้ด้วยข้อมูลปัจจุบันหรือไม่?`)) return;
@@ -2217,7 +2338,7 @@
   }
 
   function handleError(error) {
-    console.error("Personal Wealth error:", error?.code || error?.status || "UNKNOWN");
+    console.error("TasuyaWay error:", error?.code || error?.status || "UNKNOWN");
     const apiMessage = error?.result?.error?.message;
     let message = apiMessage || error?.message || "เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ";
     if (/API has not been used|accessNotConfigured/i.test(message)) {
