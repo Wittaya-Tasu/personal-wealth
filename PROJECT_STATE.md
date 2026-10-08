@@ -1,8 +1,8 @@
 # TasuyaWay — Project State
 
 > อัปเดต: 8 ตุลาคม 2569 (2026-10-08), Asia/Bangkok  
-> รุ่นพัฒนา: **v2.10.0 — Financial Foundation**  
-> รุ่นฐานก่อนเริ่มงาน: **v2.9.0**  
+> รุ่นพัฒนา: **v2.11.0 — Four-tier Wealth Planning**  
+> รุ่นฐานก่อนเริ่มงาน: **v2.10.0 — Financial Foundation**  
 > สถานะ: Code และ Mock tests ผ่าน; รอ Migration และทดสอบกับ Google Sheet จริง
 
 ## 1. สรุปโครงการ
@@ -18,123 +18,117 @@
 | Backend | ไม่มีสำหรับหน้าเว็บ; Apps Script ใช้เฉพาะ Scheduled Snapshot |
 | UI หลัก | ภาษาไทย, Dark Emerald + Gold, Sarabun, Mobile-first สำหรับ iPhone |
 
-## 2. การเปลี่ยนแปลง v2.10.0
+## 2. การเปลี่ยนแปลง v2.11.0
 
 | งาน | ผลลัพธ์ |
 |---|---|
-| หน้าที่ของบัญชี | เพิ่ม `account_role` และตัวเลือก General/Spending/Emergency/SinkingFund/Investment |
-| เงินฉุกเฉิน | นับเฉพาะ Accounts ที่ `account_role = Emergency` ไม่รวมบัญชีอื่นหรือ Investments |
-| รายจ่ายระดับบน | เพิ่ม `expense_group`: Personal/Family/HomeDebt/Health/Protection |
-| ความจำเป็น | เพิ่ม `is_essential`: Yes/No และบังคับเลือกเมื่อบันทึก Expense ใหม่ |
-| สูตรรายจ่ายจำเป็น | ใช้ Expense ที่เป็น Yes เฉลี่ย 3 เดือน หรือใช้ Settings override หากกรอกไว้ |
-| กราฟรายจ่าย | รวมตาม `expense_group`; แถวเดิมที่ยังว่างรวมเป็น `ยังไม่จัดกลุ่ม` |
-| รายการบัตรเก่า | Expense ที่ `category = บัตรเครดิต` ยังถูกตัดออกเพื่อไม่ให้นับยอดชำระซ้ำ |
-| ความเข้ากันได้ | เพิ่ม Header ต่อท้ายเท่านั้น ไม่คำนวณ Opening Balance หรือ Transactions เก่าย้อนหลัง |
-| PWA | Versioned assets และ cache เป็น v2.10.0 |
+| Wealth Overview | เพิ่มหน้าแรกของเมนูความมั่งคั่ง สรุประบบการเงิน 4 ชั้นโดยไม่สร้างคะแนนรวม |
+| ชั้น 1 | รายรับ กระแสเงินสด และอัตราออมเดือนปัจจุบัน |
+| ชั้น 2 | งบเทียบยอดจริง ภาระหนี้ และกลุ่มรายจ่ายที่ยังไม่จำแนก |
+| ชั้น 3 | จำนวนเดือนเงินฉุกเฉินและเป้าหมายตาม Settings |
+| ชั้น 4 | มูลค่าการลงทุนและสัดส่วนการลงทุนต่อทรัพย์สิน |
+| งบประมาณ | ตั้งงบรายเดือนแยก 5 กลุ่มรายจ่าย เปรียบเทียบยอดจริง คงเหลือ และอัตราใช้ไป |
+| เงินเตรียมรายจ่าย | สร้างเป้าหมายรายปี/รายจ่ายก้อนใหญ่ พร้อมยอดที่ควรเก็บต่อเดือน |
+| การติดตามเงินเตรียม | รองรับ Manual หรืออ่าน Account ที่เป็น `SinkingFund` |
+| ความเข้ากันได้ | ชีตใหม่เป็น Optional ระหว่าง Migration; การเงินเดิมยังโหลดได้ |
+| PWA | Versioned assets และ cache เป็น v2.11.0 |
 
-## 3. โครงสร้าง Google Sheet
+## 3. Migration และโครงสร้างใหม่
 
-| Sheet | Headers |
+สร้างชีตใหม่ตาม `WEALTH_PLANNING_MIGRATION.md` โดยไม่แทรกคอลัมน์ในชีตเดิม:
+
+| Sheet | Headers ตามลำดับ |
 |---|---|
-| `Accounts` | `account_id`, `account_name`, `currency`, `balance`, `type`, `note`, `account_role` |
-| `Transactions` | `tx_id`, `date`, `type`, `category`, `account_from`, `account_to`, `amount`, `note`, `item_name`, `payment_method`, `credit_card`, `expense_group`, `is_essential` |
-| `Investments` | `investment_id`, `asset_name`, `category`, `units`, `avg_cost`, `current_price`, `current_value`, `tax_deductible`, `note`, `account_from`, `funded_amount` |
-| `Assets` | `asset_id`, `asset_name`, `category`, `purchase_price`, `estimated_value`, `note` |
-| `Liabilities` | `liability_id`, `liability_name`, `total_amount`, `monthly_payment`, `note`, `liability_type` |
-| `Goals` | `goal_id`, `goal_name`, `target_amount`, `current_amount`, `deadline`, `note`, `goal_type`, `progress_source`, `linked_account`, `status` |
-| `Categories` | `category_id`, `category_name`, `type`, `note` |
-| `MonthlySnapshots` | `snapshot_month`, `total_assets`, `total_liabilities`, `net_worth`, `monthly_cashflow`, `savings_rate`, `note` |
-| `Settings` | `key`, `value`, `description` |
-| `Gratitude` | `gratitude_id`, `date`, `slot`, `category`, `gratitude_text`, `created_at`, `updated_at` |
-| `Todos` | `todo_id`, `date`, `category`, `task_text`, `is_important`, `is_completed`, `completed_at`, `created_at`, `updated_at`, `parent_todo_id` |
-| `Habits` | `habit_id`, `habit_name`, `frequency`, `active`, `created_at`, `updated_at` |
-| `HabitLogs` | `habit_log_id`, `habit_id`, `period_key`, `completed_date`, `completed_at`, `created_at`, `updated_at` |
+| `Budgets` | `budget_id`, `month`, `expense_group`, `budget_amount`, `note`, `created_at`, `updated_at` |
+| `SinkingFunds` | `fund_id`, `fund_name`, `target_amount`, `current_amount`, `due_date`, `progress_source`, `linked_account`, `expense_group`, `status`, `note`, `created_at`, `updated_at` |
 
-### Migration v2.10.0
+ค่าที่รองรับ:
 
-| Cell | Header |
-|---|---|
-| Accounts G1 | `account_role` |
-| Transactions L1 | `expense_group` |
-| Transactions M1 | `is_essential` |
-
-เพิ่มต่อท้ายเท่านั้น ห้ามแทรกคอลัมน์กลางตาราง อ่าน `FINANCIAL_FOUNDATION_MIGRATION.md`
+- `Budgets.month`: `YYYY-MM`
+- `expense_group`: `Personal`, `Family`, `HomeDebt`, `Health`, `Protection`
+- `progress_source`: `Manual`, `Account`
+- `status`: `Active`, `Paused`, `Completed`
+- `linked_account`: จำเป็นเมื่อใช้ Account และบัญชีนั้นต้องมี `account_role = SinkingFund`
 
 ## 4. กติกาการคำนวณ
 
 ```text
-Emergency Balance = SUM(Accounts.balance WHERE account_role = Emergency)
+Budget Remaining = Budget Amount − Actual Expense ของเดือนและกลุ่มเดียวกัน
 
-Essential Monthly Expense =
-  average of Expense WHERE is_essential = Yes in the latest 3 calendar months
-
-Emergency Months = Emergency Balance ÷ Essential Monthly Expense
+Sinking Remaining = MAX(Target Amount − Current Amount, 0)
+Sinking Monthly Required = Sinking Remaining ÷ จำนวนเดือนที่ยังเก็บได้ถึง Due Date
 ```
 
 | กรณี | ผลลัพธ์ |
 |---|---|
-| ไม่มีบัญชี Emergency | ยอดเงินฉุกเฉินเป็น 0 และแสดงคำเตือน |
-| ไม่มีรายจ่ายที่จำแนกได้ | จำนวนเดือนเป็น `—` และแสดงคำเตือน |
-| จำแนก Expense ไม่ครบ | คำนวณจากข้อมูลที่ระบุได้ พร้อมเตือนว่าอาจคลาดเคลื่อน |
-| ตั้ง `essential_expense_override` | ใช้ค่าที่กรอกแทนข้อมูล Transactions |
-| มีหลายบัญชี Emergency | รวมยอดทุกบัญชี |
-| เงินฝาก/เงินสดอยู่ใน Investments | ไม่นับเป็นเงินฉุกเฉิน |
+| เดือนนั้นไม่มี Budget | แสดงว่ายังไม่ได้ตั้งงบ และใช้ `monthly_budget` เป็น fallback ใน Warning เดิม |
+| Expense ยังไม่มี group | ไม่นำไปปนกับกลุ่มที่ตั้งงบ และแสดงยอด `ยังไม่จัดกลุ่ม` |
+| Budget ใช้เกิน | Remaining ติดลบและแสดงสถานะเกินงบ |
+| Sinking Fund แบบ Manual | ใช้ `current_amount` |
+| Sinking Fund แบบ Account | ใช้ยอดปัจจุบันของ `linked_account` |
+| Account หาย/ชื่อซ้ำ/หน้าที่ผิด | ไม่เดายอด; แสดงข้อความให้ตรวจสอบ |
+| เลยกำหนดและยังไม่ครบ | แสดง Overdue และยอดคงเหลือ |
+| Paused/Completed | ยอดควรเก็บต่อเดือนเป็น 0 |
 
-## 5. กติกาการบันทึก
+## 5. หลัก Wealth Overview 4 ชั้น
 
-- Account ใหม่หรือ Account ที่แก้ไขต้องมี `account_role`
-- Expense ใหม่หรือ Expense ที่แก้ไขต้องมี `expense_group` และ `is_essential`
-- Income, Transfer และ CreditCardPayment ไม่ใช้สองช่องดังกล่าว
-- การซื้อด้วยบัตรเครดิตยังนับเป็น Expense ในเดือนที่ซื้อและต้องจำแนกกลุ่ม/ความจำเป็น
-- การจ่ายบัตรเครดิตไม่ถูกนับเป็น Expense ซ้ำ
-- Transaction และ Opening Balance เดิมไม่ถูกคำนวณย้อนหลัง
+- ใช้ข้อมูลจริงที่มีในระบบและแสดงแต่ละชั้นแยกกัน
+- ไม่มีคะแนนสุขภาพการเงินรวม เพราะเกณฑ์และน้ำหนักยังไม่ได้ตกลง
+- ชั้น 2 ใช้งบ กลุ่มรายจ่าย และหนี้ที่มีอยู่จริง; รายละเอียดความคุ้มครอง/ประกันเป็นงานลำดับที่ 5
+- ชั้น 4 แสดงการลงทุนปัจจุบัน; เป้าหมายเกษียณ ความเสี่ยง และประเภทสินทรัพย์จริงเป็นงานลำดับที่ 6
+- การแสดงสถานะเป็นเครื่องมือทบทวนข้อมูล ไม่ใช่คำแนะนำการลงทุน
 
 ## 6. ไฟล์ที่เปลี่ยน
 
 | ไฟล์ | การเปลี่ยนแปลง |
 |---|---|
-| `app.js` | ฟอร์ม หน้ารายการ คำเตือน และการแสดงหน้าที่บัญชี |
-| `api.js` | Schema checks และ validation ของ Header/ค่ารุ่นใหม่ |
-| `analytics.js` | สูตร Emergency Fund, Essential Expense และกราฟตามกลุ่มระดับบน |
-| `index.html` | Version URL และคำอธิบาย Settings |
-| `sw.js` | Cache v2.10.0 |
-| `FINANCIAL_FOUNDATION_MIGRATION.md` | คู่มือเพิ่ม Header และกรอกข้อมูลเดิม |
+| `app.js` | Tabs, Overview, รายการ/ฟอร์ม Budget และ Sinking Fund, warnings |
+| `api.js` | Optional-sheet loader, schema validation และ CRUD สองชีตใหม่ |
+| `analytics.js` | Budget actual, Sinking Fund plan และ 4-tier view model |
+| `index.html` | Tabs/ข้อความใหม่และ Version URL |
+| `style.css` | Layout mobile-first ของ Overview, Budget และ Sinking Fund |
+| `sw.js` | Cache v2.11.0 |
+| `WEALTH_PLANNING_MIGRATION.md` | คู่มือสร้างชีตและทดสอบ |
 | `README.md`, `PROJECT_STATE.md`, `CHANGELOG.md` | เอกสารรุ่นใหม่ |
 
-`style.css`, `manifest.json`, `MONTH_END_SNAPSHOT.gs`, OAuth Client ID และ Spreadsheet ID ไม่เปลี่ยน
+`manifest.json`, `MONTH_END_SNAPSHOT.gs`, OAuth Client ID, Spreadsheet ID และสูตร Transaction/Opening Balance ไม่เปลี่ยน
 
 ## 7. ผลทดสอบ
 
 | การทดสอบ | ผล |
 |---|---|
 | JavaScript syntax: app/api/analytics/sw | ผ่าน |
-| รวมเฉพาะหลายบัญชี Emergency | ผ่าน Mock |
-| ไม่รวม Spending และเงินสดใน Investments | ผ่าน Mock |
-| ค่าใช้จ่ายจำเป็นเฉลี่ย 3 เดือน | ผ่าน Mock |
-| ข้อมูลเดิมไม่จำแนกทำให้แสดง `—` และ Warning | ผ่าน Mock |
-| Expense validation: group + Yes/No | ผ่าน Mock |
-| Account validation: account_role | ผ่าน Mock |
-| กราฟรวมตามกลุ่มระดับบน | ผ่าน Mock |
+| Budget รวม/ใช้จริง/คงเหลือ | ผ่าน Mock |
+| Budget ซ้ำเดือนและกลุ่มเดียวกัน | ป้องกันผ่าน Mock |
+| Expense ไม่จัดกลุ่มและบัตรเครดิตเก่า | ผ่าน Mock |
+| Sinking Fund Manual/Account | ผ่าน Mock |
+| ตรวจ Account role สำหรับ Sinking Fund | ผ่าน Mock |
+| คำนวณยอดที่ควรเก็บต่อเดือน/เลยกำหนด | ผ่าน Mock |
+| Four-tier Overview | ผ่าน Mock |
+| Transaction/Account effects และ Emergency Fund เดิม | ผ่าน Regression Mock |
+| HTML/CSS selectors และ Version markers | ผ่าน Static checks |
+| Mobile browser visual smoke | ยังไม่ได้รันใน Container เพราะไม่มี browser binary; ต้องตรวจบน iPhone หลัง Deploy |
 | Google Sheet จริง / iPhone PWA | รอผู้ใช้ทดสอบหลัง Deploy |
 
 ## 8. ลำดับ Deploy
 
 1. สำรอง Google Sheet และ Repository
-2. ทำ `FINANCIAL_FOUNDATION_MIGRATION.md`
-3. กำหนด `account_role` ให้ Accounts โดยเฉพาะบัญชี Emergency
-4. เติม `expense_group` และ `is_essential` ให้ Expense อย่างน้อย 3 เดือนล่าสุด
-5. Replace ไฟล์จาก `tasuya-way-v2.10.0.zip` ที่ Root
-6. Commit: `feat: add account roles and essential expense planning`
-7. รอ GitHub Pages workflow เป็นสีเขียว
-8. ปิด PWA เดิม เปิดใหม่ และ Refresh
-9. ทดสอบ Expense จำนวนเล็กน้อยแล้วลบออก
+2. ทำ `WEALTH_PLANNING_MIGRATION.md`
+3. สร้างชีต `Budgets` และ `SinkingFunds` พร้อม Header ที่ตรงทุกตัว
+4. Replace ไฟล์จาก `tasuya-way-v2.11.0.zip` ที่ Root
+5. Commit: `feat: add four-tier wealth overview and planning`
+6. รอ GitHub Pages workflow เป็นสีเขียว
+7. ปิด PWA เดิม เปิดใหม่ และ Refresh
+8. ตั้ง Budget 1 กลุ่มในเดือนปัจจุบันและตรวจยอดจริง
+9. เพิ่ม Sinking Fund 1 รายการและตรวจยอดที่ควรเก็บต่อเดือน
 
 ## 9. Rollback และข้อจำกัด
 
-- Header ใหม่สามารถคงไว้ได้เมื่อย้อน Code เพราะรุ่นเก่าจะเพิกเฉย
-- Code rollback ไม่ย้อนยอด Account, Liability หรือ Transaction ที่เขียนแล้ว
-- Google Sheets API ไม่มี Atomic transaction ข้ามชีต; ระบบใช้ compensating rollback
-- ชื่อ Account ยังถูกอ้างอิงด้วย `account_name` ไม่ใช่ `account_id`
-- Goal หนึ่งรายการยังผูกได้หนึ่ง Account
-- ค่า Emergency Fund อาศัยการจัดประเภทที่ผู้ใช้กรอก ไม่ตรวจสภาพคล่องของธนาคารอัตโนมัติ
-- ไม่มี Refresh Token และไม่มี Multi-user concurrency control
+- สามารถย้อน Code เป็น v2.10.0 และคงชีตใหม่ไว้ได้; รุ่นเก่าจะเพิกเฉย
+- Code rollback ไม่ลบ Budget หรือ Sinking Fund ที่บันทึกแล้ว
+- Google Sheets API ไม่มี Atomic transaction ข้ามชีตและไม่มี Multi-user concurrency control
+- Account-linked Sinking Fund อ้างอิงด้วย `account_name` ไม่ใช่ `account_id`
+- Account หนึ่งบัญชีเชื่อมได้หนึ่ง Sinking Fund เพื่อป้องกันยอดรวมซ้ำ; หากรวมหลายวัตถุประสงค์ในบัญชีเดียวให้ใช้ Manual
+- การตั้ง Budget ไม่กันเงินหรือบล็อก Expense; ใช้เพื่อเปรียบเทียบและเตือน
+- ระบบไม่สร้างรายการโอนเงินเข้า Sinking Fund อัตโนมัติ
+- ไม่มี Refresh Token; Access Token อยู่ใน `sessionStorage`

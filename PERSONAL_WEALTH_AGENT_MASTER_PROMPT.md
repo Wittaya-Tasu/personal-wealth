@@ -79,7 +79,7 @@
 | UI Theme | Dark Emerald + Gold |
 | Font | Sarabun |
 | อุปกรณ์หลัก | iPhone 16+ และ Desktop |
-| เวอร์ชันล่าสุด | v2.10.0 — Financial Foundation |
+| เวอร์ชันล่าสุด | v2.11.0 — Four-tier Wealth Planning |
 
 ค่าจริงของ OAuth Client ID และ Spreadsheet ID ให้ตรวจจาก `config.js` ล่าสุด ห้ามคัดลอกค่าจากข้อความเก่ามาเขียนทับ
 
@@ -149,6 +149,7 @@ iPhone / Browser
 | `TODAY_MIGRATION.md` | วิธีสร้าง Todos, Habits และ HabitLogs รุ่น v2.7.0 |
 | `PROJECT_TODOS_MIGRATION.md` | วิธีเพิ่ม `parent_todo_id` สำหรับโปรเจกและ Todo ย่อยรุ่น v2.9.0 |
 | `FINANCIAL_FOUNDATION_MIGRATION.md` | วิธีเพิ่มหน้าที่บัญชี กลุ่มรายจ่าย และสถานะรายจ่ายจำเป็นรุ่น v2.10.0 |
+| `WEALTH_PLANNING_MIGRATION.md` | วิธีสร้าง Budgets และ SinkingFunds รุ่น v2.11.0 |
 | `SNAPSHOT_AUTOMATION.md` | วิธีติดตั้ง Snapshot สิ้นเดือนอัตโนมัติ |
 | `MONTH_END_SNAPSHOT.gs` | Google Apps Script สำหรับ Scheduled Snapshot |
 | `icons/` | ไอคอน WebApp/PWA |
@@ -176,6 +177,8 @@ iPhone / Browser
 | `Todos` | `todo_id`, `date`, `category`, `task_text`, `is_important`, `is_completed`, `completed_at`, `created_at`, `updated_at`, `parent_todo_id` |
 | `Habits` | `habit_id`, `habit_name`, `frequency`, `active`, `created_at`, `updated_at` |
 | `HabitLogs` | `habit_log_id`, `habit_id`, `period_key`, `completed_date`, `completed_at`, `created_at`, `updated_at` |
+| `Budgets` | `budget_id`, `month`, `expense_group`, `budget_amount`, `note`, `created_at`, `updated_at` |
+| `SinkingFunds` | `fund_id`, `fund_name`, `target_amount`, `current_amount`, `due_date`, `progress_source`, `linked_account`, `expense_group`, `status`, `note`, `created_at`, `updated_at` |
 
 ID ที่ลงท้าย `_id` ถูกสร้างอัตโนมัติเมื่อเพิ่มแถวใหม่
 
@@ -282,9 +285,31 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 - Investment ไม่รวมใน Expense Mix
 - Allocation กลางวงแสดงตัวเลข compact 1 ตำแหน่งและไม่มีคำว่า `สินทรัพย์รวม`
 
+#### 7.10 Wealth Overview 4 ชั้น
+
+- ชั้น 1: รายรับ กระแสเงินสด และ Savings Rate เดือนปัจจุบัน
+- ชั้น 2: Budget เทียบ Expense จริงและ Debt Service Ratio
+- ชั้น 3: Emergency Balance ÷ Essential Monthly Expense
+- ชั้น 4: มูลค่า Investments และสัดส่วนต่อทรัพย์สิน
+- ห้ามสร้างคะแนนรวมจนกว่าจะมีเกณฑ์และน้ำหนักที่ผู้ใช้อนุมัติ
+- Insurance detail เป็น roadmap ลำดับ 5; Retirement/Risk/Asset class detail เป็นลำดับ 6
+
+#### 7.11 Budget และ Sinking Fund
+
+```text
+Budget Remaining = budget_amount − Expense ของ month + expense_group เดียวกัน
+Sinking Remaining = MAX(target_amount − current_amount, 0)
+Sinking Monthly Required = Sinking Remaining ÷ จำนวนเดือนที่ยังเก็บได้ถึง due_date
+```
+
+- Budget หนึ่งเดือนห้ามมีกลุ่มเดียวกันซ้ำ
+- Sinking Fund แบบ Account ใช้ `Accounts.balance`, Account ต้องมี `account_role = SinkingFund` และหนึ่ง Account เชื่อมได้หนึ่งกอง
+- Budget และ Sinking Fund ไม่ย้ายเงินจริงและไม่สร้าง Transaction อัตโนมัติ
+- ถ้า Account อ้างอิงหาย ชื่อซ้ำ หรือ role ไม่ถูกต้อง ห้ามเดายอด ให้แสดงสถานะตรวจสอบ
+
 ---
 
-### 8. ความสามารถและข้อจำกัดปัจจุบันของ v2.10.0
+### 8. ความสามารถและข้อจำกัดปัจจุบันของ v2.11.0
 
 | การกระทำ | สิ่งที่ระบบทำ | ข้อจำกัด |
 |---|---|---|
@@ -301,6 +326,9 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 | วันนี้ | Todo แยกงาน/ส่วนตัว/โปรเจก งานค้างแสดงต่อ และโปรเจกมี Checklist ย่อยหนึ่งระดับ; Habit 4 ความถี่; Gratitude ใน Tab เดียว | ยังไม่มี Reminder, Streak หรือ Project Deadline |
 | ขอบคุณวันนี้ | บันทึก 1–3 เรื่อง แยก 8 หมวด และเลือกวันที่ได้ | ยังไม่มีกราฟสถิติ |
 | Snapshot อัตโนมัติ | Apps Script บันทึกวันสุดท้ายของเดือนแม้ปิดแอป | Trigger ทำงานในช่วงเวลาโดยประมาณ |
+| Wealth Overview | สรุประบบการเงิน 4 ชั้นจาก Cash Flow, Budget/Debt, Emergency และ Investment | ไม่มีคะแนนรวม; Insurance/Retirement เชิงลึกอยู่ในลำดับถัดไป |
+| Monthly Budget | ตั้งงบรายเดือนแยก `expense_group` และเทียบยอดจริง | ใช้เพื่อเตือน ไม่บล็อก Expense |
+| Sinking Fund | กรอกยอดเองหรืออ่าน Account role `SinkingFund` และคำนวณยอดต่อเดือน | ไม่ย้ายเงิน/สร้าง Transaction อัตโนมัติ |
 
 ยอด Accounts ตอนเริ่มใช้ v2.1.0 เป็น Opening Balance ห้ามนำ Transactions เก่ามาคำนวณย้อนกลับ
 
@@ -326,7 +354,7 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 | Refresh หลัง Archive GAS | ผ่าน |
 | GAS Active deployment | ไม่มี |
 | iPhone Safe Area / Dynamic Island | แก้แล้วและผู้ใช้ยืนยัน |
-| PWA cache base | `tasuya-way-shell-v2.10.0` |
+| PWA cache base | `tasuya-way-shell-v2.11.0` |
 
 เคยทดสอบด้วยรายการรายรับ 1 บาท หมวด `ทดสอบระบบ` และลบออกสำเร็จแล้ว ห้ามถือรายการดังกล่าวว่าเป็นข้อมูลจริงหรือสร้างซ้ำ
 

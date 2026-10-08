@@ -13,6 +13,8 @@
   const CREDIT_CARD_TRANSACTION_HEADERS = ["payment_method", "credit_card"];
   const ACCOUNT_ROLE_HEADERS = ["account_role"];
   const EXPENSE_PLANNING_HEADERS = ["expense_group", "is_essential"];
+  const BUDGET_HEADERS = ["budget_id", "month", "expense_group", "budget_amount", "note", "created_at", "updated_at"];
+  const SINKING_FUND_HEADERS = ["fund_id", "fund_name", "target_amount", "current_amount", "due_date", "progress_source", "linked_account", "expense_group", "status", "note", "created_at", "updated_at"];
   const LIABILITY_TYPE_HEADERS = ["liability_type"];
   const GRATITUDE_HEADERS = ["gratitude_id", "date", "slot", "category", "gratitude_text", "created_at", "updated_at"];
   const TODO_HEADERS = ["todo_id", "date", "category", "task_text", "is_important", "is_completed", "completed_at", "created_at", "updated_at", "parent_todo_id"];
@@ -23,6 +25,8 @@
   const HABIT_FREQUENCIES = new Set(["Daily", "Weekly", "Monthly", "Yearly"]);
   const ACCOUNT_ROLES = new Set(["General", "Spending", "Emergency", "SinkingFund", "Investment"]);
   const EXPENSE_GROUPS = new Set(["Personal", "Family", "HomeDebt", "Health", "Protection"]);
+  const SINKING_FUND_SOURCES = new Set(["Manual", "Account"]);
+  const SINKING_FUND_STATUSES = new Set(["Active", "Paused", "Completed"]);
 
   function waitFor(predicate, timeoutMs = 15000) {
     return new Promise((resolve, reject) => {
@@ -154,6 +158,21 @@
     return ["account", "บัญชี"].includes(normalized) ? "Account" : "Manual";
   }
 
+  function normalizeSinkingFundSource(value) {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    if (["account", "บัญชี"].includes(normalized)) return "Account";
+    if (["manual", "กรอกเอง"].includes(normalized)) return "Manual";
+    return "";
+  }
+
+  function normalizeSinkingFundStatus(value) {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    if (["active", "กำลังสะสม"].includes(normalized)) return "Active";
+    if (["paused", "pause", "พักไว้"].includes(normalized)) return "Paused";
+    if (["completed", "complete", "ครบแล้ว"].includes(normalized)) return "Completed";
+    return "";
+  }
+
   function normalizeGoalStatus(value) {
     const normalized = String(value ?? "").trim().toLowerCase();
     if (["completed", "complete", "done", "สำเร็จ", "เสร็จสิ้น"].includes(normalized)) return "Completed";
@@ -212,6 +231,8 @@
       this.todoLoadError = null;
       this.habitLoadError = null;
       this.habitLogLoadError = null;
+      this.budgetLoadError = null;
+      this.sinkingFundLoadError = null;
     }
 
     async init() {
@@ -359,7 +380,7 @@
     }
 
     async loadAll() {
-      const optionalKeys = new Set(["gratitude", "todos", "habits", "habitLogs"]);
+      const optionalKeys = new Set(["gratitude", "todos", "habits", "habitLogs", "budgets", "sinkingFunds"]);
       const entries = Object.entries(this.config.SHEETS).filter(([key]) => !optionalKeys.has(key));
       const ranges = entries.map(([, sheetName]) => `${quoteSheet(sheetName)}!A:Z`);
       const response = await this.request("/values:batchGet", {
@@ -395,6 +416,8 @@
       await this.loadOptionalSheet(data, "todos", this.getTodoSheetName(), "J", "todoLoadError");
       await this.loadOptionalSheet(data, "habits", this.getHabitSheetName(), "F", "habitLoadError");
       await this.loadOptionalSheet(data, "habitLogs", this.getHabitLogSheetName(), "G", "habitLogLoadError");
+      await this.loadOptionalSheet(data, "budgets", this.getBudgetSheetName(), "G", "budgetLoadError");
+      await this.loadOptionalSheet(data, "sinkingFunds", this.getSinkingFundSheetName(), "L", "sinkingFundLoadError");
 
       this.currentData = data;
       return data;
@@ -471,6 +494,14 @@
       return this.config.SHEETS.habitLogs || "HabitLogs";
     }
 
+    getBudgetSheetName() {
+      return this.config.SHEETS.budgets || "Budgets";
+    }
+
+    getSinkingFundSheetName() {
+      return this.config.SHEETS.sinkingFunds || "SinkingFunds";
+    }
+
     getMissingTodoHeaders() {
       const headers = this.headers[this.getTodoSheetName()] || [];
       return TODO_HEADERS.filter((header) => !headers.includes(header));
@@ -486,6 +517,16 @@
       return HABIT_LOG_HEADERS.filter((header) => !headers.includes(header));
     }
 
+    getMissingBudgetHeaders() {
+      const headers = this.headers[this.getBudgetSheetName()] || [];
+      return BUDGET_HEADERS.filter((header) => !headers.includes(header));
+    }
+
+    getMissingSinkingFundHeaders() {
+      const headers = this.headers[this.getSinkingFundSheetName()] || [];
+      return SINKING_FUND_HEADERS.filter((header) => !headers.includes(header));
+    }
+
     isTodoSheetReady() {
       return !this.todoLoadError && this.getMissingTodoHeaders().length === 0;
     }
@@ -495,6 +536,14 @@
         && !this.habitLogLoadError
         && this.getMissingHabitHeaders().length === 0
         && this.getMissingHabitLogHeaders().length === 0;
+    }
+
+    isBudgetSheetReady() {
+      return !this.budgetLoadError && this.getMissingBudgetHeaders().length === 0;
+    }
+
+    isSinkingFundSheetReady() {
+      return !this.sinkingFundLoadError && this.getMissingSinkingFundHeaders().length === 0;
     }
 
     buildRow(sheetName, record) {
@@ -623,10 +672,19 @@
       });
     }
 
+    isAccountReferencedBySinkingFund(name) {
+      const key = accountKey(name);
+      return (this.currentData?.sinkingFunds || []).some((fund) => {
+        return normalizeGoalProgressSource(fund.progress_source) === "Account"
+          && accountKey(fund.linked_account) === key;
+      });
+    }
+
     isAccountReferenced(name) {
       return this.isAccountReferencedByTransaction(name)
         || this.isAccountReferencedByGoal(name)
-        || this.isAccountReferencedByInvestment(name);
+        || this.isAccountReferencedByInvestment(name)
+        || this.isAccountReferencedBySinkingFund(name);
     }
 
     accountReferenceLabel(name) {
@@ -634,6 +692,7 @@
       if (this.isAccountReferencedByTransaction(name)) references.push("Transaction");
       if (this.isAccountReferencedByGoal(name)) references.push("Goal");
       if (this.isAccountReferencedByInvestment(name)) references.push("Investment");
+      if (this.isAccountReferencedBySinkingFund(name)) references.push("Sinking Fund");
       return references.join(" และ ") || "ข้อมูลอื่น";
     }
 
@@ -1026,6 +1085,142 @@
       };
       if (existing?._rowNumber) return this.update(this.getHabitLogSheetName(), existing._rowNumber, record);
       return this.append(this.getHabitLogSheetName(), record);
+    }
+
+    getBudgetRows() {
+      return this.currentData?.budgets || [];
+    }
+
+    validateBudgetRecord(record, existingRecord = null) {
+      if (!this.isBudgetSheetReady()) {
+        const error = new Error(`ระบบงบประมาณยังไม่พร้อม กรุณาสร้างชีต Budgets และ Header: ${BUDGET_HEADERS.join(", ")}`);
+        error.code = "BUDGET_SCHEMA_MIGRATION_REQUIRED";
+        error.missingHeaders = this.getMissingBudgetHeaders();
+        throw error;
+      }
+      const month = normalizeName(record?.month);
+      const expenseGroup = normalizeExpenseGroup(record?.expense_group);
+      const amount = roundMoney(record?.budget_amount);
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error("เดือนของงบประมาณไม่ถูกต้อง");
+      if (!EXPENSE_GROUPS.has(expenseGroup)) throw new Error("กรุณาเลือกกลุ่มรายจ่ายของงบประมาณ");
+      if (!(amount > 0)) throw new Error("วงเงินงบประมาณต้องมากกว่า 0 บาท");
+      const duplicate = this.getBudgetRows().find((row) => {
+        return row._rowNumber !== existingRecord?._rowNumber
+          && normalizeName(row.month) === month
+          && normalizeExpenseGroup(row.expense_group) === expenseGroup;
+      });
+      if (duplicate) throw new Error("เดือนและกลุ่มรายจ่ายนี้มีงบประมาณอยู่แล้ว กรุณาแก้แถวเดิม");
+      const now = new Date().toISOString();
+      return {
+        ...(existingRecord || {}),
+        ...record,
+        budget_id: existingRecord?.budget_id || record?.budget_id || `budget-${month.replace("-", "")}-${createShortId()}`,
+        month,
+        expense_group: expenseGroup,
+        budget_amount: amount,
+        note: normalizeName(record?.note),
+        created_at: existingRecord?.created_at || record?.created_at || now,
+        updated_at: now
+      };
+    }
+
+    async appendBudget(record) {
+      return this.append(this.getBudgetSheetName(), this.validateBudgetRecord(record));
+    }
+
+    async updateBudgetRecord(rowNumber, existingRecord, record) {
+      return this.update(
+        this.getBudgetSheetName(),
+        rowNumber,
+        this.validateBudgetRecord({ ...existingRecord, ...record }, existingRecord)
+      );
+    }
+
+    getSinkingFundRows() {
+      return this.currentData?.sinkingFunds || [];
+    }
+
+    validateSinkingFundRecord(record, existingRecord = null) {
+      if (!this.isSinkingFundSheetReady()) {
+        const error = new Error(`ระบบเงินเตรียมรายจ่ายยังไม่พร้อม กรุณาสร้างชีต SinkingFunds และ Header: ${SINKING_FUND_HEADERS.join(", ")}`);
+        error.code = "SINKING_FUND_SCHEMA_MIGRATION_REQUIRED";
+        error.missingHeaders = this.getMissingSinkingFundHeaders();
+        throw error;
+      }
+      const fundName = normalizeName(record?.fund_name);
+      const targetAmount = roundMoney(record?.target_amount);
+      const currentAmount = roundMoney(record?.current_amount);
+      const dueDate = normalizeName(record?.due_date);
+      const progressSource = normalizeSinkingFundSource(record?.progress_source);
+      const expenseGroup = normalizeExpenseGroup(record?.expense_group);
+      const status = normalizeSinkingFundStatus(record?.status || "Active");
+      let linkedAccount = "";
+      if (!fundName) throw new Error("กรุณาระบุชื่อเงินเตรียมรายจ่าย");
+      if (!(targetAmount > 0)) throw new Error("ยอดเป้าหมายต้องมากกว่า 0 บาท");
+      if (currentAmount < 0) throw new Error("ยอดสะสมติดลบไม่ได้");
+      const dueParts = dueDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      const dueValue = dueParts
+        ? new Date(Date.UTC(Number(dueParts[1]), Number(dueParts[2]) - 1, Number(dueParts[3])))
+        : null;
+      if (
+        !dueParts
+        || dueValue.getUTCFullYear() !== Number(dueParts[1])
+        || dueValue.getUTCMonth() !== Number(dueParts[2]) - 1
+        || dueValue.getUTCDate() !== Number(dueParts[3])
+      ) throw new Error("วันครบกำหนดไม่ถูกต้อง");
+      if (!SINKING_FUND_SOURCES.has(progressSource)) throw new Error("แหล่งติดตามเงินเตรียมรายจ่ายไม่ถูกต้อง");
+      if (!EXPENSE_GROUPS.has(expenseGroup)) throw new Error("กรุณาเลือกกลุ่มรายจ่าย");
+      if (!SINKING_FUND_STATUSES.has(status)) throw new Error("สถานะเงินเตรียมรายจ่ายไม่ถูกต้อง");
+      if (progressSource === "Account") {
+        const account = this.findAccountByName(record?.linked_account);
+        if (normalizeAccountRole(account.account_role) !== "SinkingFund") {
+          throw new Error(`บัญชี “${account.account_name}” ต้องกำหนดหน้าที่เป็น เงินเตรียมรายจ่าย ก่อนเชื่อม`);
+        }
+        linkedAccount = normalizeName(account.account_name);
+        const linkedDuplicate = this.getSinkingFundRows().find((row) => {
+          return row._rowNumber !== existingRecord?._rowNumber
+            && normalizeSinkingFundSource(row.progress_source) === "Account"
+            && accountKey(row.linked_account) === accountKey(linkedAccount);
+        });
+        if (linkedDuplicate) {
+          throw new Error(`บัญชี “${linkedAccount}” ถูกเชื่อมกับเงินเตรียมรายจ่ายรายการอื่นแล้ว กรุณาใช้บัญชีแยกหรือเลือกกรอกยอดเอง`);
+        }
+      }
+      const duplicate = this.getSinkingFundRows().find((row) => {
+        return row._rowNumber !== existingRecord?._rowNumber
+          && accountKey(row.fund_name) === accountKey(fundName)
+          && normalizeName(row.due_date) === dueDate;
+      });
+      if (duplicate) throw new Error("ชื่อและวันครบกำหนดนี้มีรายการเงินเตรียมรายจ่ายอยู่แล้ว");
+      const now = new Date().toISOString();
+      return {
+        ...(existingRecord || {}),
+        ...record,
+        fund_id: existingRecord?.fund_id || record?.fund_id || `fund-${createShortId()}`,
+        fund_name: fundName,
+        target_amount: targetAmount,
+        current_amount: progressSource === "Manual" ? currentAmount : (existingRecord?.current_amount || ""),
+        due_date: dueDate,
+        progress_source: progressSource,
+        linked_account: linkedAccount,
+        expense_group: expenseGroup,
+        status,
+        note: normalizeName(record?.note),
+        created_at: existingRecord?.created_at || record?.created_at || now,
+        updated_at: now
+      };
+    }
+
+    async appendSinkingFund(record) {
+      return this.append(this.getSinkingFundSheetName(), this.validateSinkingFundRecord(record));
+    }
+
+    async updateSinkingFundRecord(rowNumber, existingRecord, record) {
+      return this.update(
+        this.getSinkingFundSheetName(),
+        rowNumber,
+        this.validateSinkingFundRecord({ ...existingRecord, ...record }, existingRecord)
+      );
     }
 
     validateGoalRecord(record) {

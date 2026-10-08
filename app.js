@@ -8,7 +8,8 @@
     data: null,
     viewModel: null,
     activeView: "dashboard",
-    wealthTab: "investments",
+    wealthTab: "overview",
+    budgetMonth: localIsoDate().slice(0, 7),
     activeSheet: null,
     activeFormType: null,
     activeRecord: null,
@@ -26,6 +27,8 @@
     todoSchemaMissingHeaders: [],
     habitSchemaMissingHeaders: [],
     habitLogSchemaMissingHeaders: [],
+    budgetSchemaMissingHeaders: [],
+    sinkingFundSchemaMissingHeaders: [],
     charts: {
       netWorth: null,
       cashflow: null,
@@ -49,7 +52,9 @@
     account: { title: "บัญชีเงิน", eyebrow: "CASH & BANK", sheet: config.SHEETS.accounts },
     asset: { title: "ทรัพย์สิน", eyebrow: "ASSET", sheet: config.SHEETS.assets },
     liability: { title: "หนี้สิน", eyebrow: "LIABILITY", sheet: config.SHEETS.liabilities },
-    goal: { title: "เป้าหมาย", eyebrow: "GOAL", sheet: config.SHEETS.goals }
+    goal: { title: "เป้าหมาย", eyebrow: "GOAL", sheet: config.SHEETS.goals },
+    budget: { title: "งบประมาณ", eyebrow: "MONTHLY BUDGET", sheet: config.SHEETS.budgets || "Budgets" },
+    sinkingFund: { title: "เงินเตรียมรายจ่าย", eyebrow: "SINKING FUND", sheet: config.SHEETS.sinkingFunds || "SinkingFunds" }
   };
 
   const EXPENSE_CATEGORIES = [
@@ -176,7 +181,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js?v=2.10.0").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.11.0").catch(() => {});
     }
   }
 
@@ -194,7 +199,7 @@
     });
     qs("#settingsButton").addEventListener("click", openSettings);
     qs("#quickAddButton").addEventListener("click", openQuickAdd);
-    qs("#wealthAddButton").addEventListener("click", openQuickAdd);
+    qs("#wealthAddButton").addEventListener("click", openWealthAdd);
 
     qsa(".nav-item").forEach((button) => {
       button.addEventListener("click", () => navigate(button.dataset.target));
@@ -210,6 +215,7 @@
       button.addEventListener("click", () => {
         state.wealthTab = button.dataset.wealthTab;
         qsa(".wealth-tabs button").forEach((item) => item.classList.toggle("is-active", item === button));
+        updateWealthAddButton();
         renderWealthList();
       });
     });
@@ -241,6 +247,7 @@
     qs("#settingsForm").addEventListener("submit", submitSettings);
     qs("#transactionList").addEventListener("click", handleListAction);
     qs("#wealthList").addEventListener("click", handleListAction);
+    qs("#wealthList").addEventListener("change", handleWealthChange);
     qs("#goalList").addEventListener("click", handleListAction);
     qsa(".today-tabs button").forEach((button) => {
       button.addEventListener("click", () => {
@@ -339,6 +346,8 @@
       state.todoSchemaMissingHeaders = store.getMissingTodoHeaders();
       state.habitSchemaMissingHeaders = store.getMissingHabitHeaders();
       state.habitLogSchemaMissingHeaders = store.getMissingHabitLogHeaders();
+      state.budgetSchemaMissingHeaders = store.getMissingBudgetHeaders();
+      state.sinkingFundSchemaMissingHeaders = store.getMissingSinkingFundHeaders();
       state.viewModel = analytics.buildViewModel(data, config.DEFAULTS);
       populateChartFilters();
       renderAll();
@@ -511,6 +520,18 @@
       warnings.push(
         `ระบบจัดกลุ่มรายจ่ายและเงินฉุกเฉินยังไม่พร้อม: เพิ่ม Header ในชีต Transactions ต่อท้ายแถวที่ 1 ได้แก่ `
         + state.expensePlanningSchemaMissingHeaders.join(", ")
+      );
+    }
+    if (state.budgetSchemaMissingHeaders.length) {
+      warnings.push(
+        `ระบบงบประมาณยังไม่พร้อม: สร้างชีต Budgets และ Header `
+        + state.budgetSchemaMissingHeaders.join(", ")
+      );
+    }
+    if (state.sinkingFundSchemaMissingHeaders.length) {
+      warnings.push(
+        `ระบบเงินเตรียมรายจ่ายยังไม่พร้อม: สร้างชีต SinkingFunds และ Header `
+        + state.sinkingFundSchemaMissingHeaders.join(", ")
       );
     }
     if (state.creditCardSchemaMissingHeaders.length) {
@@ -939,7 +960,207 @@
     setText("wealthAssetsSummary", formatCurrency(vm.totals.totalAssets));
     setText("wealthLiabilitiesSummary", formatCurrency(vm.totals.liabilities));
     setText("wealthNetSummary", formatCurrency(vm.totals.netWorth));
+    updateWealthAddButton();
     renderWealthList();
+  }
+
+  function tierStatusClass(statusKey) {
+    if (statusKey === "attention") return "negative";
+    if (statusKey === "incomplete") return "neutral";
+    return "";
+  }
+
+  function renderWealthOverview(container) {
+    const vm = state.viewModel;
+    const grid = createElement("div", "four-tier-grid");
+    (vm.fourTiers || []).forEach((tier) => {
+      const card = createElement("article", `tier-card tier-${tier.key}`);
+      const heading = createElement("div", "tier-heading");
+      const title = createElement("div", "tier-title");
+      title.append(
+        createElement("span", "tier-number", `ชั้น ${tier.tier}`),
+        createElement("h3", "", tier.title)
+      );
+      heading.append(title, createElement("span", `status-pill ${tierStatusClass(tier.status.key)}`, tier.status.label));
+      const value = createElement("strong", "tier-value", formatCurrency(tier.value));
+      const detail = createElement("p", "tier-detail");
+      let progressValue = 0;
+      if (tier.key === "income") {
+        detail.textContent = `กระแสเงินสด ${formatCurrency(vm.currentMonth.cashflow)} · อัตราออม ${formatPercent(vm.savingsRate, 0)}`;
+        progressValue = Math.max(0, Math.min(vm.savingsRate || 0, 1));
+      } else if (tier.key === "expense") {
+        detail.textContent = vm.budget.totalBudget > 0
+          ? `งบ ${formatCurrency(vm.budget.totalBudget)} · ใช้ ${formatPercent(vm.budget.utilization, 0)} · ภาระหนี้ ${formatPercent(vm.debtServiceRatio, 0)}`
+          : "ยังไม่ได้ตั้งงบรายเดือนตามกลุ่มรายจ่าย";
+        progressValue = Math.max(0, Math.min(vm.budget.utilization || 0, 1));
+      } else if (tier.key === "emergency") {
+        detail.textContent = vm.emergencyMonths === null
+          ? `เป้าหมาย ${vm.settings.emergency_months_target} เดือน · ยังขาดข้อมูลรายจ่ายจำเป็น`
+          : `${vm.emergencyMonths.toFixed(1)} เดือน จากเป้า ${vm.settings.emergency_months_target} เดือน · ขาด ${formatCurrency(vm.emergencyFund.shortfall || 0)}`;
+        progressValue = vm.emergencyMonths === null
+          ? 0
+          : Math.max(0, Math.min(vm.emergencyMonths / vm.settings.emergency_months_target, 1));
+      } else {
+        detail.textContent = `คิดเป็น ${formatPercent(tier.secondary, 0)} ของสินทรัพย์รวม · เงินเตรียมรายจ่ายที่ควรเก็บ ${formatCurrency(vm.sinkingFunds.monthlyRequired)}/เดือน`;
+        progressValue = Math.max(0, Math.min(tier.secondary || 0, 1));
+      }
+      const progress = createElement("div", "tier-progress");
+      const progressBar = createElement("span");
+      progressBar.style.width = `${progressValue * 100}%`;
+      progress.appendChild(progressBar);
+      card.append(heading, value, detail, progress);
+      grid.appendChild(card);
+    });
+
+    const summary = createElement("div", "wealth-overview-summary");
+    const budgetCard = createElement("article", "overview-mini-card");
+    budgetCard.append(
+      createElement("span", "metric-label", "งบประมาณเดือนนี้"),
+      createElement("strong", "", vm.budget.totalBudget > 0 ? formatCurrency(vm.budget.remaining) : "ยังไม่ได้ตั้งงบ"),
+      createElement("p", "", vm.budget.totalBudget > 0
+        ? `คงเหลือจากงบ ${formatCurrency(vm.budget.totalBudget)} · ตั้งแล้ว ${vm.budget.configuredGroups}/5 กลุ่ม`
+        : "เปิดแท็บงบประมาณเพื่อกำหนดวงเงินของแต่ละกลุ่ม")
+    );
+    const sinkingCard = createElement("article", "overview-mini-card");
+    sinkingCard.append(
+      createElement("span", "metric-label", "เงินเตรียมรายจ่าย"),
+      createElement("strong", "", formatCurrency(vm.sinkingFunds.totalCurrent)),
+      createElement("p", "", `${vm.sinkingFunds.rows.length} รายการ · ควรเก็บ ${formatCurrency(vm.sinkingFunds.monthlyRequired)}/เดือน`)
+    );
+    summary.append(budgetCard, sinkingCard);
+
+    const scopeNote = createElement("p", "wealth-scope-note");
+    scopeNote.textContent = "ภาพรวมนี้ใช้ข้อมูลที่ระบบมีในปัจจุบัน: รายละเอียดประกันจะเพิ่มในขั้นที่ 5 และเป้าหมายเกษียณ/ระดับความเสี่ยงจะเพิ่มในขั้นที่ 6";
+    container.append(grid, summary, scopeNote);
+  }
+
+  function renderBudgetList(container) {
+    if (!store.isBudgetSheetReady()) {
+      const migration = emptyState();
+      qs("strong", migration).textContent = "ระบบงบประมาณยังไม่พร้อม";
+      qs("p", migration).textContent = "สร้างชีต Budgets และ Header ตาม WEALTH_PLANNING_MIGRATION.md";
+      container.appendChild(migration);
+      return;
+    }
+    const months = new Map();
+    const currentMonth = analytics.monthKey(new Date());
+    const nextDate = new Date();
+    nextDate.setMonth(nextDate.getMonth() + 1);
+    [currentMonth, analytics.monthKey(nextDate)].forEach((key) => months.set(key, key));
+    (state.data?.budgets || []).forEach((row) => {
+      const key = String(row.month || "").trim();
+      if (/^\d{4}-\d{2}$/.test(key)) months.set(key, key);
+    });
+    if (!months.has(state.budgetMonth)) state.budgetMonth = currentMonth;
+    const toolbar = createElement("div", "planning-toolbar");
+    toolbar.appendChild(createElement("span", "metric-label", "เดือนที่แสดง"));
+    const monthSelect = document.createElement("select");
+    monthSelect.id = "budgetMonthFilter";
+    monthSelect.className = "compact-select";
+    [...months.keys()].sort().reverse().forEach((key) => {
+      const [year, month] = key.split("-").map(Number);
+      const option = document.createElement("option");
+      option.value = key;
+      option.textContent = new Date(year, month - 1, 1).toLocaleDateString("th-TH", { month: "long", year: "numeric" });
+      option.selected = key === state.budgetMonth;
+      monthSelect.appendChild(option);
+    });
+    toolbar.appendChild(monthSelect);
+    container.appendChild(toolbar);
+    const selectedBudget = analytics.buildBudgetOverview(state.data?.budgets, state.data?.transactions, state.budgetMonth);
+    const heading = createElement("div", "planning-summary");
+    heading.append(
+      createElement("div", "", `งบรวม ${formatCurrency(selectedBudget.totalBudget)}`),
+      createElement("div", "", `ใช้จริง ${formatCurrency(selectedBudget.totalActual)}`),
+      createElement("div", selectedBudget.remaining < 0 ? "negative" : "positive", `${selectedBudget.remaining < 0 ? "เกิน" : "เหลือ"} ${formatCurrency(Math.abs(selectedBudget.remaining))}`)
+    );
+    container.appendChild(heading);
+    const records = (state.data?.budgets || []).filter((row) => String(row.month || "") === state.budgetMonth);
+    if (!records.length) {
+      const empty = emptyState();
+      qs("strong", empty).textContent = "ยังไม่ได้ตั้งงบเดือนนี้";
+      qs("p", empty).textContent = "กด “ตั้งงบ” แล้วเพิ่มวงเงินของกลุ่มรายจ่ายที่ต้องการ";
+      container.appendChild(empty);
+      return;
+    }
+    records.sort((a, b) => analytics.expenseGroupLabel(a.expense_group).localeCompare(analytics.expenseGroupLabel(b.expense_group), "th"));
+    records.forEach((record) => {
+      const calculated = selectedBudget.rows.find((row) => row.group === analytics.normalizeExpenseGroup(record.expense_group));
+      const item = createElement("article", "planning-row");
+      const copy = createElement("div", "planning-copy");
+      copy.append(
+        createElement("strong", "", analytics.expenseGroupLabel(record.expense_group)),
+        createElement("span", "", `ใช้ ${formatCurrency(calculated?.actual || 0)} จากงบ ${formatCurrency(record.budget_amount)}`)
+      );
+      const progress = createElement("div", "planning-progress");
+      const bar = createElement("span");
+      const utilization = calculated?.utilization || 0;
+      bar.style.width = `${Math.min(utilization, 1) * 100}%`;
+      if (utilization > 1) bar.className = "is-over";
+      progress.appendChild(bar);
+      copy.appendChild(progress);
+      const actions = createElement("div", "row-actions");
+      actions.append(
+        createElement("span", `row-amount ${(calculated?.remaining || 0) < 0 ? "negative" : ""}`, formatCurrency(calculated?.remaining || 0)),
+        editButton("budget", record._rowNumber, analytics.expenseGroupLabel(record.expense_group)),
+        deleteButton(store.getBudgetSheetName(), record._rowNumber, `งบ ${analytics.expenseGroupLabel(record.expense_group)}`)
+      );
+      item.append(copy, actions);
+      container.appendChild(item);
+    });
+  }
+
+  function renderSinkingFundList(container) {
+    if (!store.isSinkingFundSheetReady()) {
+      const migration = emptyState();
+      qs("strong", migration).textContent = "ระบบเงินเตรียมรายจ่ายยังไม่พร้อม";
+      qs("p", migration).textContent = "สร้างชีต SinkingFunds และ Header ตาม WEALTH_PLANNING_MIGRATION.md";
+      container.appendChild(migration);
+      return;
+    }
+    const vm = state.viewModel;
+    const heading = createElement("div", "planning-summary");
+    heading.append(
+      createElement("div", "", `เป้าหมาย ${formatCurrency(vm.sinkingFunds.totalTarget)}`),
+      createElement("div", "", `สะสม ${formatCurrency(vm.sinkingFunds.totalCurrent)}`),
+      createElement("div", "", `ควรเก็บ ${formatCurrency(vm.sinkingFunds.monthlyRequired)}/เดือน`)
+    );
+    container.appendChild(heading);
+    if (!vm.sinkingFunds.rows.length) {
+      const empty = emptyState();
+      qs("strong", empty).textContent = "ยังไม่มีเงินเตรียมรายจ่าย";
+      qs("p", empty).textContent = "เพิ่มประกัน ภาษี ซ่อมรถ หรือรายจ่ายก้อนที่ทราบล่วงหน้า";
+      container.appendChild(empty);
+      return;
+    }
+    vm.sinkingFunds.rows.forEach((fund) => {
+      const item = createElement("article", "sinking-fund-row");
+      const copy = createElement("div", "planning-copy");
+      const sourceLabel = fund.source === "account" ? `บัญชี ${fund.linked_account}` : "กรอกยอดเอง";
+      const dueLabel = fund.dueDate ? formatDate(fund.dueDate) : "ไม่ระบุวัน";
+      copy.append(
+        createElement("strong", "", fund.fund_name || "เงินเตรียมรายจ่าย"),
+        createElement("span", "", `${analytics.expenseGroupLabel(fund.expense_group)} · ครบกำหนด ${dueLabel} · ${sourceLabel}`)
+      );
+      const progress = createElement("div", "planning-progress");
+      const bar = createElement("span");
+      bar.style.width = `${Math.max(0, Math.min(fund.percentage || 0, 1)) * 100}%`;
+      progress.appendChild(bar);
+      copy.appendChild(progress);
+      if (fund.trackingError) copy.appendChild(createElement("small", "negative", fund.trackingError));
+      const values = createElement("div", "sinking-values");
+      values.append(
+        createElement("strong", "", `${formatCurrency(fund.current)} / ${formatCurrency(fund.target)}`),
+        createElement("span", "", fund.status === "Completed" ? "ครบแล้ว" : `ควรเก็บ ${formatCurrency(fund.monthlyRequired)}/เดือน`)
+      );
+      const actions = createElement("div", "row-actions");
+      actions.append(
+        editButton("sinkingFund", fund._rowNumber, fund.fund_name || "เงินเตรียมรายจ่าย"),
+        deleteButton(store.getSinkingFundSheetName(), fund._rowNumber, fund.fund_name || "เงินเตรียมรายจ่าย")
+      );
+      item.append(copy, values, actions);
+      container.appendChild(item);
+    });
   }
 
   function renderWealthList() {
@@ -947,6 +1168,18 @@
     container.replaceChildren();
     const data = state.viewModel?.data;
     if (!data) return;
+    if (state.wealthTab === "overview") {
+      renderWealthOverview(container);
+      return;
+    }
+    if (state.wealthTab === "budgets") {
+      renderBudgetList(container);
+      return;
+    }
+    if (state.wealthTab === "sinkingFunds") {
+      renderSinkingFundList(container);
+      return;
+    }
     const definitions = {
       investments: {
         rows: data.investments,
@@ -1705,6 +1938,12 @@
     return button;
   }
 
+  function handleWealthChange(event) {
+    if (event.target.id !== "budgetMonthFilter") return;
+    state.budgetMonth = event.target.value;
+    renderWealthList();
+  }
+
   async function handleListAction(event) {
     const payCard = event.target.closest("[data-pay-card-row]");
     if (payCard) {
@@ -1720,7 +1959,9 @@
         account: "accounts",
         asset: "assets",
         liability: "liabilities",
-        goal: "goals"
+        goal: "goals",
+        budget: "budgets",
+        sinkingFund: "sinkingFunds"
       };
       const collection = collectionMap[edit.dataset.editType];
       const record = (state.data?.[collection] || []).find((row) => row._rowNumber === Number(edit.dataset.editRow));
@@ -1829,6 +2070,30 @@
     if (!ensureCanWrite()) return;
     state.activeSheet = qs("#quickAddSheet");
     openOverlay(state.activeSheet);
+  }
+
+  function updateWealthAddButton() {
+    const button = qs("#wealthAddButton");
+    if (!button) return;
+    if (state.wealthTab === "budgets") {
+      button.lastChild.textContent = " ตั้งงบ";
+    } else if (state.wealthTab === "sinkingFunds") {
+      button.lastChild.textContent = " เพิ่มเงินเตรียม";
+    } else {
+      button.lastChild.textContent = " เพิ่มข้อมูล";
+    }
+  }
+
+  function openWealthAdd() {
+    if (state.wealthTab === "budgets") {
+      openForm("budget");
+      return;
+    }
+    if (state.wealthTab === "sinkingFunds") {
+      openForm("sinkingFund");
+      return;
+    }
+    openQuickAdd();
   }
 
   function openSettings() {
@@ -1976,6 +2241,20 @@
     return options.join("");
   }
 
+  function sinkingFundAccountOptions(selectedValue = "") {
+    const selected = String(selectedValue || "").trim().toLocaleLowerCase("th-TH");
+    const options = ['<option value="">เลือกบัญชีเงินเตรียมรายจ่าย</option>'];
+    (state.data?.accounts || []).forEach((account) => {
+      if (analytics.normalizeAccountRole(account.account_role) !== "SinkingFund") return;
+      const name = String(account.account_name || "").trim();
+      if (!name) return;
+      const value = inputValue({ value: name }, "value");
+      const label = inputValue({ value: `${name} — ${formatCurrency(account.balance)}` }, "value");
+      options.push(`<option value="${value}" ${name.toLocaleLowerCase("th-TH") === selected ? "selected" : ""}>${label}</option>`);
+    });
+    return options.join("");
+  }
+
   function formTemplate(type, record) {
     const saveLabel = record ? "บันทึกการแก้ไข" : "บันทึกข้อมูล";
     const note = (placeholder = "รายละเอียดเพิ่มเติม") => `
@@ -2064,6 +2343,48 @@
         ${note("เช่น ชำระรอบเดือนนี้")}
         <p class="security-note">การชำระจะลดทั้งยอดบัญชีและหนี้บัตร โดยไม่บันทึกเป็นรายจ่ายซ้ำใน Cash Flow</p>
         <button class="primary-button full-width" type="submit">ยืนยันการชำระบัตร</button>`;
+    }
+
+    if (type === "budget") {
+      return `
+        ${state.budgetSchemaMissingHeaders.length
+          ? `<p class="form-warning">สร้างชีต Budgets ตาม WEALTH_PLANNING_MIGRATION.md ก่อน: ${state.budgetSchemaMissingHeaders.join(", ")}</p>`
+          : ""}
+        <label class="field"><span>เดือนของงบประมาณ</span><input name="month" type="month" value="${inputValue(record, "month", state.budgetMonth || localIsoDate().slice(0, 7))}" required></label>
+        <label class="field"><span>กลุ่มรายจ่าย</span><select name="expense_group" required>${expenseGroupOptions(record?.expense_group)}</select></label>
+        <label class="field"><span>วงเงินงบประมาณ (บาท)</span><input name="budget_amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="${inputValue(record, "budget_amount")}" placeholder="0" required></label>
+        ${note("เหตุผลหรือขอบเขตของงบประมาณ")}
+        ${submit}`;
+    }
+
+    if (type === "sinkingFund") {
+      const source = String(record?.progress_source || "Manual").toLowerCase() === "account" ? "Account" : "Manual";
+      const status = String(record?.status || "Active");
+      return `
+        ${state.sinkingFundSchemaMissingHeaders.length
+          ? `<p class="form-warning">สร้างชีต SinkingFunds ตาม WEALTH_PLANNING_MIGRATION.md ก่อน: ${state.sinkingFundSchemaMissingHeaders.join(", ")}</p>`
+          : ""}
+        <label class="field"><span>ชื่อเงินเตรียมรายจ่าย</span><input name="fund_name" value="${inputValue(record, "fund_name")}" placeholder="เช่น ประกันรถยนต์ปีหน้า" required></label>
+        <label class="field"><span>กลุ่มรายจ่าย</span><select name="expense_group" required>${expenseGroupOptions(record?.expense_group)}</select></label>
+        <div class="field-row">
+          <label class="field"><span>ยอดเป้าหมาย</span><input name="target_amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="${inputValue(record, "target_amount")}" required></label>
+          <label class="field"><span>วันครบกำหนด</span><input name="due_date" type="date" value="${inputDate(record, "due_date")}" required></label>
+        </div>
+        <label class="field"><span>ติดตามยอดสะสมจาก</span><select name="progress_source" required>
+          <option value="Manual" ${source === "Manual" ? "selected" : ""}>กรอกยอดเอง</option>
+          <option value="Account" ${source === "Account" ? "selected" : ""}>ยอดคงเหลือในบัญชี</option>
+        </select></label>
+        <label class="field" data-sinking-manual-field><span>ยอดสะสมปัจจุบัน</span><input name="current_amount" type="number" min="0" step="0.01" inputmode="decimal" value="${inputValue(record, "current_amount", "0")}"></label>
+        <label class="field" data-sinking-account-field><span>บัญชีเงินเตรียมรายจ่าย</span><select name="linked_account">${sinkingFundAccountOptions(record?.linked_account)}</select>
+          <small>แสดงเฉพาะ Account ที่กำหนดหน้าที่เป็น “เงินเตรียมรายจ่าย”</small>
+        </label>
+        <label class="field"><span>สถานะ</span><select name="status" required>
+          <option value="Active" ${status === "Active" ? "selected" : ""}>กำลังสะสม</option>
+          <option value="Paused" ${status === "Paused" ? "selected" : ""}>พักไว้</option>
+          <option value="Completed" ${status === "Completed" ? "selected" : ""}>ครบแล้ว</option>
+        </select></label>
+        ${note("เช่น ต่อประกันเดือนเมษายน หรือภาษีประจำปี")}
+        ${submit}`;
     }
 
     if (type === "investment") {
@@ -2187,6 +2508,23 @@
   }
 
   function bindFormBehavior(type) {
+    if (type === "sinkingFund") {
+      const form = qs("#dynamicForm");
+      const updateSource = () => {
+        const usesAccount = form.elements.progress_source.value === "Account";
+        const manualField = qs("[data-sinking-manual-field]", form);
+        const accountField = qs("[data-sinking-account-field]", form);
+        manualField.hidden = usesAccount;
+        accountField.hidden = !usesAccount;
+        form.elements.current_amount.disabled = usesAccount;
+        form.elements.current_amount.required = !usesAccount;
+        form.elements.linked_account.disabled = !usesAccount;
+        form.elements.linked_account.required = usesAccount;
+      };
+      form.elements.progress_source.addEventListener("change", updateSource);
+      updateSource();
+      return;
+    }
     if (type === "creditCardPayment") {
       const form = qs("#dynamicForm");
       const cardSelect = form.elements.credit_card;
@@ -2360,6 +2698,26 @@
     const type = state.activeFormType;
     const meta = formMeta[type];
     const values = Object.fromEntries(new FormData(form).entries());
+    if (type === "budget" && !(analytics.toNumber(values.budget_amount) > 0)) {
+      showToast("วงเงินงบประมาณต้องมากกว่า 0 บาท", "error");
+      return;
+    }
+    if (type === "budget") state.budgetMonth = values.month;
+    if (type === "sinkingFund") {
+      if (!(analytics.toNumber(values.target_amount) > 0)) {
+        showToast("ยอดเป้าหมายต้องมากกว่า 0 บาท", "error");
+        return;
+      }
+      if (values.progress_source === "Account") {
+        values.current_amount = state.activeRecord?.current_amount || "";
+        if (!values.linked_account) {
+          showToast("กรุณาเลือกบัญชีเงินเตรียมรายจ่าย", "error");
+          return;
+        }
+      } else {
+        values.linked_account = "";
+      }
+    }
     if (type === "investment") {
       values.investment_row = form.elements.investment_target.value;
       values.account_from = form.elements.account_from.value;
@@ -2488,6 +2846,14 @@
         );
       } else if (type === "goal") {
         await store.appendGoal(values);
+      } else if (type === "budget" && state.activeRecord?._rowNumber) {
+        await store.updateBudgetRecord(state.activeRecord._rowNumber, state.activeRecord, values);
+      } else if (type === "budget") {
+        await store.appendBudget(values);
+      } else if (type === "sinkingFund" && state.activeRecord?._rowNumber) {
+        await store.updateSinkingFundRecord(state.activeRecord._rowNumber, state.activeRecord, values);
+      } else if (type === "sinkingFund") {
+        await store.appendSinkingFund(values);
       } else if (type === "investment") {
         await store.addInvestmentContribution(values);
       } else if (type === "liability" && state.activeRecord?._rowNumber) {

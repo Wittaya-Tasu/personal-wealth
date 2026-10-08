@@ -326,6 +326,159 @@
     return { total, rows };
   }
 
+  function buildBudgetOverview(budgets, transactions, selectedMonthKey) {
+    const budgetByGroup = new Map();
+    (budgets || []).forEach((row) => {
+      if (String(row.month || "").trim() !== selectedMonthKey) return;
+      const group = normalizeExpenseGroup(row.expense_group);
+      if (!group) return;
+      budgetByGroup.set(group, (budgetByGroup.get(group) || 0) + Math.max(toNumber(row.budget_amount), 0));
+    });
+    const actualByGroup = new Map();
+    (transactions || []).forEach((row) => {
+      if (normalizeType(row.type) !== "expense" || isLegacyCreditCardCategory(row)) return;
+      if (monthKey(parseDate(row.date)) !== selectedMonthKey) return;
+      const group = normalizeExpenseGroup(row.expense_group) || "Unclassified";
+      actualByGroup.set(group, (actualByGroup.get(group) || 0) + Math.abs(toNumber(row.amount)));
+    });
+    const groupOrder = ["Personal", "Family", "HomeDebt", "Health", "Protection"];
+    const rows = groupOrder.map((group) => {
+      const budget = budgetByGroup.get(group) || 0;
+      const actual = actualByGroup.get(group) || 0;
+      return {
+        group,
+        name: EXPENSE_GROUP_LABELS[group],
+        budget,
+        actual,
+        remaining: budget - actual,
+        utilization: budget > 0 ? actual / budget : null
+      };
+    });
+    const unclassified = actualByGroup.get("Unclassified") || 0;
+    const totalBudget = rows.reduce((total, row) => total + row.budget, 0);
+    const totalActual = rows.reduce((total, row) => total + row.actual, 0) + unclassified;
+    return {
+      month: selectedMonthKey,
+      rows,
+      totalBudget,
+      totalActual,
+      remaining: totalBudget - totalActual,
+      utilization: totalBudget > 0 ? totalActual / totalBudget : null,
+      unclassified,
+      configuredGroups: rows.filter((row) => row.budget > 0).length
+    };
+  }
+
+  function monthsUntil(date, anchor) {
+    if (!date || Number.isNaN(date.getTime())) return null;
+    const anchorDay = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate(), 12, 0, 0);
+    const dueDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
+    if (dueDay < anchorDay) return 0;
+    const base = ((dueDay.getFullYear() - anchorDay.getFullYear()) * 12) + dueDay.getMonth() - anchorDay.getMonth();
+    return Math.max(base + (dueDay.getDate() >= anchorDay.getDate() ? 1 : 0), 1);
+  }
+
+  function buildSinkingFundOverview(funds, accounts, anchor = new Date()) {
+    const accountIndex = new Map();
+    (accounts || []).forEach((account) => {
+      const key = normalizeAccountName(account.account_name);
+      if (!key) return;
+      const entries = accountIndex.get(key) || [];
+      entries.push(account);
+      accountIndex.set(key, entries);
+    });
+    const rows = (funds || []).map((fund) => {
+      const source = normalizeGoalProgressSource(fund.progress_source);
+      const linkedMatches = source === "account"
+        ? accountIndex.get(normalizeAccountName(fund.linked_account)) || []
+        : [];
+      const linkedAccount = linkedMatches.length === 1 ? linkedMatches[0] : null;
+      const trackingError = source === "account" && linkedMatches.length !== 1
+        ? linkedMatches.length > 1
+          ? `พบบัญชี “${fund.linked_account}” ซ้ำ`
+          : `ไม่พบบัญชี “${fund.linked_account}”`
+        : source === "account" && normalizeAccountRole(linkedAccount?.account_role) !== "SinkingFund"
+          ? `บัญชี “${fund.linked_account}” ไม่ได้กำหนดหน้าที่เป็นเงินเตรียมรายจ่าย`
+          : "";
+      const target = Math.max(toNumber(fund.target_amount), 0);
+      const current = source === "account" && linkedAccount && !trackingError
+        ? Math.max(toNumber(linkedAccount.balance), 0)
+        : source === "account"
+          ? 0
+          : Math.max(toNumber(fund.current_amount), 0);
+      const dueDate = parseDate(fund.due_date);
+      const monthsRemaining = monthsUntil(dueDate, anchor);
+      const remaining = Math.max(target - current, 0);
+      const normalizedStatus = String(fund.status || "Active").trim().toLowerCase();
+      const status = ["completed", "complete", "ครบแล้ว"].includes(normalizedStatus)
+        ? "Completed"
+        : ["paused", "pause", "พักไว้"].includes(normalizedStatus)
+          ? "Paused"
+          : "Active";
+      return {
+        ...fund,
+        source,
+        linkedAccount,
+        target,
+        current,
+        dueDate,
+        monthsRemaining,
+        remaining,
+        status,
+        trackingError,
+        percentage: target > 0 && !trackingError ? Math.min(current / target, 1) : null,
+        monthlyRequired: status !== "Active" || trackingError || remaining === 0 || monthsRemaining === null
+          ? 0
+          : remaining / Math.max(monthsRemaining, 1)
+      };
+    }).sort((a, b) => {
+      if (!a.dueDate && !b.dueDate) return String(a.fund_name || "").localeCompare(String(b.fund_name || ""), "th");
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return a.dueDate - b.dueDate;
+    });
+    const activeRows = rows.filter((row) => row.status !== "Completed");
+    return {
+      rows,
+      totalTarget: rows.reduce((total, row) => total + row.target, 0),
+      totalCurrent: rows.reduce((total, row) => total + row.current, 0),
+      totalRemaining: activeRows.reduce((total, row) => total + row.remaining, 0),
+      monthlyRequired: activeRows.reduce((total, row) => total + row.monthlyRequired, 0),
+      overdueCount: activeRows.filter((row) => row.status === "Active" && row.monthsRemaining === 0 && row.remaining > 0).length
+    };
+  }
+
+  function buildFourTierOverview({ currentMonth, savingsRate, debtServiceRatio, emergencyMonths, emergencyFund, budget, sinkingFunds, investments, totalAssets }) {
+    const incomeStatus = currentMonth.income <= 0
+      ? { key: "incomplete", label: "ข้อมูลไม่ครบ" }
+      : currentMonth.cashflow < 0
+        ? { key: "attention", label: "ควรปรับปรุง" }
+        : savingsRate >= 0.2
+          ? { key: "strong", label: "แข็งแรง" }
+          : { key: "building", label: "กำลังสร้าง" };
+    const expenseStatus = budget.totalBudget <= 0
+      ? { key: "incomplete", label: "ยังไม่ได้ตั้งงบ" }
+      : budget.totalActual > budget.totalBudget
+        ? { key: "attention", label: "เกินงบ" }
+        : { key: "strong", label: "อยู่ในแผน" };
+    const emergencyStatus = emergencyMonths === null
+      ? { key: "incomplete", label: "ข้อมูลไม่ครบ" }
+      : emergencyMonths >= emergencyFund.targetMonths
+        ? { key: "strong", label: "ถึงเป้าหมาย" }
+        : emergencyMonths >= 3
+          ? { key: "building", label: "กำลังสร้าง" }
+          : { key: "attention", label: "ควรเร่งสะสม" };
+    const investmentStatus = investments > 0
+      ? { key: "building", label: "กำลังเติบโต" }
+      : { key: "incomplete", label: "ยังไม่มีข้อมูล" };
+    return [
+      { tier: 1, key: "income", title: "รายได้", status: incomeStatus, value: currentMonth.income, secondary: savingsRate },
+      { tier: 2, key: "expense", title: "รายจ่ายและความคุ้มครอง", status: expenseStatus, value: budget.totalActual, secondary: budget.utilization, debtServiceRatio },
+      { tier: 3, key: "emergency", title: "เงินฉุกเฉิน", status: emergencyStatus, value: emergencyFund.balance, secondary: emergencyMonths, target: emergencyFund.targetAmount },
+      { tier: 4, key: "investment", title: "ลงทุนและเกษียณ", status: investmentStatus, value: investments, secondary: totalAssets > 0 ? investments / totalAssets : null, sinkingMonthly: sinkingFunds.monthlyRequired }
+    ];
+  }
+
   function classifyAllocation(label, source) {
     const text = `${label || ""} ${source || ""}`.toLowerCase();
     if (/cash|เงินสด|เงินฝาก|ออมทรัพย์|ฝากประจำ/.test(text)) return "เงินสดและเงินฝาก";
@@ -450,7 +603,7 @@
       });
   }
 
-  function buildWarnings(data, settings, snapshots, monthly, goals = []) {
+  function buildWarnings(data, settings, snapshots, monthly, goals = [], budget = null) {
     const warnings = [];
     const accountCash = sum(data.accounts, (row) => row.balance);
     const investmentCash = sum((data.investments || []).filter(isCashInvestment), getInvestmentValue);
@@ -470,7 +623,7 @@
     if (monthly.at(-1)?.income === 0 && sum(data.liabilities, (row) => row.monthly_payment) > 0) {
       warnings.push("มีค่างวดหนี้ แต่ไม่มีรายรับของเดือนนี้ จึงยังคำนวณภาระหนี้ต่อรายได้ไม่ได้");
     }
-    if (settings.monthly_budget > 0 && monthly.at(-1)?.expense > settings.monthly_budget) {
+    if (!(budget?.totalBudget > 0) && settings.monthly_budget > 0 && monthly.at(-1)?.expense > settings.monthly_budget) {
       const overBudget = monthly.at(-1).expense - settings.monthly_budget;
       warnings.push(`รายจ่ายเดือนนี้เกินงบที่ตั้งไว้ ${new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(overBudget)}`);
     }
@@ -492,7 +645,9 @@
       goals: data.goals || [],
       categories: data.categories || [],
       snapshots: data.snapshots || [],
-      settings: data.settings || []
+      settings: data.settings || [],
+      budgets: data.budgets || [],
+      sinkingFunds: data.sinkingFunds || []
     };
     const settings = rowsToSettings(safeData.settings, defaults);
     const accountAssets = settings.include_accounts_in_net_worth
@@ -597,8 +752,21 @@
       ? netWorthChange / Math.abs(previousSnapshot.netWorth)
       : null;
     const allocation = buildAllocation(safeData, settings.include_accounts_in_net_worth);
+    const budget = buildBudgetOverview(safeData.budgets, safeData.transactions, currentMonthKey);
+    const sinkingFunds = buildSinkingFundOverview(safeData.sinkingFunds, safeData.accounts, anchor);
+    const fourTiers = buildFourTierOverview({
+      currentMonth,
+      savingsRate,
+      debtServiceRatio,
+      emergencyMonths,
+      emergencyFund,
+      budget,
+      sinkingFunds,
+      investments,
+      totalAssets
+    });
     const goals = buildGoalRows(safeData.goals, safeData.accounts);
-    const warnings = buildWarnings(safeData, settings, snapshots, monthly, goals);
+    const warnings = buildWarnings(safeData, settings, snapshots, monthly, goals, budget);
     if (!emergencyAccounts.length) {
       warnings.push("ยังไม่มีบัญชีที่กำหนดหน้าที่เป็น “เงินฉุกเฉิน” ตัวเลขเงินสำรองจึงยังเป็นศูนย์");
     }
@@ -620,6 +788,18 @@
     if (monthlySpending.status === "duplicate") {
       warnings.push(`พบบัญชีชื่อ “${MONTHLY_SPENDING_ACCOUNT_NAME}” ซ้ำ จึงไม่สามารถระบุยอดเงินใช้จ่ายคงเหลือได้อย่างแน่นอน`);
     }
+    if (budget.unclassified > 0) {
+      warnings.push(`รายจ่ายเดือนนี้ ${budget.unclassified.toLocaleString("th-TH")} บาท ยังไม่มีกลุ่มระดับบน จึงเทียบงบประมาณรายกลุ่มไม่ได้ครบ`);
+    }
+    if (budget.totalBudget > 0 && budget.totalActual > budget.totalBudget) {
+      warnings.push(`รายจ่ายเดือนนี้เกินงบประมาณรายกลุ่ม ${(budget.totalActual - budget.totalBudget).toLocaleString("th-TH")} บาท`);
+    }
+    if (sinkingFunds.overdueCount > 0) {
+      warnings.push(`มีเงินเตรียมรายจ่ายเลยกำหนดและยังไม่ครบ ${sinkingFunds.overdueCount} รายการ`);
+    }
+    sinkingFunds.rows.forEach((fund) => {
+      if (fund.trackingError && !warnings.includes(fund.trackingError)) warnings.push(fund.trackingError);
+    });
 
     const transactions = [...safeData.transactions]
       .map((row) => ({
@@ -659,6 +839,9 @@
       emergencyMonths,
       emergencyFund,
       expenseClassification,
+      budget,
+      sinkingFunds,
+      fourTiers,
       snapshots,
       netWorthChange,
       netWorthChangeRate,
@@ -686,6 +869,9 @@
     getTransactionYears,
     getExpenseMonthOptions,
     buildExpenseBreakdown,
+    buildBudgetOverview,
+    buildSinkingFundOverview,
+    buildFourTierOverview,
     buildGoalRows,
     buildViewModel
   });

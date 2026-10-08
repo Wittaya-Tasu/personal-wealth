@@ -6,6 +6,37 @@
 
 - ยังไม่มีรายการ
 
+## [2.11.0] - 2026-10-08
+
+### Added
+
+- หน้า Wealth Overview สรุประบบการเงิน 4 ชั้นจากข้อมูลจริง โดยไม่สร้างคะแนนรวม
+- ชีต `Budgets` สำหรับตั้งงบรายเดือนแยกตามกลุ่มรายจ่ายระดับบน
+- ชีต `SinkingFunds` สำหรับเงินเตรียมรายจ่ายประจำปีและรายจ่ายก้อนใหญ่
+- การคำนวณงบรวม ยอดใช้จริง ยอดคงเหลือ อัตราใช้ไป และคำเตือนเมื่อเกินงบ
+- การคำนวณยอดที่ยังต้องเตรียมและยอดที่ควรเก็บต่อเดือนถึงวันครบกำหนด
+- การติดตาม Sinking Fund แบบกรอกเองหรืออ่านยอด Account ที่มีหน้าที่ `SinkingFund`
+- คู่มือ `WEALTH_PLANNING_MIGRATION.md`
+
+### Changed
+
+- หน้าแรกของเมนูความมั่งคั่งเปลี่ยนเป็น Overview 4 ชั้น โดยยังคง Tab การลงทุน บัญชี ทรัพย์สิน และหนี้เดิม
+- คำเตือนงบรวม `monthly_budget` ใช้เป็น fallback เมื่อยังไม่มีงบรายกลุ่มในเดือนนั้น
+- Static Assets และ Service Worker cache เปลี่ยนเป็น v2.11.0
+
+### Safety
+
+- สองชีตใหม่เป็น Optional ระหว่าง Migration เพื่อไม่ให้หน้าเดิมล้มเมื่อยังสร้างชีตไม่ครบ
+- Account-linked Sinking Fund ต้องอ้างถึง Account ที่มี `account_role = SinkingFund`
+- ไม่ย้ายเงินหรือสร้าง Transaction อัตโนมัติจาก Budget/Sinking Fund
+- ไม่แก้สูตร Transaction, Opening Balance, OAuth, Apps Script หรือข้อมูลเดิม
+
+### Migration
+
+- สร้าง `Budgets!A1:G1` ตาม Header ที่กำหนด
+- สร้าง `SinkingFunds!A1:L1` ตาม Header ที่กำหนด
+- ไม่ต้องแก้ Header ของชีตเดิม ไม่ต้องแก้ OAuth และไม่ต้องแก้ Apps Script
+
 ## [2.10.0] - 2026-10-08
 
 ### Added

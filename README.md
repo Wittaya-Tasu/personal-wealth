@@ -1,4 +1,4 @@
-# TasuyaWay v2.10.0
+# TasuyaWay v2.11.0
 
 **Personal finance and daily life hub** — WebApp/PWA ส่วนตัวสำหรับบันทึกการเงิน เป้าหมายชีวิต Todo, Habit และสิ่งที่อยากขอบคุณ โดยใช้ GitHub Pages เป็น Frontend และอ่าน–เขียน Google Sheet แบบ Private ผ่าน Google OAuth และ Google Sheets API v4 โดยตรง พร้อม Google Apps Script เฉพาะงาน Snapshot ตามเวลา
 
@@ -30,8 +30,12 @@
 - กราฟ Cash Flow เลือก 6/12 เดือนและปี พ.ศ. ได้ แกน X แสดงชื่อเดือน แกน Y แสดงจำนวนเต็ม
 - ตารางสรุปใต้กราฟ Cash Flow แสดงรายรับ รายจ่าย และเงินออมของเดือนชุดเดียวกับกราฟ พร้อมสลับ `%`/`ยอดเงิน`
 - กราฟสัดส่วนรายจ่ายรวมตามกลุ่มระดับบนและเลือกเดือนได้
+- หน้า Wealth Overview สรุประบบการเงิน 4 ชั้น: กระแสเงินสด, ควบคุมรายจ่ายและหนี้, เงินฉุกเฉิน และลงทุนระยะยาว โดยไม่สร้างคะแนนรวมที่กำกวม
+- ตั้งงบรายเดือนแยกตามกลุ่มรายจ่ายระดับบน พร้อมเทียบยอดจริงและยอดคงเหลือ
+- เงินเตรียมรายจ่ายประจำปี/รายจ่ายก้อนใหญ่คำนวณยอดที่ควรเก็บต่อเดือนจากเป้าหมาย ยอดสะสม และวันครบกำหนด
+- เงินเตรียมรายจ่ายเลือกกรอกยอดเองหรือเชื่อม Account ที่มี `account_role = SinkingFund` ได้
 - ป้องกันการเปลี่ยนชื่อหรือลบ Account ที่ Transaction, Goal หรือ Investment ยังอ้างถึง
-- Static Asset ใช้ Version URL `v=2.10.0` ลดปัญหา PWA โหลด HTML และ JavaScript คนละรุ่น
+- Static Asset ใช้ Version URL `v=2.11.0` ลดปัญหา PWA โหลด HTML และ JavaScript คนละรุ่น
 - รักษา Quick Reconnect, PWA, iPhone Safe Area และ Theme เดิม
 
 ## สถาปัตยกรรม
@@ -74,6 +78,7 @@ iPhone / Browser
 ├── TODAY_MIGRATION.md
 ├── PROJECT_TODOS_MIGRATION.md
 ├── FINANCIAL_FOUNDATION_MIGRATION.md
+├── WEALTH_PLANNING_MIGRATION.md
 ├── SNAPSHOT_AUTOMATION.md
 ├── MONTH_END_SNAPSHOT.gs
 └── icons/
@@ -83,7 +88,7 @@ iPhone / Browser
 
 ## โครงสร้าง Google Sheet
 
-v2.10.0 เพิ่ม `account_role` ต่อท้ายชีต `Accounts` และเพิ่ม `expense_group`, `is_essential` ต่อท้ายชีต `Transactions` ตาม `FINANCIAL_FOUNDATION_MIGRATION.md`
+v2.11.0 สร้างชีต `Budgets` และ `SinkingFunds` ตาม `WEALTH_PLANNING_MIGRATION.md` โดยไม่แก้ Header ของชีตเดิม
 
 | Sheet | Headers ตามลำดับ |
 |---|---|
@@ -100,8 +105,10 @@ v2.10.0 เพิ่ม `account_role` ต่อท้ายชีต `Accounts`
 | `Todos` | `todo_id`, `date`, `category`, `task_text`, `is_important`, `is_completed`, `completed_at`, `created_at`, `updated_at`, `parent_todo_id` |
 | `Habits` | `habit_id`, `habit_name`, `frequency`, `active`, `created_at`, `updated_at` |
 | `HabitLogs` | `habit_log_id`, `habit_id`, `period_key`, `completed_date`, `completed_at`, `created_at`, `updated_at` |
+| `Budgets` | `budget_id`, `month`, `expense_group`, `budget_amount`, `note`, `created_at`, `updated_at` |
+| `SinkingFunds` | `fund_id`, `fund_name`, `target_amount`, `current_amount`, `due_date`, `progress_source`, `linked_account`, `expense_group`, `status`, `note`, `created_at`, `updated_at` |
 
-ก่อน Deploy v2.10.0 ต้องทำ [FINANCIAL_FOUNDATION_MIGRATION.md](FINANCIAL_FOUNDATION_MIGRATION.md) แล้วจึงตรวจ Migration รุ่นก่อนที่เกี่ยวข้อง
+ก่อน Deploy v2.11.0 ต้องทำ [WEALTH_PLANNING_MIGRATION.md](WEALTH_PLANNING_MIGRATION.md) แล้วจึงตรวจ Migration รุ่นก่อนที่เกี่ยวข้อง
 
 ชื่อ `account_name` ต้องไม่ซ้ำ เพราะ Transactions, Goals และ Investments ยังเก็บชื่อบัญชีตามโครงสร้างเดิม
 
@@ -307,13 +314,47 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 - เงินออมติดลบหมายถึงรายจ่ายมากกว่ารายรับ
 - เดือนที่ไม่มีรายรับจะแสดง `—` ในโหมดเปอร์เซ็นต์ เพราะไม่มีฐานสำหรับหาร แต่ยังดูยอดจริงได้ในโหมด `ยอดเงิน`
 
+## Wealth Overview 4 ชั้น
+
+หน้าแรกของเมนู `ความมั่งคั่ง` สรุปข้อมูลจริงจากระบบเป็น 4 ชั้น โดยไม่รวมเป็นคะแนนเดียว:
+
+| ชั้น | สิ่งที่แสดง | แหล่งข้อมูลหลัก |
+|---|---|---|
+| 1 กระแสเงินสด | รายรับ กระแสเงินสด และอัตราออมเดือนนี้ | Transactions |
+| 2 ควบคุมรายจ่ายและหนี้ | งบเทียบยอดจริง และภาระหนี้ต่อรายได้ | Budgets, Transactions, Liabilities |
+| 3 เงินสำรองและความพร้อม | จำนวนเดือนเงินฉุกเฉินและเป้าหมาย | Accounts, รายจ่ายจำเป็น, Settings |
+| 4 ลงทุนระยะยาว | มูลค่าการลงทุนและสัดส่วนต่อทรัพย์สิน | Investments, Assets, Accounts |
+
+สถานะในแต่ละชั้นเป็นตัวช่วยชี้จุดที่ควรตรวจ ไม่ใช่คำแนะนำการลงทุนหรือคะแนนสุขภาพการเงินสำเร็จรูป รายละเอียดประกันจะเพิ่มในลำดับพัฒนาที่ 5 และรายละเอียดเกษียณ/ความเสี่ยงจะเพิ่มในลำดับที่ 6
+
+## งบประมาณรายเดือน
+
+- ตั้งงบแยกตาม `expense_group` และเดือนรูปแบบ `YYYY-MM`
+- หนึ่งเดือนมีงบได้หนึ่งแถวต่อหนึ่งกลุ่ม เพื่อป้องกันยอดซ้ำ
+- ยอดใช้จริงนับ Expense ของเดือนและกลุ่มเดียวกัน; รายการชำระบัตรไม่ถูกนับซ้ำ
+- ระบบแสดงงบรวม ใช้จริง คงเหลือ และอัตราใช้ไป พร้อมเตือนเมื่อเกินงบ
+- `monthly_budget` ใน Settings ยังเป็นงบรวมแบบเดิม และใช้เป็น fallback เมื่อเดือนนั้นยังไม่มีงบรายกลุ่ม
+
+## เงินเตรียมรายจ่ายประจำปี
+
+```text
+ยอดที่ยังต้องเตรียม = เป้าหมาย − ยอดสะสม
+ควรเก็บต่อเดือน = ยอดที่ยังต้องเตรียม ÷ จำนวนเดือนถึงวันครบกำหนด
+```
+
+- ตัวอย่าง: ประกันรายปี ภาษี ท่องเที่ยว การศึกษา หรือค่าซ่อมใหญ่
+- แบบ `Manual` ใช้ `current_amount` ที่กรอกเอง
+- แบบ `Account` อ่านยอดจาก Account ที่มี `account_role = SinkingFund`; หนึ่งบัญชีเชื่อมได้หนึ่งกองและระบบไม่ย้ายเงินให้เอง
+- สถานะมี `Active`, `Paused`, `Completed`; รายการพักหรือสำเร็จแล้วไม่คำนวณยอดที่ควรเก็บต่อเดือน
+- หากเลยกำหนดแล้วยังไม่ครบ ระบบแสดงเตือนให้ปรับแผนหรือวันครบกำหนด
+
 ## OAuth และ Quick Reconnect
 
 - การเชื่อมต่อเกิดจากการกดปุ่มของผู้ใช้
 - ใช้ `prompt` ว่างในการเชื่อมต่อทั่วไปเพื่อลด consent ซ้ำ
 - เมื่อ Token หมดอายุจะแสดง `แตะเพื่อเชื่อมต่อ Google`
 - ไม่มี Refresh Token และไม่มี PIN แทน Google OAuth
-- ไม่ต้องเปลี่ยน Google Cloud OAuth configuration สำหรับ v2.10.0
+- ไม่ต้องเปลี่ยน Google Cloud OAuth configuration สำหรับ v2.11.0
 
 ## ความปลอดภัย
 
@@ -327,28 +368,27 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 ## วิธี Deploy
 
 1. สำรอง Google Sheet และ Repository รุ่นปัจจุบัน
-2. ทำ `FINANCIAL_FOUNDATION_MIGRATION.md`: Accounts G1, Transactions L1 และ M1
-3. ตรวจ Migration ชีต Goals ตาม `GOALS_MIGRATION.md`
-4. ทำ Migration ชีต Investments ตาม `INVESTMENTS_MIGRATION.md`
-5. ตรวจ Migration บัตรเครดิตตาม `CREDIT_CARD_MIGRATION.md`
-6. ตรวจชีต Gratitude/Todos/Habits และ Apps Script ที่ติดตั้งไว้แล้ว
-7. ดาวน์โหลด `tasuya-way-v2.10.0.zip`
-8. แตก ZIP แล้ว Replace ไฟล์ใน Root ของ Repository
-9. Commit:
+2. ทำ `WEALTH_PLANNING_MIGRATION.md`: สร้างชีต Budgets และ SinkingFunds พร้อม Header ตามลำดับ
+3. ตรวจว่า Migration v2.10.0 ของ Accounts/Transactions ยังครบ
+4. ตรวจ Migration ชีต Goals, Investments และบัตรเครดิตตามคู่มือเดิม
+5. ตรวจชีต Gratitude/Todos/Habits และ Apps Script ที่ติดตั้งไว้แล้ว
+6. ดาวน์โหลด `tasuya-way-v2.11.0.zip`
+7. แตก ZIP แล้ว Replace ไฟล์ใน Root ของ Repository
+8. Commit:
 
 ```text
-feat: add account roles and essential expense planning
+feat: add four-tier wealth overview and planning
 ```
 
-10. รอ GitHub Actions `pages build and deployment` เป็นสีเขียว
-11. ปิด WebApp/PWA ทุกหน้าต่าง แล้วเปิดใหม่
-12. กด Refresh และทดสอบบัญชีเงินฉุกเฉินกับ Expense 1 รายการ
+9. รอ GitHub Actions `pages build and deployment` เป็นสีเขียว
+10. ปิด WebApp/PWA ทุกหน้าต่าง แล้วเปิดใหม่
+11. กด Refresh แล้วทดสอบงบ 1 รายการและเงินเตรียม 1 รายการ
 
 ## วิธี Rollback
 
 1. หยุดบันทึก Transaction และ Investment ชั่วคราว
-2. Revert Commit v2.10.0 หรือ Replace Code ด้วย Backup รุ่นที่ใช้งานอยู่ก่อน Deploy
-3. Header ใหม่ใน Accounts และ Transactions สามารถคงไว้ได้ เพราะ Code เก่าจะเพิกเฉย
+2. Revert Commit v2.11.0 หรือ Replace Code ด้วย Backup รุ่นที่ใช้งานอยู่ก่อน Deploy
+3. ชีต Budgets และ SinkingFunds สามารถคงไว้ได้ เพราะ Code เก่าจะเพิกเฉย
 4. รอ Deploy และเปิดแอปใหม่
 
 Rollback Code ไม่ย้อนยอด Accounts, Liabilities หรือแถว Gratitude ที่เขียนแล้ว ต้อง Reconcile ยอดจริงก่อนใช้งานต่อ
@@ -367,6 +407,10 @@ Rollback Code ไม่ย้อนยอด Accounts, Liabilities หรือ�
 | กราฟขึ้น `ยังไม่จัดกลุ่ม` | Expense เดิมยังไม่มีค่า `expense_group` |
 | เงินฉุกเฉินเป็น 0 | ยังไม่มี Account ที่กำหนด `account_role = Emergency` |
 | เงินฉุกเฉินเป็น `—` เดือน | ยังไม่มีค่าใช้จ่ายจำเป็นที่คำนวณได้ และไม่ได้ตั้งค่า override |
+| เมนูงบประมาณบันทึกไม่ได้ | สร้างชีต `Budgets` และตรวจ Header A1:G1 ตามคู่มือ |
+| เมนูเงินเตรียมบันทึกไม่ได้ | สร้างชีต `SinkingFunds` และตรวจ Header A1:L1 ตามคู่มือ |
+| เงินเตรียมแบบ Account เลือกบัญชีไม่ได้ | กำหนด Account นั้นเป็น `account_role = SinkingFund` ก่อน |
+| งบจริงเป็น 0 หรือมี `ยังไม่จัดกลุ่ม` | ตรวจ `month` ของงบและเติม `expense_group` ใน Expense เดิม |
 | ภาระหนี้แสดง `—` | มีค่างวดแต่ยังไม่มี Income เดือนปัจจุบัน |
 | หน้าเว็บยังเป็นรุ่นเก่า | รอ Deploy, ปิด PWA แล้วเปิดใหม่ หรือ Clear site data |
 | สิทธิ์หมดอายุ | กด `แตะเพื่อเชื่อมต่อ Google` |

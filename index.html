@@ -12,13 +12,13 @@
   <meta name="description" content="TasuyaWay — ระบบส่วนตัวสำหรับการเงิน เป้าหมาย Todo Habit และบันทึกขอบคุณวันนี้">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://sheets.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; img-src 'self' data:; manifest-src 'self'; worker-src 'self'">
   <title>TasuyaWay</title>
-  <link rel="manifest" href="manifest.json?v=2.10.0">
+  <link rel="manifest" href="manifest.json?v=2.11.0">
   <link rel="icon" href="icons/wealth-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.10.0">
+  <link rel="stylesheet" href="style.css?v=2.11.0">
 </head>
 <body>
   <svg class="svg-sprite" aria-hidden="true">
@@ -236,8 +236,8 @@
       <section id="wealthView" class="view" data-view="wealth">
         <div class="view-header">
           <div>
-            <p class="eyebrow">BALANCE SHEET</p>
-            <h2>ทรัพย์สินและหนี้สิน</h2>
+            <p class="eyebrow">FINANCIAL SYSTEM</p>
+            <h2>ความมั่งคั่งและระบบการเงิน 4 ชั้น</h2>
           </div>
           <button class="primary-button" id="wealthAddButton" type="button">
             <svg><use href="#i-plus"/></svg> เพิ่มข้อมูล
@@ -249,7 +249,10 @@
           <div><span>สุทธิ</span><strong id="wealthNetSummary">฿—</strong></div>
         </section>
         <div class="segmented-control wealth-tabs" role="tablist">
-          <button class="is-active" type="button" data-wealth-tab="investments">การลงทุน</button>
+          <button class="is-active" type="button" data-wealth-tab="overview">ภาพรวม 4 ชั้น</button>
+          <button type="button" data-wealth-tab="budgets">งบประมาณ</button>
+          <button type="button" data-wealth-tab="sinkingFunds">เงินเตรียมรายจ่าย</button>
+          <button type="button" data-wealth-tab="investments">การลงทุน</button>
           <button type="button" data-wealth-tab="accounts">บัญชีเงิน</button>
           <button type="button" data-wealth-tab="assets">ทรัพย์สิน</button>
           <button type="button" data-wealth-tab="liabilities">หนี้สิน</button>
@@ -430,6 +433,8 @@
       <button type="button" data-form="asset"><span class="action-icon asset">◆</span><strong>ทรัพย์สิน</strong><small>บ้าน รถ และทรัพย์สินอื่น</small></button>
       <button type="button" data-form="liability"><span class="action-icon debt">−</span><strong>หนี้สิน</strong><small>ยอดหนี้และค่างวด</small></button>
       <button type="button" data-form="goal"><span class="action-icon goal">◎</span><strong>เป้าหมาย</strong><small>ติดตามเงิน บัญชี หรือ Milestone</small></button>
+      <button type="button" data-form="budget"><span class="action-icon cash">≡</span><strong>งบประมาณ</strong><small>ตั้งงบรายเดือนตามกลุ่มรายจ่าย</small></button>
+      <button type="button" data-form="sinkingFund"><span class="action-icon goal">◷</span><strong>เงินเตรียมรายจ่าย</strong><small>เตรียมประกัน ภาษี และรายจ่ายก้อน</small></button>
     </div>
   </aside>
 
@@ -451,8 +456,9 @@
     </div>
     <form id="settingsForm" class="data-form">
       <label class="field">
-        <span>งบใช้จ่ายต่อเดือน (บาท)</span>
+        <span>งบใช้จ่ายรวมแบบเดิม (บาท)</span>
         <input name="monthly_budget" type="number" min="0" step="100" inputmode="decimal">
+        <small>ใช้เป็นค่ารวมสำรองเมื่อเดือนนั้นยังไม่ได้ตั้งงบรายกลุ่มในหน้า Wealth</small>
       </label>
       <label class="field">
         <span>เป้าหมายเงินสำรองฉุกเฉิน (เดือน)</span>
@@ -486,9 +492,9 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="config.js?v=2.10.0"></script>
-  <script src="analytics.js?v=2.10.0"></script>
-  <script src="api.js?v=2.10.0"></script>
-  <script src="app.js?v=2.10.0"></script>
+  <script src="config.js?v=2.11.0"></script>
+  <script src="analytics.js?v=2.11.0"></script>
+  <script src="api.js?v=2.11.0"></script>
+  <script src="app.js?v=2.11.0"></script>
 </body>
 </html>

@@ -756,6 +756,195 @@ svg {
   flex-direction: column;
 }
 
+.four-tier-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.tier-card,
+.overview-mini-card {
+  min-width: 0;
+  padding: 15px;
+  background: rgba(7, 20, 16, 0.34);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.tier-heading,
+.tier-title,
+.planning-toolbar,
+.planning-summary {
+  display: flex;
+  align-items: center;
+}
+
+.tier-heading,
+.planning-toolbar {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tier-title {
+  min-width: 0;
+  gap: 9px;
+}
+
+.tier-title h3 {
+  overflow: hidden;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tier-number {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  background: var(--gold-soft);
+  border-radius: 8px;
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.tier-value {
+  display: block;
+  margin-top: 14px;
+  font-size: 23px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tier-detail,
+.overview-mini-card p,
+.wealth-scope-note {
+  margin: 5px 0 0;
+  color: var(--muted-2);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.tier-progress,
+.planning-progress {
+  height: 6px;
+  margin-top: 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 99px;
+}
+
+.tier-progress span,
+.planning-progress span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #aa8c34, var(--gold));
+  border-radius: inherit;
+}
+
+.planning-progress span.is-over {
+  background: var(--red);
+}
+
+.wealth-overview-summary {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.overview-mini-card strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wealth-scope-note {
+  padding: 12px 2px 0;
+}
+
+.planning-toolbar {
+  margin-bottom: 12px;
+}
+
+.planning-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 12px;
+  background: var(--surface-input);
+  border-radius: 13px;
+}
+
+.planning-summary div {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planning-row,
+.sinking-fund-row {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.planning-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.sinking-fund-row {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.planning-row:last-child,
+.sinking-fund-row:last-child {
+  border-bottom: 0;
+}
+
+.planning-copy {
+  min-width: 0;
+}
+
+.planning-copy > strong,
+.planning-copy > span,
+.sinking-values strong,
+.sinking-values span {
+  display: block;
+}
+
+.planning-copy > strong {
+  font-size: 14px;
+}
+
+.planning-copy > span,
+.sinking-values span,
+.planning-copy small {
+  margin-top: 3px;
+  color: var(--muted-2);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.sinking-values {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sinking-values strong {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
 .transaction-row,
 .wealth-row {
   display: grid;
@@ -2057,6 +2246,11 @@ svg {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .four-tier-grid,
+  .wealth-overview-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .hero-panel {
     padding: 26px 28px;
   }
@@ -2142,6 +2336,15 @@ svg {
   .donut-wrap {
     width: min(72vw, 230px);
     margin: 0 auto;
+  }
+
+  .sinking-fund-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .sinking-values {
+    grid-column: 1 / -1;
+    text-align: left;
   }
 }
 
