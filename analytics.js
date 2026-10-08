@@ -11,6 +11,20 @@
   const MILESTONE_GOAL_TYPES = new Set(["milestone", "life", "ชีวิต", "หมุดหมาย"]);
   const ACCOUNT_PROGRESS_SOURCES = new Set(["account", "บัญชี"]);
   const COMPLETED_GOAL_STATUSES = new Set(["completed", "complete", "done", "สำเร็จ", "เสร็จสิ้น"]);
+  const ACCOUNT_ROLE_LABELS = Object.freeze({
+    General: "เงินทั่วไป",
+    Spending: "บัญชีใช้จ่าย",
+    Emergency: "เงินฉุกเฉิน",
+    SinkingFund: "เงินเตรียมรายจ่าย",
+    Investment: "เงินรอลงทุน"
+  });
+  const EXPENSE_GROUP_LABELS = Object.freeze({
+    Personal: "ส่วนตัว",
+    Family: "ครอบครัว",
+    HomeDebt: "บ้าน รถ และหนี้",
+    Health: "สุขภาพ",
+    Protection: "ประกันและการป้องกัน"
+  });
 
   function toNumber(value) {
     if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -61,6 +75,61 @@
 
   function normalizeAccountName(value) {
     return String(value || "").trim().toLocaleLowerCase("th-TH");
+  }
+
+  function normalizeAccountRole(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    const aliases = {
+      general: "General",
+      "เงินทั่วไป": "General",
+      spending: "Spending",
+      "ใช้จ่าย": "Spending",
+      "บัญชีใช้จ่าย": "Spending",
+      emergency: "Emergency",
+      "เงินฉุกเฉิน": "Emergency",
+      sinkingfund: "SinkingFund",
+      sinking_fund: "SinkingFund",
+      "เงินเตรียมรายจ่าย": "SinkingFund",
+      investment: "Investment",
+      "เงินรอลงทุน": "Investment"
+    };
+    return aliases[normalized] || "";
+  }
+
+  function accountRoleLabel(value) {
+    return ACCOUNT_ROLE_LABELS[normalizeAccountRole(value)] || "ยังไม่กำหนดหน้าที่";
+  }
+
+  function normalizeExpenseGroup(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    const aliases = {
+      personal: "Personal",
+      "ส่วนตัว": "Personal",
+      family: "Family",
+      "ครอบครัว": "Family",
+      homedebt: "HomeDebt",
+      home_debt: "HomeDebt",
+      "บ้าน รถ และหนี้": "HomeDebt",
+      health: "Health",
+      "สุขภาพ": "Health",
+      protection: "Protection",
+      "ประกันและการป้องกัน": "Protection"
+    };
+    return aliases[normalized] || "";
+  }
+
+  function expenseGroupLabel(value) {
+    return EXPENSE_GROUP_LABELS[normalizeExpenseGroup(value)] || "ยังไม่จัดกลุ่ม";
+  }
+
+  function hasBooleanValue(value) {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    return typeof value === "boolean"
+      || ["true", "yes", "1", "on", "ใช่", "false", "no", "0", "off", "ไม่ใช่"].includes(normalized);
+  }
+
+  function isLegacyCreditCardCategory(transaction) {
+    return String(transaction?.category || "").trim().toLocaleLowerCase("th-TH") === "บัตรเครดิต";
   }
 
   function normalizeGoalType(value) {
@@ -238,9 +307,9 @@
     (transactions || []).forEach((tx) => {
       if (normalizeType(tx.type) !== "expense") return;
       if (monthKey(parseDate(tx.date)) !== selectedMonthKey) return;
-      const name = String(tx.category || "ไม่ระบุหมวดหมู่").trim() || "ไม่ระบุหมวดหมู่";
+      if (isLegacyCreditCardCategory(tx)) return;
+      const name = expenseGroupLabel(tx.expense_group);
       const key = name.toLocaleLowerCase("th-TH");
-      if (key === "บัตรเครดิต") return;
       const existing = buckets.get(key) || { name, value: 0 };
       existing.value += Math.abs(toNumber(tx.amount));
       buckets.set(key, existing);
@@ -472,20 +541,53 @@
         ? debtPayments / currentMonth.income
         : null;
 
-    const cashInvestments = sum(safeData.investments.filter(isCashInvestment), getInvestmentValue);
-    const cashAccounts = settings.include_accounts_in_net_worth
-      ? sum(safeData.accounts, (row) => row.balance)
-      : 0;
-    const liquidCash = cashInvestments + cashAccounts;
+    const emergencyAccounts = safeData.accounts.filter((account) => {
+      return normalizeAccountRole(account.account_role) === "Emergency";
+    });
+    const emergencyBalance = sum(emergencyAccounts, (row) => row.balance);
     const recentThree = monthly.slice(-3);
-    const activeExpenseMonths = recentThree.filter((row) => row.transactionCount > 0);
-    const averageExpense = activeExpenseMonths.length
-      ? activeExpenseMonths.reduce((acc, row) => acc + row.expense, 0) / activeExpenseMonths.length
-      : 0;
-    const essentialExpense = settings.essential_expense_override === ""
-      ? averageExpense
-      : toNumber(settings.essential_expense_override);
-    const emergencyMonths = essentialExpense > 0 ? liquidCash / essentialExpense : null;
+    const recentMonthKeys = new Set(recentThree.map((row) => row.key));
+    const recentExpenses = safeData.transactions.filter((transaction) => {
+      return normalizeType(transaction.type) === "expense"
+        && !isLegacyCreditCardCategory(transaction)
+        && recentMonthKeys.has(monthKey(parseDate(transaction.date)));
+    });
+    const classifiedExpenses = recentExpenses.filter((transaction) => {
+      return Boolean(normalizeExpenseGroup(transaction.expense_group))
+        && hasBooleanValue(transaction.is_essential);
+    });
+    const activeExpenseMonthKeys = new Set(recentExpenses.map((transaction) => monthKey(parseDate(transaction.date))));
+    const essentialTotal = classifiedExpenses.reduce((total, transaction) => {
+      return toBoolean(transaction.is_essential, false)
+        ? total + Math.abs(toNumber(transaction.amount))
+        : total;
+    }, 0);
+    const calculatedEssentialExpense = activeExpenseMonthKeys.size
+      ? essentialTotal / activeExpenseMonthKeys.size
+      : null;
+    const usesEssentialOverride = settings.essential_expense_override !== "";
+    const essentialExpense = usesEssentialOverride
+      ? toNumber(settings.essential_expense_override)
+      : classifiedExpenses.length
+        ? calculatedEssentialExpense
+        : null;
+    const emergencyMonths = essentialExpense > 0 ? emergencyBalance / essentialExpense : null;
+    const expenseClassification = {
+      total: recentExpenses.length,
+      classified: classifiedExpenses.length,
+      unclassified: Math.max(recentExpenses.length - classifiedExpenses.length, 0),
+      coverage: recentExpenses.length ? classifiedExpenses.length / recentExpenses.length : null
+    };
+    const emergencyFund = {
+      accounts: emergencyAccounts,
+      balance: emergencyBalance,
+      targetMonths: settings.emergency_months_target,
+      targetAmount: essentialExpense === null ? null : essentialExpense * settings.emergency_months_target,
+      shortfall: essentialExpense === null
+        ? null
+        : Math.max((essentialExpense * settings.emergency_months_target) - emergencyBalance, 0),
+      essentialExpenseSource: usesEssentialOverride ? "override" : "transactions"
+    };
     const snapshots = buildSnapshotHistory(safeData.snapshots);
     const previousSnapshot = snapshots.length >= 2 ? snapshots.at(-2) : null;
     const latestSnapshot = snapshots.at(-1) || null;
@@ -497,6 +599,21 @@
     const allocation = buildAllocation(safeData, settings.include_accounts_in_net_worth);
     const goals = buildGoalRows(safeData.goals, safeData.accounts);
     const warnings = buildWarnings(safeData, settings, snapshots, monthly, goals);
+    if (!emergencyAccounts.length) {
+      warnings.push("ยังไม่มีบัญชีที่กำหนดหน้าที่เป็น “เงินฉุกเฉิน” ตัวเลขเงินสำรองจึงยังเป็นศูนย์");
+    }
+    if (!usesEssentialOverride && recentExpenses.length && expenseClassification.unclassified > 0) {
+      warnings.push(
+        `รายจ่าย 3 เดือนล่าสุดยังจัดกลุ่มหรือระบุความจำเป็นไม่ครบ `
+        + `${expenseClassification.unclassified} รายการ ตัวเลขเงินสำรองฉุกเฉินจึงอาจคลาดเคลื่อน`
+      );
+    }
+    if (!usesEssentialOverride && recentExpenses.length && classifiedExpenses.length === 0) {
+      warnings.push("ยังคำนวณค่าใช้จ่ายจำเป็นไม่ได้ กรุณาจัดกลุ่มรายจ่ายเดิมและระบุว่าเป็นรายจ่ายจำเป็นหรือไม่");
+    }
+    if (essentialExpense === 0) {
+      warnings.push("ค่าใช้จ่ายจำเป็นต่อเดือนเป็น 0 จึงยังคำนวณจำนวนเดือนเงินสำรองฉุกเฉินไม่ได้");
+    }
     if (monthlySpending.status === "missing") {
       warnings.push(`ไม่พบบัญชี “${MONTHLY_SPENDING_ACCOUNT_NAME}” จึงยังแสดงเงินใช้จ่ายคงเหลือไม่ได้`);
     }
@@ -531,7 +648,7 @@
         investableNetWorth: accountAssets + investments - liabilities,
         debtPayments,
         hasDebt,
-        liquidCash
+        liquidCash: emergencyBalance
       },
       currentMonth,
       monthlySpending,
@@ -540,6 +657,8 @@
       debtServiceRatio,
       essentialExpense,
       emergencyMonths,
+      emergencyFund,
+      expenseClassification,
       snapshots,
       netWorthChange,
       netWorthChangeRate,
@@ -555,6 +674,10 @@
     parseDate,
     monthKey,
     normalizeType,
+    normalizeAccountRole,
+    accountRoleLabel,
+    normalizeExpenseGroup,
+    expenseGroupLabel,
     getInvestmentValue,
     getAssetValue,
     rowsToSettings,

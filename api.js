@@ -11,6 +11,8 @@
   const INVESTMENT_FUNDING_HEADERS = ["account_from", "funded_amount"];
   const TRANSACTION_ITEM_HEADERS = ["item_name"];
   const CREDIT_CARD_TRANSACTION_HEADERS = ["payment_method", "credit_card"];
+  const ACCOUNT_ROLE_HEADERS = ["account_role"];
+  const EXPENSE_PLANNING_HEADERS = ["expense_group", "is_essential"];
   const LIABILITY_TYPE_HEADERS = ["liability_type"];
   const GRATITUDE_HEADERS = ["gratitude_id", "date", "slot", "category", "gratitude_text", "created_at", "updated_at"];
   const TODO_HEADERS = ["todo_id", "date", "category", "task_text", "is_important", "is_completed", "completed_at", "created_at", "updated_at", "parent_todo_id"];
@@ -19,6 +21,8 @@
   const GRATITUDE_CATEGORIES = new Set(["คน", "ตัวเอง", "สัตว์", "สิ่งของ", "สถานที่", "เหตุการณ์", "ประสบการณ์", "อื่น ๆ"]);
   const TODO_CATEGORIES = new Set(["เรื่องงาน", "เรื่องส่วนตัว", "โปรเจก"]);
   const HABIT_FREQUENCIES = new Set(["Daily", "Weekly", "Monthly", "Yearly"]);
+  const ACCOUNT_ROLES = new Set(["General", "Spending", "Emergency", "SinkingFund", "Investment"]);
+  const EXPENSE_GROUPS = new Set(["Personal", "Family", "HomeDebt", "Health", "Protection"]);
 
   function waitFor(predicate, timeoutMs = 15000) {
     return new Promise((resolve, reject) => {
@@ -87,6 +91,43 @@
   function normalizePaymentMethod(value) {
     const normalized = String(value ?? "").trim().toLowerCase();
     return ["creditcard", "credit_card", "บัตรเครดิต"].includes(normalized) ? "CreditCard" : "Account";
+  }
+
+  function normalizeAccountRole(value) {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    const aliases = {
+      general: "General",
+      "เงินทั่วไป": "General",
+      spending: "Spending",
+      "ใช้จ่าย": "Spending",
+      "บัญชีใช้จ่าย": "Spending",
+      emergency: "Emergency",
+      "เงินฉุกเฉิน": "Emergency",
+      sinkingfund: "SinkingFund",
+      sinking_fund: "SinkingFund",
+      "เงินเตรียมรายจ่าย": "SinkingFund",
+      investment: "Investment",
+      "เงินรอลงทุน": "Investment"
+    };
+    return aliases[normalized] || "";
+  }
+
+  function normalizeExpenseGroup(value) {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    const aliases = {
+      personal: "Personal",
+      "ส่วนตัว": "Personal",
+      family: "Family",
+      "ครอบครัว": "Family",
+      homedebt: "HomeDebt",
+      home_debt: "HomeDebt",
+      "บ้าน รถ และหนี้": "HomeDebt",
+      health: "Health",
+      "สุขภาพ": "Health",
+      protection: "Protection",
+      "ประกันและการป้องกัน": "Protection"
+    };
+    return aliases[normalized] || "";
   }
 
   function normalizeLiabilityType(value, name = "") {
@@ -382,6 +423,14 @@
       return this.getMissingHeaders(this.config.SHEETS.transactions, TRANSACTION_ITEM_HEADERS);
     }
 
+    getMissingAccountRoleHeaders() {
+      return this.getMissingHeaders(this.config.SHEETS.accounts, ACCOUNT_ROLE_HEADERS);
+    }
+
+    getMissingExpensePlanningHeaders() {
+      return this.getMissingHeaders(this.config.SHEETS.transactions, EXPENSE_PLANNING_HEADERS);
+    }
+
     getMissingCreditCardTransactionHeaders() {
       return this.getMissingHeaders(this.config.SHEETS.transactions, CREDIT_CARD_TRANSACTION_HEADERS);
     }
@@ -589,8 +638,20 @@
     }
 
     validateAccountRecord(record, existingRecord = null) {
+      const missingHeaders = this.getMissingAccountRoleHeaders();
+      if (missingHeaders.length) {
+        const error = new Error(
+          `ชีต Accounts ยังขาด Header: ${missingHeaders.join(", ")} `
+          + "กรุณาเพิ่ม Header ต่อท้ายแถวที่ 1 ก่อนบันทึกบัญชี"
+        );
+        error.code = "ACCOUNT_ROLE_SCHEMA_MIGRATION_REQUIRED";
+        error.missingHeaders = missingHeaders;
+        throw error;
+      }
       const name = normalizeName(record?.account_name);
       if (!name) throw new Error("กรุณาระบุชื่อบัญชี");
+      const accountRole = normalizeAccountRole(record?.account_role);
+      if (!ACCOUNT_ROLES.has(accountRole)) throw new Error("กรุณาเลือกหน้าที่ของบัญชี");
 
       const rows = this.getAccountRows();
       this.buildAccountIndex();
@@ -611,7 +672,7 @@
         error.code = "ACCOUNT_NAME_REFERENCED";
         throw error;
       }
-      return { ...record, account_name: name };
+      return { ...record, account_name: name, account_role: accountRole };
     }
 
     async appendAccount(record) {
@@ -1242,7 +1303,10 @@
         validated.credit_card = "";
       } else if (type === "expense") {
         if (requireExpenseItem) {
-          const missingHeaders = this.getMissingTransactionItemHeaders();
+          const missingHeaders = [
+            ...this.getMissingTransactionItemHeaders(),
+            ...this.getMissingExpensePlanningHeaders()
+          ];
           if (missingHeaders.length) {
             const error = new Error(
               `ชีต Transactions ยังขาด Header: ${missingHeaders.join(", ")} `
@@ -1254,8 +1318,14 @@
           }
           validated.category = normalizeName(record.category);
           validated.item_name = normalizeName(record.item_name);
+          validated.expense_group = normalizeExpenseGroup(record.expense_group);
+          validated.is_essential = isYes(record.is_essential) ? "Yes" : "No";
           if (!validated.category) throw new Error("กรุณาเลือกหมวดหมู่รายจ่าย");
           if (!validated.item_name) throw new Error("กรุณาระบุรายการรายจ่าย");
+          if (!EXPENSE_GROUPS.has(validated.expense_group)) throw new Error("กรุณาเลือกกลุ่มรายจ่ายระดับบน");
+          if (!["yes", "no"].includes(String(record.is_essential || "").trim().toLowerCase())) {
+            throw new Error("กรุณาระบุว่ารายจ่ายนี้จำเป็นหรือไม่");
+          }
         }
         validated.type = "Expense";
         validated.account_to = "";
@@ -1322,7 +1392,11 @@
         validated.payment_method = "Account";
         validated.credit_card = normalizeName(card.liability_name);
       }
-      if (type === "income" || type === "transfer") validated.item_name = "";
+      if (type === "income" || type === "transfer" || type === "credit_card_payment") {
+        if (type === "income" || type === "transfer") validated.item_name = "";
+        validated.expense_group = "";
+        validated.is_essential = "";
+      }
       return validated;
     }
 
@@ -1617,7 +1691,7 @@
       const descriptions = {
         monthly_budget: "งบใช้จ่ายต่อเดือน",
         emergency_months_target: "เป้าหมายเงินสำรองฉุกเฉิน (เดือน)",
-        essential_expense_override: "ค่าใช้จ่ายจำเป็นต่อเดือน; เว้นว่างเพื่อใช้ค่าเฉลี่ย",
+        essential_expense_override: "ค่าใช้จ่ายจำเป็นต่อเดือน; เว้นว่างเพื่อใช้ Expense ที่ is_essential = Yes เฉลี่ย 3 เดือน",
         include_accounts_in_net_worth: "นับยอด Accounts รวมในความมั่งคั่งสุทธิ"
       };
 

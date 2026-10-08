@@ -1,9 +1,9 @@
 # TasuyaWay — Project State
 
 > อัปเดต: 8 ตุลาคม 2569 (2026-10-08), Asia/Bangkok  
-> รุ่นพัฒนา: **v2.9.0 — Project Todo Lists**  
-> รุ่นที่ผู้ใช้ Deploy ก่อนเริ่มงาน: **v2.8.0**  
-> สถานะ v2.9.0: พร้อมทดสอบ; เพิ่ม Header หนึ่งช่องใน Todos และไม่เปลี่ยน Apps Script
+> รุ่นพัฒนา: **v2.10.0 — Financial Foundation**  
+> รุ่นฐานก่อนเริ่มงาน: **v2.9.0**  
+> สถานะ: Code และ Mock tests ผ่าน; รอ Migration และทดสอบกับ Google Sheet จริง
 
 ## 1. สรุปโครงการ
 
@@ -12,33 +12,32 @@
 | Repository | `Wittaya-Tasu/personal-wealth` |
 | Branch | `main` |
 | WebApp | `https://wittaya-tasu.github.io/personal-wealth/` |
-| Hosting | GitHub Pages |
-| รูปแบบ | Static WebApp / PWA |
+| Hosting | GitHub Pages, Static PWA |
 | Database | Google Sheet แบบ Private/Restricted |
-| Auth | Google OAuth Token Model |
-| API | Google Sheets API v4 โดยตรง |
-| Backend | ไม่มีสำหรับ WebApp; มี Apps Script เฉพาะ Scheduled Snapshot |
-| UI | ภาษาไทย, Dark Emerald + Gold, Sarabun |
-| อุปกรณ์หลัก | iPhone โดยเฉพาะหน้าจอประมาณ 390–430px และ Desktop |
+| Auth/API | Google OAuth Token Model + Google Sheets API v4 โดยตรง |
+| Backend | ไม่มีสำหรับหน้าเว็บ; Apps Script ใช้เฉพาะ Scheduled Snapshot |
+| UI หลัก | ภาษาไทย, Dark Emerald + Gold, Sarabun, Mobile-first สำหรับ iPhone |
 
-## 2. การเปลี่ยนแปลง v2.9.0
+## 2. การเปลี่ยนแปลง v2.10.0
 
 | งาน | ผลลัพธ์ |
 |---|---|
-| หมวด Todo | เพิ่ม `โปรเจก` ต่อจากเรื่องงานและเรื่องส่วนตัว |
-| หน้าโปรเจก | แตะชื่อโปรเจกเพื่อเปิด Checklist ย่อย พร้อม Progress bar |
-| งานย่อย | เพิ่ม ดาว ติ๊ก แก้ และลบได้ โดยอ้างอิงโปรเจกผ่าน `parent_todo_id` |
-| ความปลอดภัยข้อมูล | ลบโปรเจกต้องยืนยันและลบงานย่อยจากแถวล่างขึ้นบน |
-| งานค้าง | โปรเจกที่ยังไม่เสร็จแสดงต่อในวันถัดไปตามกติกาเดิม |
-| Migration | เพิ่ม `Todos!J1 = parent_todo_id`; ไม่สร้างชีตใหม่และไม่แก้ Apps Script |
-| PWA | Versioned assets และ cache เป็น v2.9.0 |
+| หน้าที่ของบัญชี | เพิ่ม `account_role` และตัวเลือก General/Spending/Emergency/SinkingFund/Investment |
+| เงินฉุกเฉิน | นับเฉพาะ Accounts ที่ `account_role = Emergency` ไม่รวมบัญชีอื่นหรือ Investments |
+| รายจ่ายระดับบน | เพิ่ม `expense_group`: Personal/Family/HomeDebt/Health/Protection |
+| ความจำเป็น | เพิ่ม `is_essential`: Yes/No และบังคับเลือกเมื่อบันทึก Expense ใหม่ |
+| สูตรรายจ่ายจำเป็น | ใช้ Expense ที่เป็น Yes เฉลี่ย 3 เดือน หรือใช้ Settings override หากกรอกไว้ |
+| กราฟรายจ่าย | รวมตาม `expense_group`; แถวเดิมที่ยังว่างรวมเป็น `ยังไม่จัดกลุ่ม` |
+| รายการบัตรเก่า | Expense ที่ `category = บัตรเครดิต` ยังถูกตัดออกเพื่อไม่ให้นับยอดชำระซ้ำ |
+| ความเข้ากันได้ | เพิ่ม Header ต่อท้ายเท่านั้น ไม่คำนวณ Opening Balance หรือ Transactions เก่าย้อนหลัง |
+| PWA | Versioned assets และ cache เป็น v2.10.0 |
 
 ## 3. โครงสร้าง Google Sheet
 
 | Sheet | Headers |
 |---|---|
-| `Accounts` | `account_id`, `account_name`, `currency`, `balance`, `type`, `note` |
-| `Transactions` | `tx_id`, `date`, `type`, `category`, `account_from`, `account_to`, `amount`, `note`, `item_name`, `payment_method`, `credit_card` |
+| `Accounts` | `account_id`, `account_name`, `currency`, `balance`, `type`, `note`, `account_role` |
+| `Transactions` | `tx_id`, `date`, `type`, `category`, `account_from`, `account_to`, `amount`, `note`, `item_name`, `payment_method`, `credit_card`, `expense_group`, `is_essential` |
 | `Investments` | `investment_id`, `asset_name`, `category`, `units`, `avg_cost`, `current_price`, `current_value`, `tax_deductible`, `note`, `account_from`, `funded_amount` |
 | `Assets` | `asset_id`, `asset_name`, `category`, `purchase_price`, `estimated_value`, `note` |
 | `Liabilities` | `liability_id`, `liability_name`, `total_amount`, `monthly_payment`, `note`, `liability_type` |
@@ -51,141 +50,91 @@
 | `Habits` | `habit_id`, `habit_name`, `frequency`, `active`, `created_at`, `updated_at` |
 | `HabitLogs` | `habit_log_id`, `habit_id`, `period_key`, `completed_date`, `completed_at`, `created_at`, `updated_at` |
 
-### Migration v2.7.0
-
-เพิ่มต่อท้ายตารางเท่านั้น:
+### Migration v2.10.0
 
 | Cell | Header |
 |---|---|
-| Transactions J1 | `payment_method` |
-| Transactions K1 | `credit_card` |
-| Liabilities F1 | `liability_type` |
+| Accounts G1 | `account_role` |
+| Transactions L1 | `expense_group` |
+| Transactions M1 | `is_essential` |
 
-อ่านขั้นตอนใน `CREDIT_CARD_MIGRATION.md` ห้ามแทรกคอลัมน์กลางตาราง
+เพิ่มต่อท้ายเท่านั้น ห้ามแทรกคอลัมน์กลางตาราง อ่าน `FINANCIAL_FOUNDATION_MIGRATION.md`
 
-สร้างชีต `Todos`, `Habits`, `HabitLogs` ตาม `TODAY_MIGRATION.md`, ตรวจหมวด Gratitude ตาม `GRATITUDE_MIGRATION.md` และติดตั้ง Trigger ตาม `SNAPSHOT_AUTOMATION.md`
+## 4. กติกาการคำนวณ
 
-## 4. กติกา Expense
+```text
+Emergency Balance = SUM(Accounts.balance WHERE account_role = Emergency)
 
-| การกระทำ | กติกา |
+Essential Monthly Expense =
+  average of Expense WHERE is_essential = Yes in the latest 3 calendar months
+
+Emergency Months = Emergency Balance ÷ Essential Monthly Expense
+```
+
+| กรณี | ผลลัพธ์ |
 |---|---|
-| เพิ่ม Expense | เลือกหมวดก่อน ช่องรายการจึงพิมพ์ได้ |
-| หมวดมาตรฐาน | อาหาร, เครื่องดื่ม, หนังสือ, ทำบุญ, ของใช้ส่วนตัว, ค่าเดินทาง, ครอบครัว, สุขภาพ, อิเล็กทรอนิกส์, อื่น ๆ |
-| หมวดเพิ่มเอง | อ่านจาก Categories ที่ `type = Expense` |
-| บันทึก | `category` อยู่คอลัมน์ D และ `item_name` อยู่คอลัมน์ I |
-| รายการเก่า | ยังอ่าน แสดง ลบ และย้อน Account ได้แม้ `item_name` ว่าง |
-| กราฟ | รวมตาม `category`; ตัด `บัตรเครดิต` ออก |
+| ไม่มีบัญชี Emergency | ยอดเงินฉุกเฉินเป็น 0 และแสดงคำเตือน |
+| ไม่มีรายจ่ายที่จำแนกได้ | จำนวนเดือนเป็น `—` และแสดงคำเตือน |
+| จำแนก Expense ไม่ครบ | คำนวณจากข้อมูลที่ระบุได้ พร้อมเตือนว่าอาจคลาดเคลื่อน |
+| ตั้ง `essential_expense_override` | ใช้ค่าที่กรอกแทนข้อมูล Transactions |
+| มีหลายบัญชี Emergency | รวมยอดทุกบัญชี |
+| เงินฝาก/เงินสดอยู่ใน Investments | ไม่นับเป็นเงินฉุกเฉิน |
 
-`บัตรเครดิต` ใน v2.4.0 หมายถึงค่า exact match ใน `Transactions.category` ไม่ใช่ชื่อ `account_from` ดังนั้นค่าอาหารที่ชำระผ่าน Account บัตรเครดิตจะยังอยู่ในกราฟ หาก category เป็น `อาหาร`
+## 5. กติกาการบันทึก
 
-## 5. กติกา Investment Contribution
+- Account ใหม่หรือ Account ที่แก้ไขต้องมี `account_role`
+- Expense ใหม่หรือ Expense ที่แก้ไขต้องมี `expense_group` และ `is_essential`
+- Income, Transfer และ CreditCardPayment ไม่ใช้สองช่องดังกล่าว
+- การซื้อด้วยบัตรเครดิตยังนับเป็น Expense ในเดือนที่ซื้อและต้องจำแนกกลุ่ม/ความจำเป็น
+- การจ่ายบัตรเครดิตไม่ถูกนับเป็น Expense ซ้ำ
+- Transaction และ Opening Balance เดิมไม่ถูกคำนวณย้อนหลัง
 
-| การกระทำ | กติกา |
-|---|---|
-| เลือก RMF เดิม | แสดงมูลค่าปัจจุบันและ Account ต้นทางเดิม |
-| เพิ่มเงิน | `current_value += เงินรอบใหม่`; `funded_amount += เงินรอบใหม่` |
-| Account | ลดเฉพาะเงินรอบใหม่ และต้องมียอดเพียงพอ |
-| ชื่อใหม่ | Append แถวใหม่ใน Investments และตั้ง `category = เงินลงทุน` |
-| ชื่อซ้ำ | Block และให้เลือกสินทรัพย์เดิม |
-| เปลี่ยน Account | Block หากสินทรัพย์เดิมเชื่อม Account อยู่แล้ว |
-| เขียน Investment ล้มเหลว | Rollback Account เป็นยอดก่อนทำรายการ |
-| ลบสินทรัพย์เชื่อม Account | คืน `funded_amount` ทั้งหมดก่อนลบแถว |
-| Cash Flow | ไม่ถือเป็น Income หรือ Expense |
-
-ฟอร์มไม่แสดง units, avg_cost, current_price, current_value, tax_deductible และ note แต่คอลัมน์เดิมยังคงอยู่เพื่อรักษาข้อมูลเดิม การเติมเงินจะไม่ลบค่าเดิมเหล่านี้
-
-## 6. กติกากราฟสัดส่วนรายจ่าย
-
-- ใช้เฉพาะ Transaction ประเภท Expense ของเดือนที่เลือก
-- ตัดรายการที่ `category` เท่ากับ `บัตรเครดิต` หลัง trim/case normalization
-- รวมตาม `category` และเรียงจากยอดมากไปน้อย
-- ตัวหารเปอร์เซ็นต์เป็นยอดหลังตัดบัตรเครดิตแล้ว
-- เปอร์เซ็นต์มากกว่า 0 แต่น้อยกว่า 10% แสดง 1 ตำแหน่ง
-- เปอร์เซ็นต์ตั้งแต่ 10% ขึ้นไปแสดงจำนวนเต็ม
-
-## 7. ไฟล์ที่เปลี่ยน
+## 6. ไฟล์ที่เปลี่ยน
 
 | ไฟล์ | การเปลี่ยนแปลง |
 |---|---|
-| `index.html` | ตัวเลือกโปรเจก หน้า Project Detail และฟอร์มงานย่อย |
-| `style.css` | กลุ่มโปรเจก Progress bar และ Mobile Project Detail |
-| `api.js` | Schema/Validation ของ `parent_todo_id` และความสัมพันธ์หนึ่งระดับ |
-| `app.js` | แสดงโปรเจก งานย่อย Progress และลบแบบ Cascade |
-| `sw.js` | Cache v2.9.0 |
-| `README.md` | คู่มือระบบและ Deploy |
-| `PROJECT_STATE.md` | สถานะล่าสุด |
-| `CHANGELOG.md` | ประวัติ v2.9.0 |
-| `GRATITUDE_MIGRATION.md` | เพิ่มหมวดตัวเองและประสบการณ์ |
-| `PROJECT_TODOS_MIGRATION.md` | วิธีเพิ่ม `parent_todo_id` ที่ Todos!J1 |
-| `MONTH_END_SNAPSHOT.gs` | Scheduled Snapshot สิ้นเดือน |
-| `SNAPSHOT_AUTOMATION.md` | วิธีติดตั้ง Trigger และทดสอบ |
+| `app.js` | ฟอร์ม หน้ารายการ คำเตือน และการแสดงหน้าที่บัญชี |
+| `api.js` | Schema checks และ validation ของ Header/ค่ารุ่นใหม่ |
+| `analytics.js` | สูตร Emergency Fund, Essential Expense และกราฟตามกลุ่มระดับบน |
+| `index.html` | Version URL และคำอธิบาย Settings |
+| `sw.js` | Cache v2.10.0 |
+| `FINANCIAL_FOUNDATION_MIGRATION.md` | คู่มือเพิ่ม Header และกรอกข้อมูลเดิม |
+| `README.md`, `PROJECT_STATE.md`, `CHANGELOG.md` | เอกสารรุ่นใหม่ |
 
-`api.js`, `analytics.js`, `config.js`, OAuth Client ID, Spreadsheet ID, โครงสร้างชีต และ Apps Script ไม่เปลี่ยน
+`style.css`, `manifest.json`, `MONTH_END_SNAPSHOT.gs`, OAuth Client ID และ Spreadsheet ID ไม่เปลี่ยน
 
-## 8. ผลทดสอบในสภาพแวดล้อมจำลอง
+## 7. ผลทดสอบ
 
 | การทดสอบ | ผล |
 |---|---|
-| JavaScript syntax: analytics/api/app/sw | ผ่าน |
-| รูดบัตรไม่ลด Account และเพิ่มหนี้ | ผ่าน |
-| รูดบัตรปรากฏใน Cash Flow/Expense Breakdown | ผ่าน |
-| แก้ยอดรูดบัตรย้อนของเดิมก่อน | ผ่าน |
-| จ่ายบางส่วนลด Account และหนี้ | ผ่าน |
-| จ่ายบัตรไม่ถูกนับเป็น Expense ซ้ำ | ผ่าน |
-| จ่ายเกินยอดหนี้ | Block |
-| ลบรายการชำระคืน Account/หนี้ | ผ่าน |
-| ลบ Expense ผ่านบัตรย้อนหนี้ | ผ่าน |
-| ลบบัตรออกจาก Liabilities | ผ่าน |
-| บันทึก Gratitude 1–3 เรื่อง | ผ่าน |
-| แก้ Slot เดิม/เพิ่ม Slot ใหม่ | ผ่าน |
-| ล้าง Slot แล้วลบเฉพาะแถวนั้น | ผ่าน |
-| หมวดหรือ Header ไม่ถูกต้อง | Block |
-| ไม่มีชีต Gratitude | หน้าการเงินยังโหลดได้ |
-| Todo validation/ดาว/สถานะเสร็จ | ผ่าน API Mock |
-| Todo ค้างแสดงต่อวันถัดไปโดยไม่สร้างแถวซ้ำ | ผ่าน Logic Mock |
-| Todo เสร็จแสดงถึงวันเสร็จและหายจากวันถัดไป | ผ่าน Logic Mock |
-| สร้างโปรเจกและงานย่อยด้วย `parent_todo_id` | ผ่าน API Mock |
-| Progress ของโปรเจกและการเรียงงานย่อย | ผ่าน Logic Mock |
-| ลบโปรเจกพร้อมงานย่อยจากแถวล่างขึ้นบน | ผ่าน Logic Mock |
-| Habit period key วัน/สัปดาห์/เดือน/ปี | ผ่าน API Mock |
-| ไม่มี Todos/Habits/HabitLogs | หน้าการเงินยังโหลดได้ |
-| Apps Script syntax | ผ่าน |
-| PWA Version URLs | ผ่าน Static check |
-| Cashflow table: % / ยอดเงิน / เงินออมติดลบ / ไม่มีรายรับ | ผ่าน Logic Mock |
-| Manifest และไอคอน 192/512 | ผ่าน Static/Image check |
+| JavaScript syntax: app/api/analytics/sw | ผ่าน |
+| รวมเฉพาะหลายบัญชี Emergency | ผ่าน Mock |
+| ไม่รวม Spending และเงินสดใน Investments | ผ่าน Mock |
+| ค่าใช้จ่ายจำเป็นเฉลี่ย 3 เดือน | ผ่าน Mock |
+| ข้อมูลเดิมไม่จำแนกทำให้แสดง `—` และ Warning | ผ่าน Mock |
+| Expense validation: group + Yes/No | ผ่าน Mock |
+| Account validation: account_role | ผ่าน Mock |
+| กราฟรวมตามกลุ่มระดับบน | ผ่าน Mock |
+| Google Sheet จริง / iPhone PWA | รอผู้ใช้ทดสอบหลัง Deploy |
 
-## 9. สิ่งที่ต้องทดสอบกับ Google Sheet จริง
-
-1. ทำ `TODAY_MIGRATION.md` และตรวจ `GRATITUDE_MIGRATION.md`
-2. ติดตั้ง `MONTH_END_SNAPSHOT.gs` ตาม `SNAPSHOT_AUTOMATION.md`
-3. เพิ่ม `parent_todo_id` ที่ Todos!J1 และ Deploy v2.9.0
-4. ทดสอบเพิ่มโปรเจก เปิดโปรเจก เพิ่ม/ติ๊ก/แก้/ลบงานย่อย และตรวจ Progress
-5. ทดสอบ Habit ทุกความถี่ และตรวจว่าในรอบเดียวกันไม่สร้าง Log ซ้ำ
-6. ทดสอบ Gratitude หมวดตัวเองและประสบการณ์
-7. Run `testMonthEndSnapshotNow` แล้วตรวจ MonthlySnapshots
-
-## 10. Deploy
+## 8. ลำดับ Deploy
 
 1. สำรอง Google Sheet และ Repository
-2. ทำ `TODAY_MIGRATION.md`
-3. ตรวจ `GRATITUDE_MIGRATION.md`
-4. ติดตั้ง `SNAPSHOT_AUTOMATION.md`
-5. Replace ไฟล์จาก `tasuya-way-v2.9.0.zip` ที่ Root
-6. Commit: `feat: add project todo lists`
+2. ทำ `FINANCIAL_FOUNDATION_MIGRATION.md`
+3. กำหนด `account_role` ให้ Accounts โดยเฉพาะบัญชี Emergency
+4. เติม `expense_group` และ `is_essential` ให้ Expense อย่างน้อย 3 เดือนล่าสุด
+5. Replace ไฟล์จาก `tasuya-way-v2.10.0.zip` ที่ Root
+6. Commit: `feat: add account roles and essential expense planning`
 7. รอ GitHub Pages workflow เป็นสีเขียว
 8. ปิด PWA เดิม เปิดใหม่ และ Refresh
+9. ทดสอบ Expense จำนวนเล็กน้อยแล้วลบออก
 
-## 11. Rollback และข้อจำกัด
+## 9. Rollback และข้อจำกัด
 
-- ย้อน Code เป็นรุ่นที่ Deploy อยู่ก่อนหน้าได้ และคง Header/ชีตใหม่ไว้ได้
-- Code rollback ไม่ย้อนยอด Accounts/Liabilities หรือแถว Gratitude ที่เขียนแล้ว
-- Google Sheets API ไม่มี Atomic transaction ข้ามชีต; ระบบทำ compensating rollback เมื่อเขียนล้มเหลว
-- หนึ่งสินทรัพย์ที่รวมในแถวเดิมรองรับหนึ่ง Account ต้นทาง
-- ไม่มี Contribution ledger, Sale, Dividend, Fee, Tax, Reinvest หรือราคาตลาดอัตโนมัติ
-- Legacy Transactions/Investments ไม่ถูกนำไปปรับ Opening Balance ย้อนหลัง
-- ลบบัตรแล้วประวัติ Expense ยังคงอยู่; หากแก้/ลบย้อนหลังต้องสร้างบัตรชื่อเดิมก่อน
+- Header ใหม่สามารถคงไว้ได้เมื่อย้อน Code เพราะรุ่นเก่าจะเพิกเฉย
+- Code rollback ไม่ย้อนยอด Account, Liability หรือ Transaction ที่เขียนแล้ว
+- Google Sheets API ไม่มี Atomic transaction ข้ามชีต; ระบบใช้ compensating rollback
+- ชื่อ Account ยังถูกอ้างอิงด้วย `account_name` ไม่ใช่ `account_id`
+- Goal หนึ่งรายการยังผูกได้หนึ่ง Account
+- ค่า Emergency Fund อาศัยการจัดประเภทที่ผู้ใช้กรอก ไม่ตรวจสภาพคล่องของธนาคารอัตโนมัติ
 - ไม่มี Refresh Token และไม่มี Multi-user concurrency control
-- การบันทึก Gratitude หลาย Slot ไม่เป็น Atomic transaction ข้ามแถว
-- Todo carry-over เป็นการแสดงแถวเดิมตามวัน ไม่ได้เปลี่ยน `date` หรือสร้างสำเนาใน Google Sheet
-- Project Todo รองรับงานย่อยหนึ่งระดับเท่านั้น และยังไม่มี Deadline/ไฟล์แนบแยกต่อโปรเจก
-- Apps Script Trigger ทำงานในช่วงเวลาโดยประมาณ ไม่รับประกันวินาทีที่แน่นอน

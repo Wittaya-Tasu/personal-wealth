@@ -6,6 +6,37 @@
 
 - ยังไม่มีรายการ
 
+## [2.10.0] - 2026-10-08
+
+### Added
+
+- Header `account_role` ต่อท้ายชีต Accounts เพื่อกำหนดหน้าที่ของเงินแต่ละบัญชี
+- Header `expense_group` และ `is_essential` ต่อท้ายชีต Transactions
+- กลุ่มรายจ่ายระดับบน: ส่วนตัว, ครอบครัว, บ้าน รถ และหนี้, สุขภาพ, ประกันและการป้องกัน
+- คู่มือ `FINANCIAL_FOUNDATION_MIGRATION.md`
+
+### Changed
+
+- เงินสำรองฉุกเฉินนับเฉพาะ Account ที่กำหนด `account_role = Emergency`
+- ค่าใช้จ่ายจำเป็นอัตโนมัติใช้ Expense ที่ระบุ `is_essential = Yes` เฉลี่ย 3 เดือน
+- กราฟสัดส่วนรายจ่ายรวมตาม `expense_group` แทนหมวดรายจ่ายย่อย
+- หน้าบัญชีแสดงหน้าที่ของแต่ละบัญชี
+- Static Assets และ Service Worker cache เปลี่ยนเป็น v2.10.0
+
+### Safety
+
+- ไม่สมมติว่าบัญชีเดิมทุกบัญชีเป็นเงินฉุกเฉิน
+- ไม่สมมติว่ารายจ่ายเดิมทั้งหมดเป็นรายจ่ายจำเป็น
+- ข้อมูลที่ยังจำแนกไม่ครบจะแสดงคำเตือนและ `ยังไม่จัดกลุ่ม`
+- เพิ่ม Header ต่อท้ายเท่านั้น และไม่คำนวณ Opening Balance/Transactions เก่าย้อนหลัง
+
+### Migration
+
+- `Accounts!G1 = account_role`
+- `Transactions!L1 = expense_group`
+- `Transactions!M1 = is_essential`
+- ไม่ต้องสร้างชีตใหม่ ไม่ต้องแก้ OAuth และไม่ต้องแก้ Apps Script
+
 ## [2.9.0] - 2026-10-08
 
 ### Added

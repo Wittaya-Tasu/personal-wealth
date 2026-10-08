@@ -12,13 +12,13 @@
   <meta name="description" content="TasuyaWay — ระบบส่วนตัวสำหรับการเงิน เป้าหมาย Todo Habit และบันทึกขอบคุณวันนี้">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://sheets.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; img-src 'self' data:; manifest-src 'self'; worker-src 'self'">
   <title>TasuyaWay</title>
-  <link rel="manifest" href="manifest.json?v=2.9.0">
+  <link rel="manifest" href="manifest.json?v=2.10.0">
   <link rel="icon" href="icons/wealth-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.9.0">
+  <link rel="stylesheet" href="style.css?v=2.10.0">
 </head>
 <body>
   <svg class="svg-sprite" aria-hidden="true">
@@ -148,7 +148,7 @@
             </div>
             <div class="allocation-content expense-breakdown-content">
               <div class="donut-wrap">
-                <canvas id="expenseBreakdownChart" aria-label="กราฟสัดส่วนรายจ่ายแต่ละประเภท"></canvas>
+                <canvas id="expenseBreakdownChart" aria-label="กราฟสัดส่วนรายจ่ายตามกลุ่มระดับบน"></canvas>
                 <div id="expenseBreakdownCenter" class="donut-center expense-donut-center">
                   <span>รายจ่ายรวม</span>
                   <strong id="expenseBreakdownTotal">฿—</strong>
@@ -461,7 +461,7 @@
       <label class="field">
         <span>ค่าใช้จ่ายจำเป็นต่อเดือน (บาท)</span>
         <input name="essential_expense_override" type="number" min="0" step="100" inputmode="decimal">
-        <small>เว้นว่างเพื่อใช้ค่าใช้จ่ายเฉลี่ย 3 เดือน</small>
+        <small>เว้นว่างเพื่อใช้เฉพาะรายจ่ายที่ระบุว่า “จำเป็น” เฉลี่ย 3 เดือน</small>
       </label>
       <label class="field toggle-field">
         <span><strong>นับยอดบัญชีใน Net Worth</strong><small>ปิดไว้หากบันทึกเงินสดซ้ำใน Investments</small></span>
@@ -486,9 +486,9 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="config.js?v=2.9.0"></script>
-  <script src="analytics.js?v=2.9.0"></script>
-  <script src="api.js?v=2.9.0"></script>
-  <script src="app.js?v=2.9.0"></script>
+  <script src="config.js?v=2.10.0"></script>
+  <script src="analytics.js?v=2.10.0"></script>
+  <script src="api.js?v=2.10.0"></script>
+  <script src="app.js?v=2.10.0"></script>
 </body>
 </html>

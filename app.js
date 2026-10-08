@@ -19,6 +19,8 @@
     goalSchemaMissingHeaders: [],
     investmentSchemaMissingHeaders: [],
     transactionSchemaMissingHeaders: [],
+    accountRoleSchemaMissingHeaders: [],
+    expensePlanningSchemaMissingHeaders: [],
     creditCardSchemaMissingHeaders: [],
     gratitudeSchemaMissingHeaders: [],
     todoSchemaMissingHeaders: [],
@@ -53,6 +55,22 @@
   const EXPENSE_CATEGORIES = [
     "อาหาร", "เครื่องดื่ม", "หนังสือ", "ทำบุญ", "ของใช้ส่วนตัว",
     "ค่าเดินทาง", "ครอบครัว", "สุขภาพ", "อิเล็กทรอนิกส์", "อื่น ๆ"
+  ];
+
+  const ACCOUNT_ROLES = [
+    ["General", "เงินทั่วไป"],
+    ["Spending", "บัญชีใช้จ่าย"],
+    ["Emergency", "เงินฉุกเฉิน"],
+    ["SinkingFund", "เงินเตรียมรายจ่าย"],
+    ["Investment", "เงินรอลงทุน"]
+  ];
+
+  const EXPENSE_GROUPS = [
+    ["Personal", "ส่วนตัว"],
+    ["Family", "ครอบครัว"],
+    ["HomeDebt", "บ้าน รถ และหนี้"],
+    ["Health", "สุขภาพ"],
+    ["Protection", "ประกันและการป้องกัน"]
   ];
 
   const qs = (selector, scope = document) => scope.querySelector(selector);
@@ -158,7 +176,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js?v=2.9.0").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.10.0").catch(() => {});
     }
   }
 
@@ -314,6 +332,8 @@
       state.goalSchemaMissingHeaders = store.getMissingGoalMetadataHeaders();
       state.investmentSchemaMissingHeaders = store.getMissingInvestmentFundingHeaders();
       state.transactionSchemaMissingHeaders = store.getMissingTransactionItemHeaders();
+      state.accountRoleSchemaMissingHeaders = store.getMissingAccountRoleHeaders();
+      state.expensePlanningSchemaMissingHeaders = store.getMissingExpensePlanningHeaders();
       state.creditCardSchemaMissingHeaders = store.getMissingCreditCardHeaders();
       state.gratitudeSchemaMissingHeaders = store.getMissingGratitudeHeaders();
       state.todoSchemaMissingHeaders = store.getMissingTodoHeaders();
@@ -431,7 +451,10 @@
     setText("savingsRateValue", formatPercent(vm.savingsRate, 0));
     qs("#savingsRateBar").style.width = `${Math.max(0, Math.min((vm.savingsRate || 0) * 100, 100))}%`;
     setText("emergencyMonthsValue", vm.emergencyMonths === null ? "— เดือน" : `${vm.emergencyMonths.toFixed(1)} เดือน`);
-    setText("emergencyDetail", `เงินพร้อมใช้ ${formatCurrency(vm.totals.liquidCash, true)} · เป้าหมาย ${vm.settings.emergency_months_target} เดือน`);
+    setText(
+      "emergencyDetail",
+      `บัญชีฉุกเฉิน ${formatCurrency(vm.emergencyFund.balance, true)} · เป้าหมาย ${vm.settings.emergency_months_target} เดือน`
+    );
     if (!vm.totals.hasDebt) {
       setText("debtServiceValue", "0%");
       setClassName("debtServiceValue", "positive");
@@ -476,6 +499,18 @@
       warnings.push(
         `ฟังก์ชันชื่อรายการรายจ่ายยังไม่พร้อม: เพิ่ม Header ในชีต Transactions ต่อท้ายแถวที่ 1 ได้แก่ `
         + state.transactionSchemaMissingHeaders.join(", ")
+      );
+    }
+    if (state.accountRoleSchemaMissingHeaders.length) {
+      warnings.push(
+        `ระบบหน้าที่ของบัญชียังไม่พร้อม: เพิ่ม Header ในชีต Accounts ต่อท้ายแถวที่ 1 ได้แก่ `
+        + state.accountRoleSchemaMissingHeaders.join(", ")
+      );
+    }
+    if (state.expensePlanningSchemaMissingHeaders.length) {
+      warnings.push(
+        `ระบบจัดกลุ่มรายจ่ายและเงินฉุกเฉินยังไม่พร้อม: เพิ่ม Header ในชีต Transactions ต่อท้ายแถวที่ 1 ได้แก่ `
+        + state.expensePlanningSchemaMissingHeaders.join(", ")
       );
     }
     if (state.creditCardSchemaMissingHeaders.length) {
@@ -839,7 +874,7 @@
     const query = qs("#transactionSearch").value.trim().toLowerCase();
     const filter = qs("#transactionTypeFilter").value;
     const rows = vm.transactions.filter((row) => {
-      const haystack = `${row.category || ""} ${row.item_name || ""} ${row.note || ""} ${row.account_from || ""} ${row.account_to || ""} ${row.credit_card || ""}`.toLowerCase();
+      const haystack = `${row.category || ""} ${row.item_name || ""} ${row.expense_group || ""} ${row.note || ""} ${row.account_from || ""} ${row.account_to || ""} ${row.credit_card || ""}`.toLowerCase();
       const matchesQuery = !query || haystack.includes(query);
       const matchesType = filter === "all" || row.normalizedType === filter;
       return matchesQuery && matchesType;
@@ -871,6 +906,9 @@
       const copy = createElement("div", "row-copy");
       const details = [formatDate(row.parsedDate, { day: "numeric", month: "short" })];
       if (row.normalizedType === "expense" && row.item_name && row.category) details.unshift(row.category);
+      if (row.normalizedType === "expense" && row.expense_group) {
+        details.unshift(`${analytics.expenseGroupLabel(row.expense_group)} · ${valueIsYes(row.is_essential) ? "จำเป็น" : "ไม่จำเป็น"}`);
+      }
       if (row.credit_card) details.push(row.credit_card);
       if (row.note) details.push(row.note);
       copy.append(
@@ -923,7 +961,7 @@
         rows: data.accounts,
         sheet: config.SHEETS.accounts,
         name: (row) => row.account_name || "บัญชีเงิน",
-        meta: (row) => `${row.type || "บัญชี"} · ${row.currency || "THB"}`,
+        meta: (row) => `${analytics.accountRoleLabel(row.account_role)} · ${row.type || "บัญชี"} · ${row.currency || "THB"}`,
         value: (row) => row.balance,
         icon: "฿",
         className: ""
@@ -1920,6 +1958,24 @@
     return options.join("");
   }
 
+  function accountRoleOptions(selectedValue = "") {
+    const selected = analytics.normalizeAccountRole(selectedValue);
+    const options = [`<option value="" ${selected ? "" : "selected"}>เลือกหน้าที่ของบัญชี</option>`];
+    ACCOUNT_ROLES.forEach(([value, label]) => {
+      options.push(`<option value="${value}" ${value === selected ? "selected" : ""}>${label}</option>`);
+    });
+    return options.join("");
+  }
+
+  function expenseGroupOptions(selectedValue = "") {
+    const selected = analytics.normalizeExpenseGroup(selectedValue);
+    const options = ['<option value="">เลือกกลุ่มรายจ่าย</option>'];
+    EXPENSE_GROUPS.forEach(([value, label]) => {
+      options.push(`<option value="${value}" ${value === selected ? "selected" : ""}>${label}</option>`);
+    });
+    return options.join("");
+  }
+
   function formTemplate(type, record) {
     const saveLabel = record ? "บันทึกการแก้ไข" : "บันทึกข้อมูล";
     const note = (placeholder = "รายละเอียดเพิ่มเติม") => `
@@ -1940,7 +1996,18 @@
       const selectedFrom = currentType === "expense" ? defaultExpenseAccount : record?.account_from || "";
       const selectedTo = record?.account_to || "";
       const isExpense = currentType === "expense";
+      const currentEssential = valueIsYes(record?.is_essential)
+        ? "Yes"
+        : String(record?.is_essential || "").trim()
+          ? "No"
+          : "";
       return `
+        ${(state.transactionSchemaMissingHeaders.length || state.expensePlanningSchemaMissingHeaders.length)
+          ? `<p class="form-warning">ก่อนบันทึก กรุณาทำ Migration v2.10.0: ${[
+            ...state.transactionSchemaMissingHeaders,
+            ...state.expensePlanningSchemaMissingHeaders
+          ].join(", ")}</p>`
+          : ""}
         <div class="form-segments" role="radiogroup" aria-label="ประเภทรายการ">
           <label><input type="radio" name="type" value="Expense" ${currentType === "expense" ? "checked" : ""}><span>รายจ่าย</span></label>
           <label><input type="radio" name="type" value="Income" ${currentType === "income" ? "checked" : ""}><span>รายรับ</span></label>
@@ -1950,8 +2017,17 @@
           <label class="field"><span>วันที่</span><input name="date" type="date" value="${inputDate(record, "date", localIsoDate())}" required></label>
           <label class="field"><span>จำนวนเงิน (บาท)</span><input name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="${inputValue(record, "amount")}" placeholder="0" required></label>
         </div>
+        <label class="field" data-expense-group-field ${isExpense ? "" : "hidden"}><span>กลุ่มรายจ่ายระดับบน</span><select name="expense_group" ${isExpense ? "required" : "disabled"}>${expenseGroupOptions(record?.expense_group)}</select></label>
         <label class="field" data-expense-category-field ${isExpense ? "" : "hidden"}><span>หมวดหมู่รายจ่าย</span><select name="category" data-expense-category ${isExpense ? "required" : "disabled"}>${transactionCategoryOptions("Expense", isExpense ? record?.category : "")}</select></label>
         <label class="field" data-expense-item-field ${isExpense ? "" : "hidden"}><span>รายการรายจ่าย</span><input name="item_name" value="${inputValue(record, "item_name")}" placeholder="เลือกหมวดหมู่ก่อน แล้วพิมพ์รายการ" ${isExpense && record?.category ? "required" : "disabled"}></label>
+        <label class="field" data-essential-field ${isExpense ? "" : "hidden"}><span>ความจำเป็นของรายจ่าย</span>
+          <select name="is_essential" ${isExpense ? "required" : "disabled"}>
+            <option value="">เลือกความจำเป็น</option>
+            <option value="Yes" ${currentEssential === "Yes" ? "selected" : ""}>จำเป็น</option>
+            <option value="No" ${currentEssential === "No" ? "selected" : ""}>ไม่จำเป็น</option>
+          </select>
+          <small>ใช้คำนวณค่าใช้จ่ายจำเป็นเฉลี่ยและเงินสำรองฉุกเฉิน</small>
+        </label>
         <label class="field" data-general-category-field ${isExpense ? "hidden" : ""}><span>หมวดหมู่</span><input name="category" value="${isExpense ? "" : inputValue(record, "category")}" placeholder="เช่น เงินเดือน หรือ โอนเงิน" ${isExpense ? "disabled" : "required"}></label>
         <label class="field" data-payment-method-field ${isExpense ? "" : "hidden"}><span>ช่องทางการจ่าย</span>
           <select name="payment_method" ${isExpense ? "required" : "disabled"}>
@@ -2012,7 +2088,13 @@
         .map((value) => `<option value="${value}" ${accountType === value ? "selected" : ""}>${value}</option>`)
         .join("");
       return `
+        ${state.accountRoleSchemaMissingHeaders.length
+          ? `<p class="form-warning">ก่อนบันทึก กรุณาทำ Migration v2.10.0: ${state.accountRoleSchemaMissingHeaders.join(", ")}</p>`
+          : ""}
         <label class="field"><span>ชื่อบัญชี</span><input name="account_name" value="${inputValue(record, "account_name")}" placeholder="เช่น KBank ออมทรัพย์" required></label>
+        <label class="field"><span>หน้าที่ของบัญชี</span><select name="account_role" required>${accountRoleOptions(record?.account_role)}</select>
+          <small>เฉพาะบัญชีที่เลือก “เงินฉุกเฉิน” เท่านั้นที่จะใช้คำนวณจำนวนเดือนสำรอง</small>
+        </label>
         <div class="field-row">
           <label class="field"><span>ประเภทบัญชี</span><select name="type">${accountTypeOptions}</select></label>
           <label class="field"><span>สกุลเงิน</span><input name="currency" value="${inputValue(record, "currency", "THB")}" maxlength="3" required></label>
@@ -2217,8 +2299,12 @@
       const toSelect = qs("#dynamicForm select[name='account_to']");
       const expenseCategoryField = qs("#dynamicForm [data-expense-category-field]");
       const expenseCategory = qs("#dynamicForm [data-expense-category]");
+      const expenseGroupField = qs("#dynamicForm [data-expense-group-field]");
+      const expenseGroup = qs("#dynamicForm select[name='expense_group']");
       const expenseItemField = qs("#dynamicForm [data-expense-item-field]");
       const expenseItem = qs("#dynamicForm input[name='item_name']");
+      const essentialField = qs("#dynamicForm [data-essential-field]");
+      const essentialSelect = qs("#dynamicForm select[name='is_essential']");
       const generalCategoryField = qs("#dynamicForm [data-general-category-field]");
       const generalCategory = qs("#dynamicForm [data-general-category-field] input[name='category']");
       const paymentMethodField = qs("#dynamicForm [data-payment-method-field]");
@@ -2239,9 +2325,15 @@
       expenseCategoryField.hidden = !isExpense;
       expenseCategory.disabled = !isExpense;
       expenseCategory.required = isExpense;
+      expenseGroupField.hidden = !isExpense;
+      expenseGroup.disabled = !isExpense;
+      expenseGroup.required = isExpense;
       expenseItemField.hidden = !isExpense;
       expenseItem.disabled = !isExpense || !expenseCategory.value;
       expenseItem.required = isExpense;
+      essentialField.hidden = !isExpense;
+      essentialSelect.disabled = !isExpense;
+      essentialSelect.required = isExpense;
       generalCategoryField.hidden = isExpense;
       generalCategory.disabled = isExpense;
       generalCategory.required = !isExpense;
@@ -2295,6 +2387,8 @@
         values.account_from = "";
         values.payment_method = "Account";
         values.credit_card = "";
+        values.expense_group = "";
+        values.is_essential = "";
       }
       if (normalized === "expense") {
         values.account_to = "";
@@ -2304,9 +2398,19 @@
       if (normalized === "transfer") {
         values.payment_method = "Account";
         values.credit_card = "";
+        values.expense_group = "";
+        values.is_essential = "";
       }
       if (normalized === "expense" && !String(values.item_name || "").trim()) {
         showToast("กรุณาเลือกรายจ่ายและพิมพ์ชื่อรายการ", "error");
+        return;
+      }
+      if (normalized === "expense" && !String(values.expense_group || "").trim()) {
+        showToast("กรุณาเลือกกลุ่มรายจ่ายระดับบน", "error");
+        return;
+      }
+      if (normalized === "expense" && !["Yes", "No"].includes(values.is_essential)) {
+        showToast("กรุณาระบุว่ารายจ่ายนี้จำเป็นหรือไม่", "error");
         return;
       }
       if (normalized === "transfer" && values.account_from === values.account_to) {

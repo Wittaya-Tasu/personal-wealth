@@ -1,4 +1,4 @@
-# TasuyaWay v2.9.0
+# TasuyaWay v2.10.0
 
 **Personal finance and daily life hub** — WebApp/PWA ส่วนตัวสำหรับบันทึกการเงิน เป้าหมายชีวิต Todo, Habit และสิ่งที่อยากขอบคุณ โดยใช้ GitHub Pages เป็น Frontend และอ่าน–เขียน Google Sheet แบบ Private ผ่าน Google OAuth และ Google Sheets API v4 โดยตรง พร้อม Google Apps Script เฉพาะงาน Snapshot ตามเวลา
 
@@ -22,13 +22,16 @@
 - Goal การเงินเลือกติดตามจาก `Accounts.balance` ได้ เช่น เลือก DIME สำหรับเงินสำรองฉุกเฉิน
 - Goal แบบ Milestone ใช้สถานะ `ยังไม่เริ่ม`, `กำลังดำเนินการ`, `สำเร็จแล้ว` โดยไม่สร้างเปอร์เซ็นต์เงินสมมติ
 - Expense ต้องเลือกหมวดหมู่ก่อน แล้วจึงพิมพ์ชื่อรายการใน `item_name`
+- Account เลือกหน้าที่เป็นเงินทั่วไป บัญชีใช้จ่าย เงินฉุกเฉิน เงินเตรียมรายจ่าย หรือเงินรอลงทุน
+- เงินสำรองฉุกเฉินนับเฉพาะ Account ที่มี `account_role = Emergency`
+- Expense ต้องเลือกกลุ่มระดับบนและระบุว่าเป็นรายจ่ายจำเป็นหรือไม่
 - Investment เลือกสินทรัพย์เดิมจากชีต Investments หรือเพิ่มชื่อใหม่ แล้วกรอกเฉพาะยอดเงินลงทุนรอบนี้
 - เงินลงทุนรอบใหม่เพิ่มใน `current_value`/`funded_amount` ของสินทรัพย์เดิมและหัก Account ต้นทาง โดยไม่ถูกนับเป็น Expense
 - กราฟ Cash Flow เลือก 6/12 เดือนและปี พ.ศ. ได้ แกน X แสดงชื่อเดือน แกน Y แสดงจำนวนเต็ม
 - ตารางสรุปใต้กราฟ Cash Flow แสดงรายรับ รายจ่าย และเงินออมของเดือนชุดเดียวกับกราฟ พร้อมสลับ `%`/`ยอดเงิน`
-- กราฟสัดส่วนรายจ่ายแยกตามหมวดหมู่และเลือกเดือนได้ โดยไม่นับหมวด `บัตรเครดิต`
+- กราฟสัดส่วนรายจ่ายรวมตามกลุ่มระดับบนและเลือกเดือนได้
 - ป้องกันการเปลี่ยนชื่อหรือลบ Account ที่ Transaction, Goal หรือ Investment ยังอ้างถึง
-- Static Asset ใช้ Version URL `v=2.9.0` ลดปัญหา PWA โหลด HTML และ JavaScript คนละรุ่น
+- Static Asset ใช้ Version URL `v=2.10.0` ลดปัญหา PWA โหลด HTML และ JavaScript คนละรุ่น
 - รักษา Quick Reconnect, PWA, iPhone Safe Area และ Theme เดิม
 
 ## สถาปัตยกรรม
@@ -70,6 +73,7 @@ iPhone / Browser
 ├── GRATITUDE_MIGRATION.md
 ├── TODAY_MIGRATION.md
 ├── PROJECT_TODOS_MIGRATION.md
+├── FINANCIAL_FOUNDATION_MIGRATION.md
 ├── SNAPSHOT_AUTOMATION.md
 ├── MONTH_END_SNAPSHOT.gs
 └── icons/
@@ -79,12 +83,12 @@ iPhone / Browser
 
 ## โครงสร้าง Google Sheet
 
-v2.9.0 เพิ่ม `parent_todo_id` ต่อท้ายชีต `Todos` ตาม `PROJECT_TODOS_MIGRATION.md`
+v2.10.0 เพิ่ม `account_role` ต่อท้ายชีต `Accounts` และเพิ่ม `expense_group`, `is_essential` ต่อท้ายชีต `Transactions` ตาม `FINANCIAL_FOUNDATION_MIGRATION.md`
 
 | Sheet | Headers ตามลำดับ |
 |---|---|
-| `Accounts` | `account_id`, `account_name`, `currency`, `balance`, `type`, `note` |
-| `Transactions` | `tx_id`, `date`, `type`, `category`, `account_from`, `account_to`, `amount`, `note`, `item_name`, `payment_method`, `credit_card` |
+| `Accounts` | `account_id`, `account_name`, `currency`, `balance`, `type`, `note`, `account_role` |
+| `Transactions` | `tx_id`, `date`, `type`, `category`, `account_from`, `account_to`, `amount`, `note`, `item_name`, `payment_method`, `credit_card`, `expense_group`, `is_essential` |
 | `Investments` | `investment_id`, `asset_name`, `category`, `units`, `avg_cost`, `current_price`, `current_value`, `tax_deductible`, `note`, `account_from`, `funded_amount` |
 | `Assets` | `asset_id`, `asset_name`, `category`, `purchase_price`, `estimated_value`, `note` |
 | `Liabilities` | `liability_id`, `liability_name`, `total_amount`, `monthly_payment`, `note`, `liability_type` |
@@ -97,7 +101,7 @@ v2.9.0 เพิ่ม `parent_todo_id` ต่อท้ายชีต `Todos` �
 | `Habits` | `habit_id`, `habit_name`, `frequency`, `active`, `created_at`, `updated_at` |
 | `HabitLogs` | `habit_log_id`, `habit_id`, `period_key`, `completed_date`, `completed_at`, `created_at`, `updated_at` |
 
-ก่อน Deploy ให้ทำ [TODAY_MIGRATION.md](TODAY_MIGRATION.md), ตรวจ [GRATITUDE_MIGRATION.md](GRATITUDE_MIGRATION.md) และติดตั้งตาม [SNAPSHOT_AUTOMATION.md](SNAPSHOT_AUTOMATION.md) หากยังไม่มีชีตใหม่ หน้าการเงินยังทำงานได้ แต่ส่วนนั้นจะบันทึกไม่ได้
+ก่อน Deploy v2.10.0 ต้องทำ [FINANCIAL_FOUNDATION_MIGRATION.md](FINANCIAL_FOUNDATION_MIGRATION.md) แล้วจึงตรวจ Migration รุ่นก่อนที่เกี่ยวข้อง
 
 ชื่อ `account_name` ต้องไม่ซ้ำ เพราะ Transactions, Goals และ Investments ยังเก็บชื่อบัญชีตามโครงสร้างเดิม
 
@@ -231,11 +235,13 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 
 ## หมวดหมู่และชื่อรายการรายจ่าย
 
+- Expense ใหม่ต้องเลือก `expense_group` ระดับบนและ `is_essential` ก่อนบันทึก
 - Expense ใหม่ต้องเลือก `category` ก่อน จึงจะพิมพ์ `item_name` ได้
 - หมวดมาตรฐานในแอป: อาหาร, เครื่องดื่ม, หนังสือ, ทำบุญ, ของใช้ส่วนตัว, ค่าเดินทาง, ครอบครัว, สุขภาพ, อิเล็กทรอนิกส์ และ อื่น ๆ
 - เพิ่มหมวดเองได้ในชีต `Categories` โดยระบุ `type` เป็น `Expense`
-- กราฟรวมตาม `category`; ชื่อร้านหรือรายละเอียดเฉพาะเก็บใน `item_name`
-- กราฟไม่นำ Transaction ที่ `category` เท่ากับ `บัตรเครดิต` มาคำนวณ เพื่อไม่ให้ยอดชำระบัตรถูกนับซ้ำ
+- กราฟรวมตาม `expense_group`; หมวดย่อยยังเก็บใน `category` และชื่อร้านหรือรายละเอียดเก็บใน `item_name`
+- การชำระบัตรเป็น `CreditCardPayment` จึงไม่ถูกนับเป็น Expense ซ้ำ ส่วนยอดซื้อผ่านบัตรยังแสดงในกลุ่มรายจ่ายที่เลือก
+- Expense เก่าที่ `category = บัตรเครดิต` ยังถูกตัดออกตามกติกาเดิมเพื่อป้องกันยอดซ้ำ
 - เปอร์เซ็นต์ต่ำกว่า 10% แสดงทศนิยม 1 ตำแหน่ง ส่วนตั้งแต่ 10% ขึ้นไปแสดงจำนวนเต็ม
 
 ## การเพิ่ม แก้ไข และลบ Account
@@ -270,7 +276,20 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 - `funded_amount` คือเงินต้นที่หักจาก Account ส่วน `current_value` คือมูลค่าปัจจุบัน สองช่องนี้ไม่ควรถูกใช้แทนกัน
 - การลงทุนไม่ถูกนับเป็น Expense หรือ Cash Flow
 - ไม่มี `InvestmentTransactions` สำหรับประวัติซื้อ–ขาย และไม่ดึงราคาตลาดอัตโนมัติ
-- สูตร Emergency Fund เดิมไม่เปลี่ยน
+- สูตรเงินฉุกเฉินใช้เฉพาะยอด Account ที่กำหนด `account_role = Emergency`
+
+## เงินสำรองฉุกเฉินและรายจ่ายจำเป็น
+
+```text
+เงินฉุกเฉิน = ผลรวม Accounts.balance ที่ account_role = Emergency
+ค่าใช้จ่ายจำเป็นต่อเดือน = ค่าเฉลี่ย 3 เดือนของ Expense ที่ is_essential = Yes
+จำนวนเดือนเงินฉุกเฉิน = เงินฉุกเฉิน ÷ ค่าใช้จ่ายจำเป็นต่อเดือน
+```
+
+- หากกรอก `essential_expense_override` ใน Settings ระบบใช้ค่าที่กรอกแทนค่าเฉลี่ย Transactions
+- บัญชีทั่วไป บัญชีใช้จ่าย เงินรอลงทุน และ Investments ไม่ถูกนับเป็นเงินฉุกเฉิน
+- หากข้อมูลรายจ่าย 3 เดือนล่าสุดยังจำแนกไม่ครบ ระบบจะแสดงคำเตือน
+- กราฟสัดส่วนรายจ่ายรวมตาม `expense_group`; รายการเดิมที่ยังว่างรวมอยู่ใน `ยังไม่จัดกลุ่ม`
 
 ## ตารางรายรับ รายจ่าย และเงินออม
 
@@ -294,7 +313,7 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 - ใช้ `prompt` ว่างในการเชื่อมต่อทั่วไปเพื่อลด consent ซ้ำ
 - เมื่อ Token หมดอายุจะแสดง `แตะเพื่อเชื่อมต่อ Google`
 - ไม่มี Refresh Token และไม่มี PIN แทน Google OAuth
-- ไม่ต้องเปลี่ยน Google Cloud OAuth configuration สำหรับ v2.9.0
+- ไม่ต้องเปลี่ยน Google Cloud OAuth configuration สำหรับ v2.10.0
 
 ## ความปลอดภัย
 
@@ -308,30 +327,28 @@ Net Worth = Accounts ที่เลือกให้นับ + Investments + 
 ## วิธี Deploy
 
 1. สำรอง Google Sheet และ Repository รุ่นปัจจุบัน
-2. ตรวจ Migration ชีต Goals ตาม `GOALS_MIGRATION.md`
-3. ทำ Migration ชีต Investments ตาม `INVESTMENTS_MIGRATION.md`
-4. ทำ Migration ชีต Transactions ตาม `TRANSACTIONS_MIGRATION.md`
-5. ทำ Migration บัตรเครดิตตาม `CREDIT_CARD_MIGRATION.md`
-6. สร้างชีต Gratitude ตาม `GRATITUDE_MIGRATION.md`
-7. เพิ่ม `parent_todo_id` ที่ J1 ของชีต Todos ตาม `PROJECT_TODOS_MIGRATION.md`
-8. ติดตั้ง Trigger ตาม `SNAPSHOT_AUTOMATION.md`
-9. ดาวน์โหลด `tasuya-way-v2.9.0.zip`
-10. แตก ZIP แล้ว Replace ไฟล์ใน Root ของ Repository
-11. Commit:
+2. ทำ `FINANCIAL_FOUNDATION_MIGRATION.md`: Accounts G1, Transactions L1 และ M1
+3. ตรวจ Migration ชีต Goals ตาม `GOALS_MIGRATION.md`
+4. ทำ Migration ชีต Investments ตาม `INVESTMENTS_MIGRATION.md`
+5. ตรวจ Migration บัตรเครดิตตาม `CREDIT_CARD_MIGRATION.md`
+6. ตรวจชีต Gratitude/Todos/Habits และ Apps Script ที่ติดตั้งไว้แล้ว
+7. ดาวน์โหลด `tasuya-way-v2.10.0.zip`
+8. แตก ZIP แล้ว Replace ไฟล์ใน Root ของ Repository
+9. Commit:
 
 ```text
-feat: add project todo lists
+feat: add account roles and essential expense planning
 ```
 
-12. รอ GitHub Actions `pages build and deployment` เป็นสีเขียว
-13. ปิด WebApp/PWA ทุกหน้าต่าง แล้วเปิดใหม่
-14. กด Refresh และทดสอบ Todo, Habit, Gratitude และ Snapshot
+10. รอ GitHub Actions `pages build and deployment` เป็นสีเขียว
+11. ปิด WebApp/PWA ทุกหน้าต่าง แล้วเปิดใหม่
+12. กด Refresh และทดสอบบัญชีเงินฉุกเฉินกับ Expense 1 รายการ
 
 ## วิธี Rollback
 
 1. หยุดบันทึก Transaction และ Investment ชั่วคราว
-2. Revert Commit v2.9.0 หรือ Replace Code ด้วย Backup รุ่นที่ใช้งานอยู่ก่อน Deploy
-3. Header ใหม่ใน Goals, Investments, Transactions และ Todos สามารถคงไว้ได้ เพราะ Code เก่าจะเพิกเฉย
+2. Revert Commit v2.10.0 หรือ Replace Code ด้วย Backup รุ่นที่ใช้งานอยู่ก่อน Deploy
+3. Header ใหม่ใน Accounts และ Transactions สามารถคงไว้ได้ เพราะ Code เก่าจะเพิกเฉย
 4. รอ Deploy และเปิดแอปใหม่
 
 Rollback Code ไม่ย้อนยอด Accounts, Liabilities หรือแถว Gratitude ที่เขียนแล้ว ต้อง Reconcile ยอดจริงก่อนใช้งานต่อ
@@ -344,9 +361,12 @@ Rollback Code ไม่ย้อนยอด Accounts, Liabilities หรือ�
 | Goal ผูกบัญชีแสดงตรวจสอบบัญชี | ตรวจ `linked_account` และชื่อ Account; ชื่อต้องไม่ซ้ำ |
 | เปลี่ยนชื่อ/ลบ Account ไม่ได้ | มี Transaction, Goal หรือ Investment อ้างถึงบัญชี |
 | บันทึก Investment ไม่ได้ | เพิ่ม Header `account_from`, `funded_amount` ต่อท้าย Investments และตรวจยอด Account |
-| บันทึกรายจ่ายไม่ได้ | เพิ่ม Header `item_name` ที่ I1 ของ Transactions แล้วเลือกหมวดและพิมพ์ชื่อรายการ |
+| บันทึก/แก้บัญชีไม่ได้ | เพิ่ม `account_role` ที่ Accounts!G1 และเลือกหน้าที่ของบัญชี |
+| บันทึกรายจ่ายไม่ได้ | เพิ่ม `expense_group` ที่ Transactions!L1 และ `is_essential` ที่ M1 แล้วกรอกข้อมูลให้ครบ |
 | ยอด Account ลดหลังลงทุน | เป็นผลปกติของ Investment ใหม่ และไม่ถูกนับเป็น Expense |
-| กราฟสัดส่วนรายจ่ายว่าง | เดือนที่เลือกไม่มี Expense หรือมีเฉพาะหมวด `บัตรเครดิต` |
+| กราฟขึ้น `ยังไม่จัดกลุ่ม` | Expense เดิมยังไม่มีค่า `expense_group` |
+| เงินฉุกเฉินเป็น 0 | ยังไม่มี Account ที่กำหนด `account_role = Emergency` |
+| เงินฉุกเฉินเป็น `—` เดือน | ยังไม่มีค่าใช้จ่ายจำเป็นที่คำนวณได้ และไม่ได้ตั้งค่า override |
 | ภาระหนี้แสดง `—` | มีค่างวดแต่ยังไม่มี Income เดือนปัจจุบัน |
 | หน้าเว็บยังเป็นรุ่นเก่า | รอ Deploy, ปิด PWA แล้วเปิดใหม่ หรือ Clear site data |
 | สิทธิ์หมดอายุ | กด `แตะเพื่อเชื่อมต่อ Google` |

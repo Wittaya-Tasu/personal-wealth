@@ -79,7 +79,7 @@
 | UI Theme | Dark Emerald + Gold |
 | Font | Sarabun |
 | อุปกรณ์หลัก | iPhone 16+ และ Desktop |
-| เวอร์ชันล่าสุด | v2.9.0 — Project Todo Lists |
+| เวอร์ชันล่าสุด | v2.10.0 — Financial Foundation |
 
 ค่าจริงของ OAuth Client ID และ Spreadsheet ID ให้ตรวจจาก `config.js` ล่าสุด ห้ามคัดลอกค่าจากข้อความเก่ามาเขียนทับ
 
@@ -148,6 +148,7 @@ iPhone / Browser
 | `GRATITUDE_MIGRATION.md` | วิธีสร้างชีตขอบคุณวันนี้รุ่น v2.6.0 |
 | `TODAY_MIGRATION.md` | วิธีสร้าง Todos, Habits และ HabitLogs รุ่น v2.7.0 |
 | `PROJECT_TODOS_MIGRATION.md` | วิธีเพิ่ม `parent_todo_id` สำหรับโปรเจกและ Todo ย่อยรุ่น v2.9.0 |
+| `FINANCIAL_FOUNDATION_MIGRATION.md` | วิธีเพิ่มหน้าที่บัญชี กลุ่มรายจ่าย และสถานะรายจ่ายจำเป็นรุ่น v2.10.0 |
 | `SNAPSHOT_AUTOMATION.md` | วิธีติดตั้ง Snapshot สิ้นเดือนอัตโนมัติ |
 | `MONTH_END_SNAPSHOT.gs` | Google Apps Script สำหรับ Scheduled Snapshot |
 | `icons/` | ไอคอน WebApp/PWA |
@@ -162,8 +163,8 @@ iPhone / Browser
 
 | Sheet | Headers ตามลำดับ |
 |---|---|
-| `Accounts` | `account_id`, `account_name`, `currency`, `balance`, `type`, `note` |
-| `Transactions` | `tx_id`, `date`, `type`, `category`, `account_from`, `account_to`, `amount`, `note`, `item_name`, `payment_method`, `credit_card` |
+| `Accounts` | `account_id`, `account_name`, `currency`, `balance`, `type`, `note`, `account_role` |
+| `Transactions` | `tx_id`, `date`, `type`, `category`, `account_from`, `account_to`, `amount`, `note`, `item_name`, `payment_method`, `credit_card`, `expense_group`, `is_essential` |
 | `Investments` | `investment_id`, `asset_name`, `category`, `units`, `avg_cost`, `current_price`, `current_value`, `tax_deductible`, `note`, `account_from`, `funded_amount` |
 | `Assets` | `asset_id`, `asset_name`, `category`, `purchase_price`, `estimated_value`, `note` |
 | `Liabilities` | `liability_id`, `liability_name`, `total_amount`, `monthly_payment`, `note`, `liability_type` |
@@ -229,10 +230,12 @@ Transfer ไม่ถูกนำมาหักเป็นรายจ่า�
 #### 7.4 Emergency Fund
 
 ```text
-Emergency Months = เงินพร้อมใช้ ÷ ค่าใช้จ่ายจำเป็นต่อเดือน
+Emergency Months = ยอด Accounts ที่ account_role = Emergency ÷ ค่าใช้จ่ายจำเป็นต่อเดือน
 ```
 
-ถ้าไม่ได้ตั้งค่าใช้จ่ายจำเป็น ระบบใช้ค่าเฉลี่ยรายจ่ายจากเดือนที่มี Transactions ใน 3 เดือนล่าสุด
+ถ้าไม่ได้ตั้งค่า override ระบบใช้เฉพาะ Expense ที่ `is_essential = Yes` เฉลี่ยจากเดือนที่มี Expense ภายใน 3 เดือนล่าสุด ข้อมูลที่ยังไม่ระบุ Yes/No จะไม่ถูกสมมติให้เป็นรายจ่ายจำเป็น
+
+Accounts ที่เป็น General, Spending, SinkingFund หรือ Investment และยอดเงินสดในชีต Investments จะไม่ถูกรวมเป็นเงินฉุกเฉิน
 
 #### 7.5 Monthly Snapshot
 
@@ -274,19 +277,19 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 - Cash Flow มีตัวกรอง 6/12 เดือนและปี พ.ศ.
 - แกน X ของ Cash Flow แสดงเฉพาะชื่อเดือน
 - แกน Y แสดงเงินบาทเต็มจำนวน ไม่ใช้ compact notation
-- Expense Mix รวมเฉพาะ Expense ตามหมวดหมู่และเลือกเดือนได้
-- Expense Mix ตัด category `บัตรเครดิต` ออก และเปอร์เซ็นต์ต่ำกว่า 10% แสดงทศนิยม 1 ตำแหน่ง
+- Expense Mix รวมเฉพาะ Expense ตาม `expense_group` ระดับบนและเลือกเดือนได้
+- Expense Mix แสดง `ยังไม่จัดกลุ่ม` สำหรับข้อมูลเดิม และเปอร์เซ็นต์ต่ำกว่า 10% แสดงทศนิยม 1 ตำแหน่ง
 - Investment ไม่รวมใน Expense Mix
 - Allocation กลางวงแสดงตัวเลข compact 1 ตำแหน่งและไม่มีคำว่า `สินทรัพย์รวม`
 
 ---
 
-### 8. ความสามารถและข้อจำกัดปัจจุบันของ v2.9.0
+### 8. ความสามารถและข้อจำกัดปัจจุบันของ v2.10.0
 
 | การกระทำ | สิ่งที่ระบบทำ | ข้อจำกัด |
 |---|---|---|
 | Income | เพิ่ม `account_to` และนับรายรับ | รายการเก่าก่อน v2.1.0 ไม่ Replay |
-| Expense | เลือก category ก่อนกรอก `item_name`, ลด `account_from` และนับรายจ่าย | ยอดไม่พอต้องไม่บันทึก |
+| Expense | เลือก expense_group, category, item_name และ is_essential; ลด `account_from` และนับรายจ่าย | ยอดไม่พอต้องไม่บันทึก |
 | Expense ผ่านบัตร | เพิ่ม Liabilities และนับรายจ่ายเดือนที่ซื้อ | ต้องเลือกบัตร `CreditCard` |
 | จ่ายบัตร | ลด Account และ Liabilities; จ่ายเต็ม/บางส่วนได้ | ห้ามจ่ายเกินหนี้หรือยอดบัญชี |
 | Transfer | ลดต้นทาง เพิ่มปลายทาง ไม่นับ Cash Flow | ปลายทางต้องเป็น Account |
@@ -323,7 +326,7 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 | Refresh หลัง Archive GAS | ผ่าน |
 | GAS Active deployment | ไม่มี |
 | iPhone Safe Area / Dynamic Island | แก้แล้วและผู้ใช้ยืนยัน |
-| PWA cache base | `tasuya-way-shell-v2.9.0` |
+| PWA cache base | `tasuya-way-shell-v2.10.0` |
 
 เคยทดสอบด้วยรายการรายรับ 1 บาท หมวด `ทดสอบระบบ` และลบออกสำเร็จแล้ว ห้ามถือรายการดังกล่าวว่าเป็นข้อมูลจริงหรือสร้างซ้ำ
 
