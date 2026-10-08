@@ -1,9 +1,9 @@
 # TasuyaWay — Project State
 
-> อัปเดต: 7 ตุลาคม 2569 (2026-10-07), Asia/Bangkok  
-> รุ่นพัฒนา: **v2.8.0 — TasuyaWay + Todo Carry-over + Cashflow Summary**  
-> รุ่นที่ตรวจพบว่า Deploy อยู่ก่อนเริ่มงาน: **v2.7.1**  
-> สถานะ v2.8.0: พร้อม Deploy; ไม่เปลี่ยน Google Sheet หรือ Apps Script
+> อัปเดต: 8 ตุลาคม 2569 (2026-10-08), Asia/Bangkok  
+> รุ่นพัฒนา: **v2.9.0 — Project Todo Lists**  
+> รุ่นที่ผู้ใช้ Deploy ก่อนเริ่มงาน: **v2.8.0**  
+> สถานะ v2.9.0: พร้อมทดสอบ; เพิ่ม Header หนึ่งช่องใน Todos และไม่เปลี่ยน Apps Script
 
 ## 1. สรุปโครงการ
 
@@ -21,17 +21,17 @@
 | UI | ภาษาไทย, Dark Emerald + Gold, Sarabun |
 | อุปกรณ์หลัก | iPhone โดยเฉพาะหน้าจอประมาณ 390–430px และ Desktop |
 
-## 2. การเปลี่ยนแปลง v2.8.0
+## 2. การเปลี่ยนแปลง v2.9.0
 
 | งาน | ผลลัพธ์ |
 |---|---|
-| Todo ค้าง | งานที่ยังไม่เสร็จแสดงต่อในวันถัดไปจนกว่าจะติ๊กเสร็จ โดยไม่สร้างแถวใหม่ |
-| ประวัติ Todo | เก็บวันเริ่มเดิม แสดง `ค้างจาก ...`; งานเสร็จหายจากวันหลังวันเสร็จ |
-| Branding | เปลี่ยนชื่อ WebApp/PWA เป็น `TasuyaWay` และเปลี่ยนไอคอนจาก W เป็น T |
-| Cashflow summary | เพิ่มตารางรายรับ รายจ่าย เงินออมใต้กราฟ โดยใช้เดือน/ปีชุดเดียวกับกราฟ |
-| โหมดตาราง | สลับแสดงเปอร์เซ็นต์หรือยอดเงินบาทได้ |
-| Migration | ไม่เพิ่ม Sheet/Header และไม่ต้องแก้ Apps Script |
-| PWA | Versioned assets และ cache เป็น v2.8.0 |
+| หมวด Todo | เพิ่ม `โปรเจก` ต่อจากเรื่องงานและเรื่องส่วนตัว |
+| หน้าโปรเจก | แตะชื่อโปรเจกเพื่อเปิด Checklist ย่อย พร้อม Progress bar |
+| งานย่อย | เพิ่ม ดาว ติ๊ก แก้ และลบได้ โดยอ้างอิงโปรเจกผ่าน `parent_todo_id` |
+| ความปลอดภัยข้อมูล | ลบโปรเจกต้องยืนยันและลบงานย่อยจากแถวล่างขึ้นบน |
+| งานค้าง | โปรเจกที่ยังไม่เสร็จแสดงต่อในวันถัดไปตามกติกาเดิม |
+| Migration | เพิ่ม `Todos!J1 = parent_todo_id`; ไม่สร้างชีตใหม่และไม่แก้ Apps Script |
+| PWA | Versioned assets และ cache เป็น v2.9.0 |
 
 ## 3. โครงสร้าง Google Sheet
 
@@ -47,7 +47,7 @@
 | `MonthlySnapshots` | `snapshot_month`, `total_assets`, `total_liabilities`, `net_worth`, `monthly_cashflow`, `savings_rate`, `note` |
 | `Settings` | `key`, `value`, `description` |
 | `Gratitude` | `gratitude_id`, `date`, `slot`, `category`, `gratitude_text`, `created_at`, `updated_at` |
-| `Todos` | `todo_id`, `date`, `category`, `task_text`, `is_important`, `is_completed`, `completed_at`, `created_at`, `updated_at` |
+| `Todos` | `todo_id`, `date`, `category`, `task_text`, `is_important`, `is_completed`, `completed_at`, `created_at`, `updated_at`, `parent_todo_id` |
 | `Habits` | `habit_id`, `habit_name`, `frequency`, `active`, `created_at`, `updated_at` |
 | `HabitLogs` | `habit_log_id`, `habit_id`, `period_key`, `completed_date`, `completed_at`, `created_at`, `updated_at` |
 
@@ -107,17 +107,16 @@
 
 | ไฟล์ | การเปลี่ยนแปลง |
 |---|---|
-| `index.html` | ชื่อ TasuyaWay, ตาราง Cashflow, Version URL |
-| `style.css` | ตาราง Cashflow แบบเลื่อนแนวนอนบนมือถือ และป้ายงานค้าง |
-| `app.js` | Todo carry-over และการคำนวณ/แสดงตาราง Cashflow |
-| `manifest.json` | ชื่อ คำอธิบาย และหมวดของ PWA |
-| `icons/*` | ไอคอน TasuyaWay ตัวอักษร T |
-| `sw.js` | Cache v2.8.0 |
+| `index.html` | ตัวเลือกโปรเจก หน้า Project Detail และฟอร์มงานย่อย |
+| `style.css` | กลุ่มโปรเจก Progress bar และ Mobile Project Detail |
+| `api.js` | Schema/Validation ของ `parent_todo_id` และความสัมพันธ์หนึ่งระดับ |
+| `app.js` | แสดงโปรเจก งานย่อย Progress และลบแบบ Cascade |
+| `sw.js` | Cache v2.9.0 |
 | `README.md` | คู่มือระบบและ Deploy |
 | `PROJECT_STATE.md` | สถานะล่าสุด |
-| `CHANGELOG.md` | ประวัติ v2.8.0 |
+| `CHANGELOG.md` | ประวัติ v2.9.0 |
 | `GRATITUDE_MIGRATION.md` | เพิ่มหมวดตัวเองและประสบการณ์ |
-| `TODAY_MIGRATION.md` | วิธีสร้าง Todos, Habits, HabitLogs |
+| `PROJECT_TODOS_MIGRATION.md` | วิธีเพิ่ม `parent_todo_id` ที่ Todos!J1 |
 | `MONTH_END_SNAPSHOT.gs` | Scheduled Snapshot สิ้นเดือน |
 | `SNAPSHOT_AUTOMATION.md` | วิธีติดตั้ง Trigger และทดสอบ |
 
@@ -145,6 +144,9 @@
 | Todo validation/ดาว/สถานะเสร็จ | ผ่าน API Mock |
 | Todo ค้างแสดงต่อวันถัดไปโดยไม่สร้างแถวซ้ำ | ผ่าน Logic Mock |
 | Todo เสร็จแสดงถึงวันเสร็จและหายจากวันถัดไป | ผ่าน Logic Mock |
+| สร้างโปรเจกและงานย่อยด้วย `parent_todo_id` | ผ่าน API Mock |
+| Progress ของโปรเจกและการเรียงงานย่อย | ผ่าน Logic Mock |
+| ลบโปรเจกพร้อมงานย่อยจากแถวล่างขึ้นบน | ผ่าน Logic Mock |
 | Habit period key วัน/สัปดาห์/เดือน/ปี | ผ่าน API Mock |
 | ไม่มี Todos/Habits/HabitLogs | หน้าการเงินยังโหลดได้ |
 | Apps Script syntax | ผ่าน |
@@ -156,8 +158,8 @@
 
 1. ทำ `TODAY_MIGRATION.md` และตรวจ `GRATITUDE_MIGRATION.md`
 2. ติดตั้ง `MONTH_END_SNAPSHOT.gs` ตาม `SNAPSHOT_AUTOMATION.md`
-3. Deploy v2.8.0 และปิด–เปิด PWA ใหม่
-4. ทดสอบ Todo: เพิ่มงานวันนี้ เปิดวันถัดไป ตรวจป้าย `ค้างจาก ...` แล้วติ๊กเสร็จ
+3. เพิ่ม `parent_todo_id` ที่ Todos!J1 และ Deploy v2.9.0
+4. ทดสอบเพิ่มโปรเจก เปิดโปรเจก เพิ่ม/ติ๊ก/แก้/ลบงานย่อย และตรวจ Progress
 5. ทดสอบ Habit ทุกความถี่ และตรวจว่าในรอบเดียวกันไม่สร้าง Log ซ้ำ
 6. ทดสอบ Gratitude หมวดตัวเองและประสบการณ์
 7. Run `testMonthEndSnapshotNow` แล้วตรวจ MonthlySnapshots
@@ -168,8 +170,8 @@
 2. ทำ `TODAY_MIGRATION.md`
 3. ตรวจ `GRATITUDE_MIGRATION.md`
 4. ติดตั้ง `SNAPSHOT_AUTOMATION.md`
-5. Replace ไฟล์จาก `tasuya-way-v2.8.0.zip` ที่ Root
-6. Commit: `feat: rebrand to TasuyaWay and add cashflow summary`
+5. Replace ไฟล์จาก `tasuya-way-v2.9.0.zip` ที่ Root
+6. Commit: `feat: add project todo lists`
 7. รอ GitHub Pages workflow เป็นสีเขียว
 8. ปิด PWA เดิม เปิดใหม่ และ Refresh
 
@@ -185,4 +187,5 @@
 - ไม่มี Refresh Token และไม่มี Multi-user concurrency control
 - การบันทึก Gratitude หลาย Slot ไม่เป็น Atomic transaction ข้ามแถว
 - Todo carry-over เป็นการแสดงแถวเดิมตามวัน ไม่ได้เปลี่ยน `date` หรือสร้างสำเนาใน Google Sheet
+- Project Todo รองรับงานย่อยหนึ่งระดับเท่านั้น และยังไม่มี Deadline/ไฟล์แนบแยกต่อโปรเจก
 - Apps Script Trigger ทำงานในช่วงเวลาโดยประมาณ ไม่รับประกันวินาทีที่แน่นอน

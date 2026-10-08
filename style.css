@@ -1231,7 +1231,8 @@ svg {
 }
 
 .todo-group-work .todo-group-title::before,
-.todo-group-personal .todo-group-title::before {
+.todo-group-personal .todo-group-title::before,
+.todo-group-project .todo-group-title::before {
   display: inline-block;
   width: 8px;
   height: 8px;
@@ -1248,6 +1249,10 @@ svg {
   background: var(--green);
 }
 
+.todo-group-project .todo-group-title::before {
+  background: var(--blue);
+}
+
 .todo-group-count {
   color: var(--muted-2);
   font-size: 12px;
@@ -1257,6 +1262,15 @@ svg {
 .todo-group-items {
   display: grid;
   gap: 8px;
+}
+
+#todoOverview {
+  display: grid;
+  gap: 14px;
+}
+
+#todoOverview[hidden] {
+  display: none;
 }
 
 .todo-group-empty {
@@ -1323,7 +1337,40 @@ svg {
   font-weight: 500;
 }
 
+.todo-project-link {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: rgba(104, 167, 255, 0.45);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todo-project-link:hover,
+.todo-project-link:focus-visible {
+  color: var(--blue);
+}
+
+.project-task-count {
+  color: var(--blue) !important;
+}
+
+.todo-item.is-project {
+  border-color: rgba(104, 167, 255, 0.25);
+}
+
 .todo-item.is-completed .todo-task,
+.todo-item.is-completed .todo-project-link,
 .habit-item.is-completed .habit-copy strong {
   color: var(--muted-2);
   text-decoration: line-through;
@@ -1333,6 +1380,68 @@ svg {
 .todo-actions {
   display: flex;
   gap: 3px;
+}
+
+.project-detail {
+  display: grid;
+  gap: 14px;
+}
+
+.project-detail[hidden] {
+  display: none;
+}
+
+.project-header-panel {
+  display: grid;
+  gap: 13px;
+}
+
+.project-back-button {
+  width: fit-content;
+  padding: 5px 0;
+  background: transparent;
+  border: 0;
+  color: var(--blue);
+  font: inherit;
+  font-size: 12px;
+}
+
+.project-title-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.project-title-row h2 {
+  margin: 3px 0 0;
+  font-size: clamp(20px, 6vw, 28px);
+}
+
+.project-progress-track {
+  height: 7px;
+  overflow: hidden;
+  background: rgba(145, 164, 155, 0.15);
+  border-radius: 999px;
+}
+
+.project-progress-track span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--blue), var(--green));
+  border-radius: inherit;
+  transition: width 180ms ease;
+}
+
+.project-task-form {
+  display: grid;
+  align-items: end;
+  gap: 10px;
+}
+
+.project-task-list .todo-item {
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
 }
 
 .text-button.danger {
@@ -1367,6 +1476,10 @@ svg {
 
   .habit-add-form {
     grid-template-columns: minmax(0, 1fr) 180px auto;
+  }
+
+  .project-task-form {
+    grid-template-columns: minmax(0, 1fr) 100px auto;
   }
 }
 

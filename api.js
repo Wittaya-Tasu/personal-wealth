@@ -13,11 +13,11 @@
   const CREDIT_CARD_TRANSACTION_HEADERS = ["payment_method", "credit_card"];
   const LIABILITY_TYPE_HEADERS = ["liability_type"];
   const GRATITUDE_HEADERS = ["gratitude_id", "date", "slot", "category", "gratitude_text", "created_at", "updated_at"];
-  const TODO_HEADERS = ["todo_id", "date", "category", "task_text", "is_important", "is_completed", "completed_at", "created_at", "updated_at"];
+  const TODO_HEADERS = ["todo_id", "date", "category", "task_text", "is_important", "is_completed", "completed_at", "created_at", "updated_at", "parent_todo_id"];
   const HABIT_HEADERS = ["habit_id", "habit_name", "frequency", "active", "created_at", "updated_at"];
   const HABIT_LOG_HEADERS = ["habit_log_id", "habit_id", "period_key", "completed_date", "completed_at", "created_at", "updated_at"];
   const GRATITUDE_CATEGORIES = new Set(["คน", "ตัวเอง", "สัตว์", "สิ่งของ", "สถานที่", "เหตุการณ์", "ประสบการณ์", "อื่น ๆ"]);
-  const TODO_CATEGORIES = new Set(["เรื่องงาน", "เรื่องส่วนตัว"]);
+  const TODO_CATEGORIES = new Set(["เรื่องงาน", "เรื่องส่วนตัว", "โปรเจก"]);
   const HABIT_FREQUENCIES = new Set(["Daily", "Weekly", "Monthly", "Yearly"]);
 
   function waitFor(predicate, timeoutMs = 15000) {
@@ -351,7 +351,7 @@
       });
 
       await this.loadOptionalSheet(data, "gratitude", this.getGratitudeSheetName(), "G", "gratitudeLoadError");
-      await this.loadOptionalSheet(data, "todos", this.getTodoSheetName(), "I", "todoLoadError");
+      await this.loadOptionalSheet(data, "todos", this.getTodoSheetName(), "J", "todoLoadError");
       await this.loadOptionalSheet(data, "habits", this.getHabitSheetName(), "F", "habitLoadError");
       await this.loadOptionalSheet(data, "habitLogs", this.getHabitLogSheetName(), "G", "habitLogLoadError");
 
@@ -449,8 +449,10 @@
     }
 
     buildRow(sheetName, record) {
-      return this.getHeaders(sheetName).map((header) => {
-        if (header.endsWith("_id") && !record[header]) return createShortId();
+      const headers = this.getHeaders(sheetName);
+      const primaryIdHeader = headers[0];
+      return headers.map((header) => {
+        if (header === primaryIdHeader && header.endsWith("_id") && !record[header]) return createShortId();
         return normalizeCell(record[header]);
       });
     }
@@ -840,10 +842,18 @@
       const date = normalizeName(record?.date);
       const category = normalizeName(record?.category);
       const taskText = normalizeName(record?.task_text);
+      const parentTodoId = normalizeName(record?.parent_todo_id);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("วันที่ Todo ไม่ถูกต้อง");
       if (!TODO_CATEGORIES.has(category)) throw new Error("กรุณาเลือกประเภท Todo");
       if (!taskText) throw new Error("กรุณาระบุสิ่งที่ต้องทำ");
       if (taskText.length > 300) throw new Error("ข้อความ Todo ยาวได้ไม่เกิน 300 ตัวอักษร");
+      if (parentTodoId) {
+        const parent = this.getTodoRows().find((row) => normalizeName(row.todo_id) === parentTodoId);
+        if (!parent) throw new Error("ไม่พบโปรเจกหลักของงานย่อยนี้");
+        if (normalizeName(parent.parent_todo_id)) throw new Error("ระบบรองรับ Todo ย่อยหนึ่งระดับเท่านั้น");
+        if (normalizeName(parent.category) !== "โปรเจก") throw new Error("Todo ย่อยต้องอ้างอิงรายการประเภทโปรเจก");
+        if (existingRecord?.todo_id && existingRecord.todo_id === parentTodoId) throw new Error("Todo ไม่สามารถอ้างอิงตัวเองได้");
+      }
       const now = new Date().toISOString();
       const completed = isYes(record?.is_completed);
       return {
@@ -851,8 +861,9 @@
         ...record,
         todo_id: existingRecord?.todo_id || record?.todo_id || `todo-${date.replace(/-/g, "")}-${createShortId()}`,
         date,
-        category,
+        category: parentTodoId ? "โปรเจก" : category,
         task_text: taskText,
+        parent_todo_id: parentTodoId,
         is_important: isYes(record?.is_important) ? "Yes" : "No",
         is_completed: completed ? "Yes" : "No",
         completed_at: completed ? (record?.completed_at || now) : "",

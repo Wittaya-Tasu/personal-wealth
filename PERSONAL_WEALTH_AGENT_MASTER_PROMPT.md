@@ -79,7 +79,7 @@
 | UI Theme | Dark Emerald + Gold |
 | Font | Sarabun |
 | อุปกรณ์หลัก | iPhone 16+ และ Desktop |
-| เวอร์ชันล่าสุด | v2.8.0 — TasuyaWay + Todo Carry-over + Cashflow Summary |
+| เวอร์ชันล่าสุด | v2.9.0 — Project Todo Lists |
 
 ค่าจริงของ OAuth Client ID และ Spreadsheet ID ให้ตรวจจาก `config.js` ล่าสุด ห้ามคัดลอกค่าจากข้อความเก่ามาเขียนทับ
 
@@ -147,6 +147,7 @@ iPhone / Browser
 | `CREDIT_CARD_MIGRATION.md` | วิธีเพิ่ม Header และตั้งค่าบัตรเครดิตรุ่น v2.5.0 |
 | `GRATITUDE_MIGRATION.md` | วิธีสร้างชีตขอบคุณวันนี้รุ่น v2.6.0 |
 | `TODAY_MIGRATION.md` | วิธีสร้าง Todos, Habits และ HabitLogs รุ่น v2.7.0 |
+| `PROJECT_TODOS_MIGRATION.md` | วิธีเพิ่ม `parent_todo_id` สำหรับโปรเจกและ Todo ย่อยรุ่น v2.9.0 |
 | `SNAPSHOT_AUTOMATION.md` | วิธีติดตั้ง Snapshot สิ้นเดือนอัตโนมัติ |
 | `MONTH_END_SNAPSHOT.gs` | Google Apps Script สำหรับ Scheduled Snapshot |
 | `icons/` | ไอคอน WebApp/PWA |
@@ -171,7 +172,7 @@ iPhone / Browser
 | `MonthlySnapshots` | `snapshot_month`, `total_assets`, `total_liabilities`, `net_worth`, `monthly_cashflow`, `savings_rate`, `note` |
 | `Settings` | `key`, `value`, `description` |
 | `Gratitude` | `gratitude_id`, `date`, `slot`, `category`, `gratitude_text`, `created_at`, `updated_at` |
-| `Todos` | `todo_id`, `date`, `category`, `task_text`, `is_important`, `is_completed`, `completed_at`, `created_at`, `updated_at` |
+| `Todos` | `todo_id`, `date`, `category`, `task_text`, `is_important`, `is_completed`, `completed_at`, `created_at`, `updated_at`, `parent_todo_id` |
 | `Habits` | `habit_id`, `habit_name`, `frequency`, `active`, `created_at`, `updated_at` |
 | `HabitLogs` | `habit_log_id`, `habit_id`, `period_key`, `completed_date`, `completed_at`, `created_at`, `updated_at` |
 
@@ -280,7 +281,7 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 
 ---
 
-### 8. ความสามารถและข้อจำกัดปัจจุบันของ v2.8.0
+### 8. ความสามารถและข้อจำกัดปัจจุบันของ v2.9.0
 
 | การกระทำ | สิ่งที่ระบบทำ | ข้อจำกัด |
 |---|---|---|
@@ -294,7 +295,7 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 | Goal Milestone | ติดตามสถานะ 3 ระดับ | ไม่มี Checklist ย่อย |
 | Investment Contribution | เลือกสินทรัพย์เดิม/ชื่อใหม่ หักเงินรอบใหม่ และเพิ่ม `current_value`/`funded_amount` | หนึ่งสินทรัพย์ใช้ Account ต้นทางเดิมและไม่ใช่ Ledger ซื้อ–ขาย |
 | RMF/ETF/PVD | เก็บมูลค่าใน Investments | ไม่มี InvestmentTransactions/ราคาตลาด |
-| วันนี้ | Todo แยกกลุ่มงาน/ส่วนตัว มีดาว/ขีดฆ่า และงานค้างแสดงต่อจนเสร็จ; Habit 4 ความถี่; Gratitude ใน Tab เดียว | ยังไม่มี Reminder หรือ Streak |
+| วันนี้ | Todo แยกงาน/ส่วนตัว/โปรเจก งานค้างแสดงต่อ และโปรเจกมี Checklist ย่อยหนึ่งระดับ; Habit 4 ความถี่; Gratitude ใน Tab เดียว | ยังไม่มี Reminder, Streak หรือ Project Deadline |
 | ขอบคุณวันนี้ | บันทึก 1–3 เรื่อง แยก 8 หมวด และเลือกวันที่ได้ | ยังไม่มีกราฟสถิติ |
 | Snapshot อัตโนมัติ | Apps Script บันทึกวันสุดท้ายของเดือนแม้ปิดแอป | Trigger ทำงานในช่วงเวลาโดยประมาณ |
 
@@ -322,7 +323,7 @@ Debt Service Ratio = ค่างวดหนี้รวมต่อเดื�
 | Refresh หลัง Archive GAS | ผ่าน |
 | GAS Active deployment | ไม่มี |
 | iPhone Safe Area / Dynamic Island | แก้แล้วและผู้ใช้ยืนยัน |
-| PWA cache base | `tasuya-way-shell-v2.8.0` |
+| PWA cache base | `tasuya-way-shell-v2.9.0` |
 
 เคยทดสอบด้วยรายการรายรับ 1 บาท หมวด `ทดสอบระบบ` และลบออกสำเร็จแล้ว ห้ามถือรายการดังกล่าวว่าเป็นข้อมูลจริงหรือสร้างซ้ำ
 

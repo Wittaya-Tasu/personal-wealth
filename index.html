@@ -12,13 +12,13 @@
   <meta name="description" content="TasuyaWay — ระบบส่วนตัวสำหรับการเงิน เป้าหมาย Todo Habit และบันทึกขอบคุณวันนี้">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://sheets.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; img-src 'self' data:; manifest-src 'self'; worker-src 'self'">
   <title>TasuyaWay</title>
-  <link rel="manifest" href="manifest.json?v=2.8.0">
+  <link rel="manifest" href="manifest.json?v=2.9.0">
   <link rel="icon" href="icons/wealth-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.8.0">
+  <link rel="stylesheet" href="style.css?v=2.9.0">
 </head>
 <body>
   <svg class="svg-sprite" aria-hidden="true">
@@ -297,20 +297,43 @@
 
         <section class="today-panel is-active" data-today-panel="todos">
           <section id="todoMigration" class="panel gratitude-migration" hidden>
-            <strong>ยังไม่ได้สร้างชีต Todos</strong>
-            <p>สร้างชีตและ Header ตามไฟล์ TODAY_MIGRATION.md ก่อนเริ่มบันทึก</p>
+            <strong>โครงสร้างชีต Todos ยังไม่พร้อม</strong>
+            <p>สร้างชีตตาม TODAY_MIGRATION.md หรือเพิ่ม parent_todo_id ที่ J1 ตาม PROJECT_TODOS_MIGRATION.md</p>
           </section>
-          <section class="panel today-editor">
-            <form id="todoForm" class="todo-add-form">
-              <label class="field"><span>ประเภท</span><select name="category"><option value="เรื่องงาน">เรื่องงาน</option><option value="เรื่องส่วนตัว">เรื่องส่วนตัว</option></select></label>
-              <label class="field todo-text-field"><span>สิ่งที่ต้องทำ</span><input name="task_text" type="text" maxlength="300" placeholder="เพิ่มสิ่งที่ต้องทำ…" required></label>
-              <label class="star-toggle" title="ทำเครื่องหมายว่าสำคัญ"><input name="is_important" type="checkbox"><span aria-hidden="true">★</span><small>สำคัญ</small></label>
-              <button class="primary-button" type="submit">เพิ่ม</button>
-            </form>
-          </section>
-          <section class="panel today-list-panel">
-            <div class="section-heading"><div><p class="eyebrow">TODO</p><h2 id="todoListTitle">สิ่งที่ต้องทำ</h2></div><span id="todoSummary" class="today-summary">0/0</span></div>
-            <div id="todoList" class="todo-list"></div>
+          <div id="todoOverview">
+            <section class="panel today-editor">
+              <form id="todoForm" class="todo-add-form">
+                <label class="field"><span>ประเภท</span><select name="category"><option value="เรื่องงาน">เรื่องงาน</option><option value="เรื่องส่วนตัว">เรื่องส่วนตัว</option><option value="โปรเจก">โปรเจก</option></select></label>
+                <label class="field todo-text-field"><span>สิ่งที่ต้องทำ / ชื่อโปรเจก</span><input name="task_text" type="text" maxlength="300" placeholder="เพิ่มสิ่งที่ต้องทำหรือโปรเจก…" required></label>
+                <label class="star-toggle" title="ทำเครื่องหมายว่าสำคัญ"><input name="is_important" type="checkbox"><span aria-hidden="true">★</span><small>สำคัญ</small></label>
+                <button class="primary-button" type="submit">เพิ่ม</button>
+              </form>
+            </section>
+            <section class="panel today-list-panel">
+              <div class="section-heading"><div><p class="eyebrow">TODO</p><h2 id="todoListTitle">สิ่งที่ต้องทำ</h2></div><span id="todoSummary" class="today-summary">0/0</span></div>
+              <div id="todoList" class="todo-list"></div>
+            </section>
+          </div>
+
+          <section id="projectDetail" class="project-detail" hidden>
+            <section class="panel project-header-panel">
+              <button id="projectBackButton" class="project-back-button" type="button">‹ กลับไป Todo ทั้งหมด</button>
+              <div class="project-title-row">
+                <div><p class="eyebrow">PROJECT</p><h2 id="projectDetailTitle">โปรเจก</h2></div>
+                <span id="projectProgress" class="today-summary">0/0</span>
+              </div>
+              <div class="project-progress-track" aria-hidden="true"><span id="projectProgressBar"></span></div>
+            </section>
+            <section class="panel today-editor">
+              <form id="projectTaskForm" class="project-task-form">
+                <label class="field project-task-text-field"><span>Todo ย่อยในโปรเจก</span><input name="task_text" type="text" maxlength="300" placeholder="เพิ่มขั้นตอนหรืองานย่อย…" required></label>
+                <label class="star-toggle" title="ทำเครื่องหมายว่าสำคัญ"><input name="is_important" type="checkbox"><span aria-hidden="true">★</span><small>สำคัญ</small></label>
+                <button class="primary-button" type="submit">เพิ่มงานย่อย</button>
+              </form>
+            </section>
+            <section class="panel today-list-panel">
+              <div id="projectTaskList" class="todo-list project-task-list"></div>
+            </section>
           </section>
         </section>
 
@@ -463,9 +486,9 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="config.js?v=2.8.0"></script>
-  <script src="analytics.js?v=2.8.0"></script>
-  <script src="api.js?v=2.8.0"></script>
-  <script src="app.js?v=2.8.0"></script>
+  <script src="config.js?v=2.9.0"></script>
+  <script src="analytics.js?v=2.9.0"></script>
+  <script src="api.js?v=2.9.0"></script>
+  <script src="app.js?v=2.9.0"></script>
 </body>
 </html>

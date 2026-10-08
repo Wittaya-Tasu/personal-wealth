@@ -14,6 +14,7 @@
     activeRecord: null,
     todayDate: localIsoDate(),
     todayTab: "todos",
+    activeProjectId: null,
     cashflowTableMode: "percent",
     goalSchemaMissingHeaders: [],
     investmentSchemaMissingHeaders: [],
@@ -134,7 +135,7 @@
   function setLoading(isLoading) {
     qs("#syncButton").classList.toggle("is-spinning", isLoading);
     qsa("button[type='submit']").forEach((button) => {
-      if (button.closest(".data-form, .gratitude-form, .todo-add-form, .habit-add-form")) button.disabled = isLoading;
+      if (button.closest(".data-form, .gratitude-form, .todo-add-form, .project-task-form, .habit-add-form")) button.disabled = isLoading;
     });
   }
 
@@ -157,7 +158,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js?v=2.8.0").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.9.0").catch(() => {});
     }
   }
 
@@ -238,6 +239,10 @@
     qs("#todoForm").addEventListener("submit", submitTodo);
     qs("#todoList").addEventListener("change", handleTodoChange);
     qs("#todoList").addEventListener("click", handleTodoAction);
+    qs("#projectBackButton").addEventListener("click", closeProjectDetail);
+    qs("#projectTaskForm").addEventListener("submit", submitProjectTask);
+    qs("#projectTaskList").addEventListener("change", handleTodoChange);
+    qs("#projectTaskList").addEventListener("click", handleTodoAction);
     qs("#habitForm").addEventListener("submit", submitHabit);
     qs("#habitList").addEventListener("change", handleHabitChange);
     qs("#habitList").addEventListener("click", handleHabitAction);
@@ -337,7 +342,7 @@
     ].forEach((id) => setText(id, id === "emergencyMonthsValue" ? "— เดือน" : "฿—"));
     setText("netWorthStatus", "รอเชื่อมต่อ");
     setText("netWorthChange", "เชื่อมต่อ Google เพื่อดูข้อมูลจริง");
-    ["recentTransactions", "transactionList", "wealthList", "goalPreview", "goalList", "todoList", "habitList"].forEach((id) => {
+    ["recentTransactions", "transactionList", "wealthList", "goalPreview", "goalList", "todoList", "projectTaskList", "habitList"].forEach((id) => {
       const container = document.getElementById(id);
       container.replaceChildren(emptyState());
     });
@@ -1034,6 +1039,7 @@
   function todoRowsForDate(dateKey) {
     return (state.data?.todos || [])
       .filter((row) => {
+        if (String(row.parent_todo_id || "").trim()) return false;
         const startDate = String(row.date || "").slice(0, 10);
         if (!startDate || startDate > dateKey) return false;
         if (!valueIsYes(row.is_completed)) return true;
@@ -1069,6 +1075,16 @@
     const ready = store.isTodoSheetReady();
     qs("#todoMigration").hidden = ready;
     qsa("input, select, button", qs("#todoForm")).forEach((field) => { field.disabled = !ready; });
+    qsa("input, button", qs("#projectTaskForm")).forEach((field) => { field.disabled = !ready; });
+    const activeProject = getActiveProject();
+    if (state.activeProjectId && !activeProject) state.activeProjectId = null;
+    const showProject = Boolean(activeProject && ready);
+    qs("#todoOverview").hidden = showProject;
+    qs("#projectDetail").hidden = !showProject;
+    if (showProject) {
+      renderProjectDetail(activeProject);
+      return;
+    }
     const container = qs("#todoList");
     container.replaceChildren();
     const rows = todoRowsForDate(state.todayDate);
@@ -1077,20 +1093,21 @@
     if (!ready) {
       const empty = emptyState();
       qs("strong", empty).textContent = "Todo ยังไม่พร้อม";
-      qs("p", empty).textContent = "สร้างชีต Todos ตาม TODAY_MIGRATION.md";
+      qs("p", empty).textContent = "ตรวจชีต Todos และเพิ่ม parent_todo_id ที่ J1 ตาม PROJECT_TODOS_MIGRATION.md";
       container.appendChild(empty);
       return;
     }
     if (!rows.length) {
       const empty = emptyState();
       qs("strong", empty).textContent = "ยังไม่มีสิ่งที่ต้องทำ";
-      qs("p", empty).textContent = "เพิ่มงานหรือเรื่องส่วนตัวของวันที่เลือกด้านบน";
+      qs("p", empty).textContent = "เพิ่มเรื่องงาน เรื่องส่วนตัว หรือโปรเจกของวันที่เลือกด้านบน";
       container.appendChild(empty);
       return;
     }
     [
       { category: "เรื่องงาน", title: "เรื่องงาน", className: "work" },
-      { category: "เรื่องส่วนตัว", title: "เรื่องส่วนตัว", className: "personal" }
+      { category: "เรื่องส่วนตัว", title: "เรื่องส่วนตัว", className: "personal" },
+      { category: "โปรเจก", title: "โปรเจก", className: "project" }
     ].forEach((definition) => {
       const groupRows = rows.filter((row) => row.category === definition.category);
       const groupCompleted = groupRows.filter((row) => todoIsCompletedOnDate(row, state.todayDate)).length;
@@ -1106,46 +1123,104 @@
         list.appendChild(createElement("p", "todo-group-empty", `ยังไม่มี${definition.title}ในวันนี้`));
       }
 
-      groupRows.forEach((row) => {
-        const completed = todoIsCompletedOnDate(row, state.todayDate);
-        const important = valueIsYes(row.is_important);
-        const startDate = String(row.date || "").slice(0, 10);
-        const item = createElement("article", `todo-item${completed ? " is-completed" : ""}${important ? " is-important" : ""}`);
-        const check = document.createElement("input");
-        check.type = "checkbox";
-        check.className = "todo-checkbox";
-        check.checked = completed;
-        check.dataset.todoRow = row._rowNumber;
-        check.setAttribute("aria-label", completed ? "ยกเลิกการทำเสร็จ" : "ทำเครื่องหมายว่าเสร็จแล้ว");
-        const star = createElement("button", `todo-star${important ? " is-active" : ""}`, "★");
-        star.type = "button";
-        star.dataset.todoStarRow = row._rowNumber;
-        star.setAttribute("aria-label", important ? "ยกเลิกดาวความสำคัญ" : "ใส่ดาวความสำคัญ");
-        const copy = createElement("div", "todo-copy");
-        copy.append(createElement("strong", "todo-task", row.task_text));
-        if (startDate && startDate < state.todayDate) {
-          const parsedStartDate = analytics.parseDate(startDate);
-          copy.append(createElement(
-            "small",
-            "todo-carryover",
-            `ค้างจาก ${formatDate(parsedStartDate, { day: "numeric", month: "short" })}`
-          ));
-        }
-        const actions = createElement("div", "todo-actions");
-        const edit = createElement("button", "text-button", "แก้");
-        edit.type = "button";
-        edit.dataset.todoEditRow = row._rowNumber;
-        const remove = createElement("button", "text-button danger", "ลบ");
-        remove.type = "button";
-        remove.dataset.todoDeleteRow = row._rowNumber;
-        actions.append(edit, remove);
-        item.append(check, star, copy, actions);
-        list.appendChild(item);
-      });
+      groupRows.forEach((row) => list.appendChild(createTodoItem(row)));
 
       group.append(heading, list);
       container.appendChild(group);
     });
+  }
+
+  function getActiveProject() {
+    if (!state.activeProjectId) return null;
+    return (state.data?.todos || []).find((row) => {
+      return String(row.todo_id || "") === state.activeProjectId
+        && String(row.category || "") === "โปรเจก"
+        && !String(row.parent_todo_id || "").trim();
+    }) || null;
+  }
+
+  function getProjectTasks(projectId) {
+    return (state.data?.todos || [])
+      .filter((row) => String(row.parent_todo_id || "").trim() === String(projectId || ""))
+      .sort((a, b) => {
+        const completedDifference = Number(valueIsYes(a.is_completed)) - Number(valueIsYes(b.is_completed));
+        if (completedDifference) return completedDifference;
+        const importantDifference = Number(valueIsYes(b.is_important)) - Number(valueIsYes(a.is_important));
+        if (importantDifference) return importantDifference;
+        return Number(a._rowNumber || 0) - Number(b._rowNumber || 0);
+      });
+  }
+
+  function createTodoItem(row, { projectTask = false } = {}) {
+    const completed = projectTask ? valueIsYes(row.is_completed) : todoIsCompletedOnDate(row, state.todayDate);
+    const important = valueIsYes(row.is_important);
+    const isProject = !projectTask && row.category === "โปรเจก";
+    const startDate = String(row.date || "").slice(0, 10);
+    const item = createElement("article", `todo-item${completed ? " is-completed" : ""}${important ? " is-important" : ""}${isProject ? " is-project" : ""}`);
+    const check = document.createElement("input");
+    check.type = "checkbox";
+    check.className = "todo-checkbox";
+    check.checked = completed;
+    check.dataset.todoRow = row._rowNumber;
+    check.setAttribute("aria-label", completed ? "ยกเลิกการทำเสร็จ" : "ทำเครื่องหมายว่าเสร็จแล้ว");
+    const star = createElement("button", `todo-star${important ? " is-active" : ""}`, "★");
+    star.type = "button";
+    star.dataset.todoStarRow = row._rowNumber;
+    star.setAttribute("aria-label", important ? "ยกเลิกดาวความสำคัญ" : "ใส่ดาวความสำคัญ");
+    const copy = createElement("div", "todo-copy");
+    if (isProject) {
+      const projectLink = createElement("button", "todo-project-link", row.task_text);
+      projectLink.type = "button";
+      projectLink.dataset.projectId = row.todo_id;
+      copy.append(projectLink);
+      const tasks = getProjectTasks(row.todo_id);
+      const done = tasks.filter((task) => valueIsYes(task.is_completed)).length;
+      copy.append(createElement("small", "project-task-count", `${done}/${tasks.length} งานย่อย · แตะเพื่อเปิด`));
+    } else {
+      copy.append(createElement("strong", "todo-task", row.task_text));
+    }
+    if (!projectTask && startDate && startDate < state.todayDate) {
+      const parsedStartDate = analytics.parseDate(startDate);
+      copy.append(createElement(
+        "small",
+        "todo-carryover",
+        `ค้างจาก ${formatDate(parsedStartDate, { day: "numeric", month: "short" })}`
+      ));
+    }
+    const actions = createElement("div", "todo-actions");
+    const edit = createElement("button", "text-button", "แก้");
+    edit.type = "button";
+    edit.dataset.todoEditRow = row._rowNumber;
+    const remove = createElement("button", "text-button danger", "ลบ");
+    remove.type = "button";
+    remove.dataset.todoDeleteRow = row._rowNumber;
+    actions.append(edit, remove);
+    item.append(check, star, copy, actions);
+    return item;
+  }
+
+  function renderProjectDetail(project) {
+    setText("projectDetailTitle", project.task_text || "โปรเจก");
+    const tasks = getProjectTasks(project.todo_id);
+    const completed = tasks.filter((row) => valueIsYes(row.is_completed)).length;
+    setText("projectProgress", `${completed}/${tasks.length}`);
+    const progress = tasks.length ? Math.round((completed / tasks.length) * 100) : 0;
+    qs("#projectProgressBar").style.width = `${progress}%`;
+    const container = qs("#projectTaskList");
+    container.replaceChildren();
+    if (!tasks.length) {
+      const empty = emptyState();
+      qs("strong", empty).textContent = "ยังไม่มีงานย่อย";
+      qs("p", empty).textContent = "เพิ่มขั้นตอนที่ต้องทำของโปรเจกนี้ด้านบน";
+      container.appendChild(empty);
+      return;
+    }
+    tasks.forEach((row) => container.appendChild(createTodoItem(row, { projectTask: true })));
+  }
+
+  function closeProjectDetail() {
+    state.activeProjectId = null;
+    renderTodos();
   }
 
   async function submitTodo(event) {
@@ -1159,12 +1234,39 @@
         category: form.elements.category.value,
         task_text: form.elements.task_text.value,
         is_important: form.elements.is_important.checked ? "Yes" : "No",
-        is_completed: "No"
+        is_completed: "No",
+        parent_todo_id: ""
       });
       form.elements.task_text.value = "";
       form.elements.is_important.checked = false;
       await refreshData();
       showToast("เพิ่มสิ่งที่ต้องทำแล้ว");
+    } catch (error) {
+      handleError(error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitProjectTask(event) {
+    event.preventDefault();
+    if (!ensureCanWrite()) return;
+    const project = getActiveProject();
+    if (!project) return;
+    const form = event.currentTarget;
+    try {
+      setLoading(true);
+      await store.appendTodo({
+        date: state.todayDate,
+        category: "โปรเจก",
+        task_text: form.elements.task_text.value,
+        is_important: form.elements.is_important.checked ? "Yes" : "No",
+        is_completed: "No",
+        parent_todo_id: project.todo_id
+      });
+      form.reset();
+      await refreshData();
+      showToast("เพิ่มงานย่อยในโปรเจกแล้ว");
     } catch (error) {
       handleError(error);
     } finally {
@@ -1191,13 +1293,31 @@
     const checkbox = event.target.closest("[data-todo-row]");
     if (!checkbox) return;
     const completed = checkbox.checked;
-    updateTodoRow(Number(checkbox.dataset.todoRow), {
+    const rowNumber = Number(checkbox.dataset.todoRow);
+    const row = (state.data?.todos || []).find((item) => item._rowNumber === rowNumber);
+    if (!row) return;
+    const isTopLevelProject = row.category === "โปรเจก" && !String(row.parent_todo_id || "").trim();
+    const openProjectTasks = isTopLevelProject
+      ? getProjectTasks(row.todo_id).filter((task) => !valueIsYes(task.is_completed))
+      : [];
+    if (completed && openProjectTasks.length && !global.confirm(`โปรเจกนี้ยังมีงานย่อยค้าง ${openProjectTasks.length} รายการ ต้องการปิดโปรเจกหรือไม่?`)) {
+      checkbox.checked = false;
+      return;
+    }
+    updateTodoRow(rowNumber, {
       is_completed: completed ? "Yes" : "No",
       completed_at: completed ? new Date().toISOString() : ""
     }, completed ? "ทำรายการนี้เสร็จแล้ว" : "ย้ายกลับเป็นงานที่ยังไม่เสร็จ");
   }
 
   async function handleTodoAction(event) {
+    const projectLink = event.target.closest("[data-project-id]");
+    if (projectLink) {
+      state.activeProjectId = projectLink.dataset.projectId;
+      renderTodos();
+      qs("#projectDetail").scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
     const star = event.target.closest("[data-todo-star-row]");
     const edit = event.target.closest("[data-todo-edit-row]");
     const remove = event.target.closest("[data-todo-delete-row]");
@@ -1215,12 +1335,20 @@
       await updateTodoRow(rowNumber, { task_text: value.trim() }, "แก้ไข Todo แล้ว");
       return;
     }
-    if (!global.confirm(`ลบ “${row.task_text}” หรือไม่?`)) return;
+    const childRows = row.category === "โปรเจก" && !String(row.parent_todo_id || "").trim()
+      ? getProjectTasks(row.todo_id)
+      : [];
+    const deleteMessage = childRows.length
+      ? `ลบโปรเจก “${row.task_text}” พร้อมงานย่อย ${childRows.length} รายการหรือไม่?`
+      : `ลบ “${row.task_text}” หรือไม่?`;
+    if (!global.confirm(deleteMessage)) return;
     try {
       setLoading(true);
-      await store.deleteTodo(rowNumber);
+      const rowNumbers = [...childRows.map((item) => item._rowNumber), rowNumber].sort((a, b) => b - a);
+      for (const targetRowNumber of rowNumbers) await store.deleteTodo(targetRowNumber);
+      if (row.todo_id === state.activeProjectId) state.activeProjectId = null;
       await refreshData();
-      showToast("ลบ Todo แล้ว");
+      showToast(childRows.length ? "ลบโปรเจกและงานย่อยแล้ว" : "ลบ Todo แล้ว");
     } catch (error) {
       handleError(error);
     } finally {

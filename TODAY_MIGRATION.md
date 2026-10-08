@@ -1,4 +1,4 @@
-# Migration หน้า “วันนี้” — v2.7.0
+# Migration หน้า “วันนี้” — v2.7.0 ถึง v2.9.0
 
 รุ่นนี้เพิ่ม Todo และ Habit โดยสร้างชีตใหม่ 3 ชีต ข้อมูลทั้งหมดแยกจากระบบการเงินและไม่กระทบยอด Account, Liability, Net Worth หรือกราฟ
 
@@ -7,7 +7,7 @@
 สร้างชีตชื่อ `Todos` แล้วคัดลอกบรรทัดนี้ไปวางที่ A1:
 
 ```text
-todo_id	date	category	task_text	is_important	is_completed	completed_at	created_at	updated_at
+todo_id	date	category	task_text	is_important	is_completed	completed_at	created_at	updated_at	parent_todo_id
 ```
 
 | Cell | Header |
@@ -21,8 +21,11 @@ todo_id	date	category	task_text	is_important	is_completed	completed_at	created_a
 | G1 | `completed_at` |
 | H1 | `created_at` |
 | I1 | `updated_at` |
+| J1 | `parent_todo_id` |
 
-ค่าประเภทที่ระบบใช้คือ `เรื่องงาน` และ `เรื่องส่วนตัว` ส่วนสถานะดาว/เสร็จแล้วใช้ `Yes` หรือ `No`
+ค่าประเภทที่ระบบใช้คือ `เรื่องงาน`, `เรื่องส่วนตัว` และ `โปรเจก` ส่วนสถานะดาว/เสร็จแล้วใช้ `Yes` หรือ `No`
+
+`parent_todo_id` เว้นว่างสำหรับ Todo/โปรเจกหลัก และใช้เก็บ `todo_id` ของโปรเจกสำหรับ Todo ย่อย
 
 ## 2. ชีต Habits
 
@@ -72,7 +75,8 @@ habit_log_id	habit_id	period_key	completed_date	completed_at	created_at	updated_
 
 ## 4. กติกาการทำงาน
 
-- Todo ผูกกับวันที่ที่เลือกและไม่ย้ายงานค้างไปวันใหม่อัตโนมัติ
+- Todo/โปรเจกหลักผูกกับวันที่เริ่ม และงานที่ยังไม่เสร็จจะแสดงต่อในวันถัดไปโดยไม่สร้างแถวซ้ำ
+- โปรเจกมี Todo ย่อยหนึ่งระดับ โดยงานย่อยอ้างอิงผ่าน `parent_todo_id`
 - ติ๊ก Todo แล้วระบบเก็บสถานะและแสดงข้อความขีดฆ่า; เอาติ๊กออกได้
 - ดาวใช้ระบุความสำคัญ และรายการสำคัญที่ยังไม่เสร็จจะอยู่ด้านบน
 - Habit หนึ่งรายการมีหนึ่งความถี่ การติ๊กจะใช้ร่วมกันตลอดรอบนั้น
