@@ -6,6 +6,15 @@
 
 - ยังไม่มีรายการ
 
+## [2.12.0] - 2026-10-09
+
+- เพิ่มรายละเอียด Liabilities G:N, Investments L:T และชีต InsurancePolicies / RetirementPlans
+- เงินต้นสะสม principal_amount แยกจาก funded_amount เพื่อไม่ Replay เงินต้นเก่า
+- เพิ่ม Auto/Manual risk โดยประกาศเป็นค่าประเมินของแอป ไม่อ้างเป็นคะแนนมาตรฐานผลิตภัณฑ์
+- เลือก Principal/Market และปันผล/ดอกเบี้ยรับจริงสะสมได้
+- ปรับ Snapshot Apps Script ให้ใช้โหมดมูลค่าเดียวกับหน้าเว็บ
+- รักษาค่าเดิมก่อนยืนยันเงินต้น และรักษา Transaction/บัตรเครดิต/งบ/เงินฉุกเฉินเดิม
+
 ## [2.11.0] - 2026-10-08
 
 ### Added

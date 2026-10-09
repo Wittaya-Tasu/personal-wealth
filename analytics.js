@@ -25,6 +25,37 @@
     Health: "สุขภาพ",
     Protection: "ประกันและการป้องกัน"
   });
+  const ASSET_CLASS_LABELS = Object.freeze({
+    Cash: "เงินสดและตลาดเงิน",
+    FixedIncome: "ตราสารหนี้",
+    Equity: "หุ้น",
+    Mixed: "กองทุนผสม",
+    Gold: "ทองคำและสินค้าโภคภัณฑ์",
+    RealEstate: "อสังหาริมทรัพย์และ REIT",
+    Crypto: "สินทรัพย์ดิจิทัล",
+    Alternative: "สินทรัพย์ทางเลือก",
+    Other: "อื่น ๆ"
+  });
+  const DEFAULT_ASSET_RISK = Object.freeze({
+    Cash: 1,
+    FixedIncome: 2,
+    Mixed: 4,
+    Gold: 4,
+    RealEstate: 4,
+    Equity: 5,
+    Alternative: 5,
+    Crypto: 7,
+    Other: null
+  });
+  const RISK_LABELS = Object.freeze({
+    1: "ต่ำที่สุด",
+    2: "ต่ำ",
+    3: "ค่อนข้างต่ำ",
+    4: "ปานกลาง",
+    5: "ค่อนข้างสูง",
+    6: "สูง",
+    7: "สูงที่สุด"
+  });
 
   function toNumber(value) {
     if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -122,6 +153,44 @@
     return EXPENSE_GROUP_LABELS[normalizeExpenseGroup(value)] || "ยังไม่จัดกลุ่ม";
   }
 
+  function normalizeAssetClass(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    const aliases = {
+      cash: "Cash", money_market: "Cash", "เงินสด": "Cash", "ตลาดเงิน": "Cash",
+      fixedincome: "FixedIncome", fixed_income: "FixedIncome", bond: "FixedIncome", "ตราสารหนี้": "FixedIncome",
+      equity: "Equity", stock: "Equity", "หุ้น": "Equity",
+      mixed: "Mixed", balanced: "Mixed", "กองทุนผสม": "Mixed",
+      gold: "Gold", commodity: "Gold", "ทอง": "Gold", "ทองคำ": "Gold",
+      realestate: "RealEstate", real_estate: "RealEstate", reit: "RealEstate", "อสังหาริมทรัพย์": "RealEstate",
+      crypto: "Crypto", digital_asset: "Crypto", "คริปโท": "Crypto", "สินทรัพย์ดิจิทัล": "Crypto",
+      alternative: "Alternative", "สินทรัพย์ทางเลือก": "Alternative",
+      other: "Other", "อื่น ๆ": "Other"
+    };
+    return aliases[normalized] || "";
+  }
+
+  function assetClassLabel(value) {
+    return ASSET_CLASS_LABELS[normalizeAssetClass(value)] || "ยังไม่ระบุประเภทสินทรัพย์";
+  }
+
+  function defaultRiskForAssetClass(value) {
+    const assetClass = normalizeAssetClass(value);
+    return assetClass ? DEFAULT_ASSET_RISK[assetClass] : null;
+  }
+
+  function investmentRisk(row) {
+    const source = String(row?.risk_source || "Auto").trim().toLowerCase();
+    const manual = Math.round(toNumber(row?.risk_level));
+    const level = source === "manual" && manual >= 1 && manual <= 7
+      ? manual
+      : defaultRiskForAssetClass(row?.asset_class);
+    return {
+      level,
+      source: source === "manual" ? "Manual" : "Auto",
+      label: level ? RISK_LABELS[level] : "ยังไม่ระบุ"
+    };
+  }
+
   function hasBooleanValue(value) {
     const normalized = String(value ?? "").trim().toLowerCase();
     return typeof value === "boolean"
@@ -159,10 +228,24 @@
     return (rows || []).reduce((total, row) => total + toNumber(selector(row)), 0);
   }
 
+  function hasCellValue(value) {
+    return value !== "" && value !== null && value !== undefined;
+  }
+
+  function getInvestmentPrincipal(row) {
+    if (hasCellValue(row?.principal_amount)) return Math.max(toNumber(row.principal_amount), 0);
+    return null; // Legacy funding is only linked contributions, not necessarily lifetime principal.
+  }
+
+  function hasInvestmentMarketValue(row) {
+    return row?.valuation_mode === "Market" && hasCellValue(row?.current_value);
+  }
+
   function getInvestmentValue(row) {
-    const current = toNumber(row.current_value);
-    if (current || row.current_value === 0 || row.current_value === "0") return current;
-    return toNumber(row.units) * toNumber(row.current_price);
+    if (row?.valuation_mode === "Principal") return getInvestmentPrincipal(row) ?? 0;
+    if (hasCellValue(row?.current_value)) return Math.max(toNumber(row.current_value), 0);
+    const unitsValue = toNumber(row?.units) * toNumber(row?.current_price);
+    return unitsValue > 0 ? unitsValue : (getInvestmentPrincipal(row) ?? 0);
   }
 
   function getAssetValue(row) {
@@ -448,7 +531,7 @@
     };
   }
 
-  function buildFourTierOverview({ currentMonth, savingsRate, debtServiceRatio, emergencyMonths, emergencyFund, budget, sinkingFunds, investments, totalAssets }) {
+  function buildFourTierOverview({ currentMonth, savingsRate, debtServiceRatio, emergencyMonths, emergencyFund, budget, sinkingFunds, investments, totalAssets, insurance, retirement }) {
     const incomeStatus = currentMonth.income <= 0
       ? { key: "incomplete", label: "ข้อมูลไม่ครบ" }
       : currentMonth.cashflow < 0
@@ -468,15 +551,204 @@
         : emergencyMonths >= 3
           ? { key: "building", label: "กำลังสร้าง" }
           : { key: "attention", label: "ควรเร่งสะสม" };
-    const investmentStatus = investments > 0
-      ? { key: "building", label: "กำลังเติบโต" }
-      : { key: "incomplete", label: "ยังไม่มีข้อมูล" };
+    const investmentStatus = !retirement?.plan
+      ? { key: "incomplete", label: "ยังไม่ได้ตั้งแผน" }
+      : retirement.gap > 0
+        ? { key: "building", label: "กำลังสะสม" }
+        : { key: "strong", label: "ตามเป้าหมาย" };
     return [
       { tier: 1, key: "income", title: "รายได้", status: incomeStatus, value: currentMonth.income, secondary: savingsRate },
-      { tier: 2, key: "expense", title: "รายจ่ายและความคุ้มครอง", status: expenseStatus, value: budget.totalActual, secondary: budget.utilization, debtServiceRatio },
+      { tier: 2, key: "expense", title: "รายจ่าย หนี้ และความคุ้มครอง", status: expenseStatus, value: budget.totalActual, secondary: budget.utilization, debtServiceRatio, insuranceCount: insurance?.activeCount || 0 },
       { tier: 3, key: "emergency", title: "เงินฉุกเฉิน", status: emergencyStatus, value: emergencyFund.balance, secondary: emergencyMonths, target: emergencyFund.targetAmount },
-      { tier: 4, key: "investment", title: "ลงทุนและเกษียณ", status: investmentStatus, value: investments, secondary: totalAssets > 0 ? investments / totalAssets : null, sinkingMonthly: sinkingFunds.monthlyRequired }
+      { tier: 4, key: "investment", title: "ลงทุนและเกษียณ", status: investmentStatus, value: retirement?.plan ? retirement.retirementPrincipal : investments, secondary: retirement?.progress ?? (totalAssets > 0 ? investments / totalAssets : null), retirementGap: retirement?.gap, sinkingMonthly: sinkingFunds.monthlyRequired }
     ];
+  }
+
+  function buildDebtOverview(liabilities, anchor = new Date()) {
+    const rows = (liabilities || []).map((row) => {
+      const balance = Math.max(toNumber(row.total_amount), 0);
+      const original = Math.max(toNumber(row.original_amount), 0);
+      const rate = Math.max(toNumber(row.interest_rate), 0);
+      const dueDate = parseDate(row.due_date);
+      const progress = original > 0 ? Math.max(0, Math.min(1 - (balance / original), 1)) : null;
+      return { ...row, balance, original, rate, dueDate, progress };
+    });
+    const totalBalance = rows.reduce((total, row) => total + row.balance, 0);
+    const weightedRate = totalBalance > 0
+      ? rows.reduce((total, row) => total + (row.balance * row.rate), 0) / totalBalance
+      : 0;
+    return {
+      rows,
+      totalBalance,
+      monthlyPayment: rows.reduce((total, row) => total + Math.max(toNumber(row.monthly_payment), 0), 0),
+      weightedRate,
+      creditCardBalance: rows.filter((row) => String(row.liability_type || "").toLowerCase() === "creditcard")
+        .reduce((total, row) => total + row.balance, 0),
+      dueWithinYear: rows.filter((row) => row.dueDate && row.dueDate >= anchor && row.dueDate <= new Date(anchor.getFullYear() + 1, anchor.getMonth(), anchor.getDate())).length
+    };
+  }
+
+  function buildInsuranceOverview(policies, anchor = new Date()) {
+    const today = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate(), 12, 0, 0);
+    const upcomingLimit = new Date(today);
+    upcomingLimit.setDate(upcomingLimit.getDate() + 90);
+    const rows = (policies || []).map((row) => {
+      const status = String(row.status || "Active").trim();
+      const renewalDate = parseDate(row.renewal_date);
+      return {
+        ...row,
+        status,
+        renewalDate,
+        coverage: Math.max(toNumber(row.coverage_amount), 0),
+        annualPremium: Math.max(toNumber(row.annual_premium), 0)
+      };
+    }).sort((a, b) => {
+      if (!a.renewalDate && !b.renewalDate) return String(a.policy_name || "").localeCompare(String(b.policy_name || ""), "th");
+      if (!a.renewalDate) return 1;
+      if (!b.renewalDate) return -1;
+      return a.renewalDate - b.renewalDate;
+    });
+    rows.forEach((row) => {
+      const endDate = parseDate(row.end_date);
+      if (row.status.toLowerCase() === "active" && endDate && endDate < today) row.status = "Expired";
+    });
+    const active = rows.filter((row) => row.status.toLowerCase() === "active");
+    return {
+      rows,
+      activeCount: active.length,
+      totalCoverage: active.reduce((total, row) => total + row.coverage, 0),
+      annualPremium: active.reduce((total, row) => total + row.annualPremium, 0),
+      monthlyPremium: active.reduce((total, row) => total + row.annualPremium, 0) / 12,
+      upcomingRenewals: active.filter((row) => row.renewalDate && row.renewalDate >= today && row.renewalDate <= upcomingLimit).length,
+      expiredCount: rows.filter((row) => row.status.toLowerCase() === "expired").length
+    };
+  }
+
+  function normalizeInvestmentPurpose(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (["retirement", "เกษียณ"].includes(normalized)) return "Retirement";
+    if (["income", "สร้างรายได้"].includes(normalized)) return "Income";
+    if (["growth", "เติบโต"].includes(normalized)) return "Growth";
+    if (["preservation", "รักษาเงินต้น"].includes(normalized)) return "Preservation";
+    return normalized ? "Other" : "";
+  }
+
+  function buildInvestmentOverview(investments) {
+    const rows = (investments || []).map((row) => {
+      const principal = getInvestmentPrincipal(row);
+      const hasMarketValue = hasInvestmentMarketValue(row);
+      const currentValue = getInvestmentValue(row);
+      const risk = investmentRisk(row);
+      return {
+        ...row,
+        principal,
+        hasMarketValue,
+        currentValue,
+        profitLoss: hasMarketValue && principal !== null ? currentValue - principal : null,
+        incomeReceived: Math.max(toNumber(row.income_received), 0),
+        assetClass: normalizeAssetClass(row.asset_class),
+        assetClassLabel: assetClassLabel(row.asset_class),
+        purpose: normalizeInvestmentPurpose(row.investment_purpose),
+        risk
+      };
+    });
+    const totalPrincipal = rows.reduce((total, row) => total + row.principal, 0);
+    const knownRiskPrincipal = rows.reduce((total, row) => total + (row.risk.level ? row.principal : 0), 0);
+    const weightedRisk = knownRiskPrincipal > 0
+      ? rows.reduce((total, row) => total + (row.risk.level ? row.principal * row.risk.level : 0), 0) / knownRiskPrincipal
+      : null;
+    const allocationMap = new Map();
+    rows.forEach((row) => {
+      if (row.principal === null) return;
+      const key = row.assetClass || "Unclassified";
+      allocationMap.set(key, (allocationMap.get(key) || 0) + row.principal);
+    });
+    return {
+      rows,
+      totalPrincipal,
+      unknownPrincipalCount: rows.filter((row) => row.principal === null).length,
+      totalDisplayValue: rows.reduce((total, row) => total + row.currentValue, 0),
+      trackedMarketValue: rows.filter((row) => row.hasMarketValue).reduce((total, row) => total + row.currentValue, 0),
+      totalIncomeReceived: rows.reduce((total, row) => total + row.incomeReceived, 0),
+      weightedRisk,
+      unclassifiedCount: rows.filter((row) => !row.assetClass).length,
+      allocation: [...allocationMap.entries()].map(([assetClass, principal], index) => ({
+        assetClass,
+        name: assetClass === "Unclassified" ? "ยังไม่ระบุประเภท" : ASSET_CLASS_LABELS[assetClass],
+        principal,
+        percentage: totalPrincipal > 0 ? principal / totalPrincipal : 0,
+        color: COLORS[index % COLORS.length]
+      })).sort((a, b) => b.principal - a.principal)
+    };
+  }
+
+  function calculateAge(birthDate, anchor) {
+    if (!birthDate) return null;
+    let age = anchor.getFullYear() - birthDate.getFullYear();
+    const birthdayPassed = anchor.getMonth() > birthDate.getMonth()
+      || (anchor.getMonth() === birthDate.getMonth() && anchor.getDate() >= birthDate.getDate());
+    if (!birthdayPassed) age -= 1;
+    return Math.max(age, 0);
+  }
+
+  function buildRetirementOverview(plans, investments, anchor = new Date()) {
+    const activePlans = (plans || []).filter((row) => String(row.status || "Active").trim().toLowerCase() === "active");
+    const plan = activePlans[0] || null;
+    const investmentOverview = buildInvestmentOverview(investments);
+    const retirementPrincipal = investmentOverview.rows
+      .filter((row) => row.purpose === "Retirement")
+      .reduce((total, row) => total + row.principal, 0);
+    if (!plan) {
+      return { plan: null, activePlanCount: activePlans.length, retirementPrincipal, investmentOverview };
+    }
+    const birthDate = parseDate(plan.birth_date);
+    const currentAge = calculateAge(birthDate, anchor);
+    const retirementAge = Math.max(toNumber(plan.retirement_age), 0);
+    const retirementDate = birthDate ? new Date(birthDate.getFullYear() + retirementAge, birthDate.getMonth(), birthDate.getDate(), 12) : null;
+    const yearsToRetirement = retirementDate ? Math.max((retirementDate - anchor) / (365.2425 * 86400000), 0) : null;
+    const inflationRate = Math.max(toNumber(plan.inflation_rate), 0) / 100;
+    const expectedReturn = Math.max(toNumber(plan.expected_return), 0) / 100;
+    const withdrawalRate = Math.max(toNumber(plan.withdrawal_rate), 0) / 100;
+    const monthlyExpenseToday = Math.max(toNumber(plan.monthly_expense_today), 0);
+    const monthlyContribution = Math.max(toNumber(plan.monthly_contribution), 0);
+    const monthlyExpenseAtRetirement = yearsToRetirement === null
+      ? null
+      : monthlyExpenseToday * ((1 + inflationRate) ** yearsToRetirement);
+    const targetFund = monthlyExpenseAtRetirement === null || withdrawalRate <= 0
+      ? null
+      : (monthlyExpenseAtRetirement * 12) / withdrawalRate;
+    const months = yearsToRetirement === null ? 0 : Math.round(yearsToRetirement * 12);
+    const monthlyReturn = ((1 + expectedReturn) ** (1 / 12)) - 1;
+    const futurePrincipal = yearsToRetirement === null
+      ? null
+      : retirementPrincipal * ((1 + expectedReturn) ** yearsToRetirement);
+    const futureContributions = yearsToRetirement === null
+      ? null
+      : monthlyReturn > 0
+        ? monthlyContribution * ((((1 + monthlyReturn) ** months) - 1) / monthlyReturn)
+        : monthlyContribution * months;
+    const projectedFund = futurePrincipal === null ? null : futurePrincipal + futureContributions;
+    const gap = targetFund === null || projectedFund === null ? null : Math.max(targetFund - projectedFund, 0);
+    return {
+      plan,
+      activePlanCount: activePlans.length,
+      birthDate,
+      currentAge,
+      retirementAge,
+      yearsToRetirement,
+      inflationRate,
+      expectedReturn,
+      withdrawalRate,
+      monthlyExpenseToday,
+      monthlyExpenseAtRetirement,
+      monthlyContribution,
+      retirementPrincipal,
+      targetFund,
+      projectedFund,
+      gap,
+      progress: targetFund > 0 ? Math.min(projectedFund / targetFund, 1) : null,
+      investmentOverview
+    };
   }
 
   function classifyAllocation(label, source) {
@@ -503,7 +775,8 @@
       (data.accounts || []).forEach((row) => add("เงินสดและเงินฝาก", row.balance));
     }
     (data.investments || []).forEach((row) => {
-      add(classifyAllocation(row.category, row.asset_name), getInvestmentValue(row));
+      const realClass = normalizeAssetClass(row.asset_class);
+      add(realClass ? ASSET_CLASS_LABELS[realClass] : classifyAllocation(row.category, row.asset_name), getInvestmentValue(row));
     });
     (data.assets || []).forEach((row) => {
       add(classifyAllocation(row.category, row.asset_name), getAssetValue(row));
@@ -647,7 +920,9 @@
       snapshots: data.snapshots || [],
       settings: data.settings || [],
       budgets: data.budgets || [],
-      sinkingFunds: data.sinkingFunds || []
+      sinkingFunds: data.sinkingFunds || [],
+      insurancePolicies: data.insurancePolicies || [],
+      retirementPlans: data.retirementPlans || []
     };
     const settings = rowsToSettings(safeData.settings, defaults);
     const accountAssets = settings.include_accounts_in_net_worth
@@ -754,6 +1029,10 @@
     const allocation = buildAllocation(safeData, settings.include_accounts_in_net_worth);
     const budget = buildBudgetOverview(safeData.budgets, safeData.transactions, currentMonthKey);
     const sinkingFunds = buildSinkingFundOverview(safeData.sinkingFunds, safeData.accounts, anchor);
+    const debt = buildDebtOverview(safeData.liabilities, anchor);
+    const insurance = buildInsuranceOverview(safeData.insurancePolicies, anchor);
+    const investmentOverview = buildInvestmentOverview(safeData.investments);
+    const retirement = buildRetirementOverview(safeData.retirementPlans, safeData.investments, anchor);
     const fourTiers = buildFourTierOverview({
       currentMonth,
       savingsRate,
@@ -763,7 +1042,9 @@
       budget,
       sinkingFunds,
       investments,
-      totalAssets
+      totalAssets,
+      insurance,
+      retirement
     });
     const goals = buildGoalRows(safeData.goals, safeData.accounts);
     const warnings = buildWarnings(safeData, settings, snapshots, monthly, goals, budget);
@@ -800,6 +1081,12 @@
     sinkingFunds.rows.forEach((fund) => {
       if (fund.trackingError && !warnings.includes(fund.trackingError)) warnings.push(fund.trackingError);
     });
+    if (investmentOverview.unclassifiedCount > 0) {
+      warnings.push(`มีการลงทุน ${investmentOverview.unclassifiedCount} รายการที่ยังไม่ระบุประเภทสินทรัพย์จริง จึงยังประเมินความเสี่ยงและสัดส่วนเงินต้นไม่ได้ครบ`);
+    }
+    if (retirement.activePlanCount > 1) {
+      warnings.push("พบแผนเกษียณสถานะ Active มากกว่า 1 แผน ระบบใช้แผนแรก กรุณาพักแผนที่ไม่ใช้");
+    }
 
     const transactions = [...safeData.transactions]
       .map((row) => ({
@@ -841,6 +1128,10 @@
       expenseClassification,
       budget,
       sinkingFunds,
+      debt,
+      insurance,
+      investmentOverview,
+      retirement,
       fourTiers,
       snapshots,
       netWorthChange,
@@ -861,6 +1152,13 @@
     accountRoleLabel,
     normalizeExpenseGroup,
     expenseGroupLabel,
+    normalizeAssetClass,
+    assetClassLabel,
+    defaultRiskForAssetClass,
+    investmentRisk,
+    normalizeInvestmentPurpose,
+    getInvestmentPrincipal,
+    hasInvestmentMarketValue,
     getInvestmentValue,
     getAssetValue,
     rowsToSettings,
@@ -871,6 +1169,10 @@
     buildExpenseBreakdown,
     buildBudgetOverview,
     buildSinkingFundOverview,
+    buildDebtOverview,
+    buildInsuranceOverview,
+    buildInvestmentOverview,
+    buildRetirementOverview,
     buildFourTierOverview,
     buildGoalRows,
     buildViewModel

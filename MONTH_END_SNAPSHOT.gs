@@ -1,5 +1,5 @@
 /**
- * Personal Wealth v2.7.0 — automatic month-end snapshot
+ * TasuyaWay v2.12.0 — automatic month-end snapshot
  *
  * วิธีติดตั้ง:
  * 1) เปิด Google Sheet > Extensions > Apps Script
@@ -66,9 +66,10 @@ function upsertMonthlySnapshot_(anchor, note) {
     ? sum_(accounts, (row) => row.balance)
     : 0;
   const investmentAssets = sum_(investments, (row) => {
+    if (row.valuation_mode === "Principal") return toNumber_(row.principal_amount);
     const explicit = row.current_value;
     if (explicit !== "" && explicit !== null && explicit !== undefined) return explicit;
-    return toNumber_(row.units) * toNumber_(row.current_price);
+    return (toNumber_(row.units) * toNumber_(row.current_price)) || toNumber_(row.principal_amount);
   });
   const otherAssets = sum_(assets, (row) => toNumber_(row.estimated_value) || toNumber_(row.purchase_price));
   const totalLiabilities = sum_(liabilities, (row) => row.total_amount);

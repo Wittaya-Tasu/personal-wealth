@@ -19,6 +19,8 @@
     cashflowTableMode: "percent",
     goalSchemaMissingHeaders: [],
     investmentSchemaMissingHeaders: [],
+    investmentPlanningSchemaMissingHeaders: [],
+    liabilityDetailSchemaMissingHeaders: [],
     transactionSchemaMissingHeaders: [],
     accountRoleSchemaMissingHeaders: [],
     expensePlanningSchemaMissingHeaders: [],
@@ -29,6 +31,8 @@
     habitLogSchemaMissingHeaders: [],
     budgetSchemaMissingHeaders: [],
     sinkingFundSchemaMissingHeaders: [],
+    insuranceSchemaMissingHeaders: [],
+    retirementSchemaMissingHeaders: [],
     charts: {
       netWorth: null,
       cashflow: null,
@@ -49,12 +53,15 @@
     transaction: { title: "รายรับ–รายจ่าย", eyebrow: "CASH FLOW", sheet: config.SHEETS.transactions },
     creditCardPayment: { title: "ชำระบัตรเครดิต", eyebrow: "CREDIT CARD", sheet: config.SHEETS.transactions },
     investment: { title: "เงินลงทุน", eyebrow: "PORTFOLIO", sheet: config.SHEETS.investments },
+    investmentMeta: { title: "รายละเอียดการลงทุน", eyebrow: "INVESTMENT PROFILE", sheet: config.SHEETS.investments },
     account: { title: "บัญชีเงิน", eyebrow: "CASH & BANK", sheet: config.SHEETS.accounts },
     asset: { title: "ทรัพย์สิน", eyebrow: "ASSET", sheet: config.SHEETS.assets },
     liability: { title: "หนี้สิน", eyebrow: "LIABILITY", sheet: config.SHEETS.liabilities },
     goal: { title: "เป้าหมาย", eyebrow: "GOAL", sheet: config.SHEETS.goals },
     budget: { title: "งบประมาณ", eyebrow: "MONTHLY BUDGET", sheet: config.SHEETS.budgets || "Budgets" },
-    sinkingFund: { title: "เงินเตรียมรายจ่าย", eyebrow: "SINKING FUND", sheet: config.SHEETS.sinkingFunds || "SinkingFunds" }
+    sinkingFund: { title: "เงินเตรียมรายจ่าย", eyebrow: "SINKING FUND", sheet: config.SHEETS.sinkingFunds || "SinkingFunds" },
+    insurance: { title: "กรมธรรม์ประกัน", eyebrow: "INSURANCE", sheet: config.SHEETS.insurancePolicies || "InsurancePolicies" },
+    retirement: { title: "แผนเกษียณ", eyebrow: "RETIREMENT", sheet: config.SHEETS.retirementPlans || "RetirementPlans" }
   };
 
   const EXPENSE_CATEGORIES = [
@@ -76,6 +83,18 @@
     ["HomeDebt", "บ้าน รถ และหนี้"],
     ["Health", "สุขภาพ"],
     ["Protection", "ประกันและการป้องกัน"]
+  ];
+
+  const ASSET_CLASSES = [
+    ["Cash", "เงินสดและตลาดเงิน"], ["FixedIncome", "ตราสารหนี้"], ["Equity", "หุ้น"],
+    ["Mixed", "กองทุนผสม"], ["Gold", "ทองคำและสินค้าโภคภัณฑ์"],
+    ["RealEstate", "อสังหาริมทรัพย์และ REIT"], ["Crypto", "สินทรัพย์ดิจิทัล"],
+    ["Alternative", "สินทรัพย์ทางเลือก"], ["Other", "อื่น ๆ"]
+  ];
+
+  const INVESTMENT_PURPOSES = [
+    ["Retirement", "เกษียณ"], ["Growth", "เติบโตระยะยาว"], ["Income", "สร้างรายได้"],
+    ["Preservation", "รักษาเงินต้น"], ["Other", "อื่น ๆ"]
   ];
 
   const qs = (selector, scope = document) => scope.querySelector(selector);
@@ -181,7 +200,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js?v=2.11.0").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.12.0").catch(() => {});
     }
   }
 
@@ -338,6 +357,8 @@
       state.data = data;
       state.goalSchemaMissingHeaders = store.getMissingGoalMetadataHeaders();
       state.investmentSchemaMissingHeaders = store.getMissingInvestmentFundingHeaders();
+      state.investmentPlanningSchemaMissingHeaders = store.getMissingInvestmentPlanningHeaders();
+      state.liabilityDetailSchemaMissingHeaders = store.getMissingLiabilityDetailHeaders();
       state.transactionSchemaMissingHeaders = store.getMissingTransactionItemHeaders();
       state.accountRoleSchemaMissingHeaders = store.getMissingAccountRoleHeaders();
       state.expensePlanningSchemaMissingHeaders = store.getMissingExpensePlanningHeaders();
@@ -348,6 +369,8 @@
       state.habitLogSchemaMissingHeaders = store.getMissingHabitLogHeaders();
       state.budgetSchemaMissingHeaders = store.getMissingBudgetHeaders();
       state.sinkingFundSchemaMissingHeaders = store.getMissingSinkingFundHeaders();
+      state.insuranceSchemaMissingHeaders = store.getMissingInsuranceHeaders();
+      state.retirementSchemaMissingHeaders = store.getMissingRetirementHeaders();
       state.viewModel = analytics.buildViewModel(data, config.DEFAULTS);
       populateChartFilters();
       renderAll();
@@ -504,6 +527,12 @@
         + state.investmentSchemaMissingHeaders.join(", ")
       );
     }
+    if (state.investmentPlanningSchemaMissingHeaders.length) {
+      warnings.push(`ระบบประเภทสินทรัพย์และความเสี่ยงยังไม่พร้อม: เพิ่ม Header ใน Investments ได้แก่ ${state.investmentPlanningSchemaMissingHeaders.join(", ")}`);
+    }
+    if (state.liabilityDetailSchemaMissingHeaders.length) {
+      warnings.push(`รายละเอียดหนี้ยังไม่พร้อม: เพิ่ม Header ใน Liabilities ได้แก่ ${state.liabilityDetailSchemaMissingHeaders.join(", ")}`);
+    }
     if (state.transactionSchemaMissingHeaders.length) {
       warnings.push(
         `ฟังก์ชันชื่อรายการรายจ่ายยังไม่พร้อม: เพิ่ม Header ในชีต Transactions ต่อท้ายแถวที่ 1 ได้แก่ `
@@ -533,6 +562,12 @@
         `ระบบเงินเตรียมรายจ่ายยังไม่พร้อม: สร้างชีต SinkingFunds และ Header `
         + state.sinkingFundSchemaMissingHeaders.join(", ")
       );
+    }
+    if (state.insuranceSchemaMissingHeaders.length) {
+      warnings.push(`ระบบประกันยังไม่พร้อม: สร้างชีต InsurancePolicies และ Header ${state.insuranceSchemaMissingHeaders.join(", ")}`);
+    }
+    if (state.retirementSchemaMissingHeaders.length) {
+      warnings.push(`ระบบแผนเกษียณยังไม่พร้อม: สร้างชีต RetirementPlans และ Header ${state.retirementSchemaMissingHeaders.join(", ")}`);
     }
     if (state.creditCardSchemaMissingHeaders.length) {
       warnings.push(
@@ -1001,7 +1036,7 @@
           ? 0
           : Math.max(0, Math.min(vm.emergencyMonths / vm.settings.emergency_months_target, 1));
       } else {
-        detail.textContent = `คิดเป็น ${formatPercent(tier.secondary, 0)} ของสินทรัพย์รวม · เงินเตรียมรายจ่ายที่ควรเก็บ ${formatCurrency(vm.sinkingFunds.monthlyRequired)}/เดือน`;
+        detail.textContent = vm.retirement.plan ? `เงินต้นเพื่อเกษียณ · ช่องว่างคาดการณ์ ${formatCurrency(vm.retirement.gap)}` : `เงินต้นลงทุนที่ยืนยัน ${formatCurrency(vm.investmentOverview.totalPrincipal)} · ยังไม่ได้ตั้งแผนเกษียณ`;
         progressValue = Math.max(0, Math.min(tier.secondary || 0, 1));
       }
       const progress = createElement("div", "tier-progress");
@@ -1030,7 +1065,7 @@
     summary.append(budgetCard, sinkingCard);
 
     const scopeNote = createElement("p", "wealth-scope-note");
-    scopeNote.textContent = "ภาพรวมนี้ใช้ข้อมูลที่ระบบมีในปัจจุบัน: รายละเอียดประกันจะเพิ่มในขั้นที่ 5 และเป้าหมายเกษียณ/ระดับความเสี่ยงจะเพิ่มในขั้นที่ 6";
+    scopeNote.textContent = `ประกันที่มีผล ${vm.insurance.activeCount} ฉบับ · เบี้ยต่อปี ${formatCurrency(vm.insurance.annualPremium)} · การลงทุนใหม่ใช้เงินต้นเป็นค่าเริ่มต้น มูลค่านี้ไม่ใช่ราคาขายปัจจุบัน`;
     container.append(grid, summary, scopeNote);
   }
 
@@ -1163,11 +1198,105 @@
     });
   }
 
+
+  function planningMetric(container, label, value, detail = "") {
+    const card = createElement("article", "overview-mini-card");
+    card.append(createElement("span", "metric-label", label), createElement("strong", "", value));
+    if (detail) card.appendChild(createElement("p", "", detail));
+    container.appendChild(card);
+  }
+
+  function planningNotice(container, message) {
+    container.appendChild(createElement("p", "wealth-scope-note", message));
+  }
+
+  function renderInvestmentPlanning(container) {
+    const summary = state.viewModel.investmentOverview;
+    const metrics = createElement("div", "wealth-overview-summary");
+    planningMetric(metrics, "เงินต้นสะสมที่ยืนยันแล้ว", formatCurrency(summary.totalPrincipal), summary.unknownPrincipalCount ? `ยังขาดเงินต้น ${summary.unknownPrincipalCount} รายการ` : "รวมเงินต้นทุกสินทรัพย์");
+    planningMetric(metrics, "ปันผล / ดอกเบี้ยรับจริงสะสม", formatCurrency(summary.totalIncomeReceived), "เฉพาะยอดที่กรอกไว้ ไม่บวกซ้ำในความมั่งคั่ง");
+    container.appendChild(metrics);
+    const composition = createElement("div", "investment-composition");
+    composition.appendChild(createElement("h3", "", "สัดส่วนเงินต้นตามสินทรัพย์จริง"));
+    summary.allocation.forEach((row) => {
+      const line = createElement("div", "composition-item");
+      line.append(createElement("span", "", row.name), createElement("strong", "", `${formatCurrency(row.principal)} · ${formatPercent(row.percentage, 1)}`));
+      const track = createElement("div", "planning-progress");
+      const bar = createElement("span"); bar.style.width = `${row.percentage * 100}%`; bar.style.background = row.color; track.appendChild(bar);
+      line.appendChild(track); composition.appendChild(line);
+    });
+    container.appendChild(composition);
+    if (!summary.rows.length) container.appendChild(emptyState());
+    summary.rows.forEach((row) => {
+      const card = createElement("article", "detail-card");
+      card.append(createElement("h3", "", row.asset_name || "การลงทุน"));
+      card.append(createElement("strong", "detail-main", row.principal === null ? "ยังไม่ได้ยืนยันเงินต้น" : `เงินต้น ${formatCurrency(row.principal)}`));
+      const purpose = INVESTMENT_PURPOSES.find(([key]) => key === row.purpose)?.[1] || "ยังไม่ระบุวัตถุประสงค์";
+      card.append(createElement("p", "", `${row.assetClassLabel} · ${purpose} · ${row.time_horizon_years ? `${row.time_horizon_years} ปี` : "ยังไม่ระบุระยะเวลา"}`));
+      card.append(createElement("p", "", `ความเสี่ยงเบื้องต้น ${row.risk.level ? `${row.risk.level}/7 ${row.risk.label}` : "ยังไม่ระบุ"} (${row.risk.source === "Manual" ? "กำหนดเอง" : "อัตโนมัติ"})`));
+      if (row.hasMarketValue) {
+        card.append(createElement("p", "", `มูลค่าปัจจุบัน ${formatCurrency(row.currentValue)} · กำไร/ขาดทุน ${row.profitLoss === null ? "—" : formatCurrency(row.profitLoss)}`));
+        card.append(createElement("small", "", `วันที่มูลค่า ${row.valuation_date ? formatDate(analytics.parseDate(row.valuation_date)) : "ยังไม่ระบุ"}`));
+      } else if (!row.valuation_mode) planningNotice(card, "ข้อมูลเดิม: ความมั่งคั่งยังใช้ยอดเดิมจนกว่าจะบันทึกรายละเอียดและเลือกใช้เงินต้น");
+      const actions = createElement("div", "detail-actions");
+      actions.append(editButton("investment", row._rowNumber, row.asset_name, "เพิ่มเงิน"), editButton("investmentMeta", row._rowNumber, row.asset_name, "รายละเอียด"), deleteButton(config.SHEETS.investments, row._rowNumber, row.asset_name));
+      card.appendChild(actions); container.appendChild(card);
+    });
+    planningNotice(container, "ค่าความเสี่ยงอัตโนมัติเป็นค่าตั้งต้นของแอปตามประเภทสินทรัพย์ ดูข้อมูลผลิตภัณฑ์จริงเพื่อปรับเองได้ เงินต้นไม่ใช่มูลค่าที่ขายได้ ณ วันนี้");
+  }
+
+  function renderInsurancePlanning(container) {
+    if (!store.isInsuranceSheetReady()) { planningNotice(container, "สร้างชีต InsurancePolicies ตาม WEALTH_LIFETIME_MIGRATION.md ก่อนบันทึก"); return; }
+    const info = state.viewModel.insurance;
+    const metrics = createElement("div", "wealth-overview-summary");
+    planningMetric(metrics, "กรมธรรม์ที่มีผล", `${info.activeCount} ฉบับ`, `วันจ่ายเบี้ยใน 90 วัน ${info.upcomingRenewals} ฉบับ`);
+    planningMetric(metrics, "เบี้ยต่อปี", formatCurrency(info.annualPremium), `เฉลี่ย ${formatCurrency(info.monthlyPremium)}/เดือน`);
+    container.appendChild(metrics);
+    if (!info.rows.length) container.appendChild(emptyState());
+    info.rows.forEach((row) => {
+      const card = createElement("article", "detail-card");
+      card.append(createElement("h3", "", row.policy_name), createElement("p", "", `${row.insurer || "ไม่ระบุบริษัท"} · ${row.insured_person || "ไม่ระบุผู้เอาประกัน"}`));
+      card.append(createElement("strong", "detail-main", `วงเงิน ${formatCurrency(row.coverage)}`));
+      card.append(createElement("p", "", `เบี้ย ${formatCurrency(row.annualPremium)}/ปี · ครั้งถัดไป ${formatDate(row.renewalDate)}`));
+      card.append(createElement("p", "", `สถานะ ${row.status === "Active" ? "มีผล" : row.status === "Expired" ? "หมดอายุ" : "ยกเลิก"}`));
+      if (row.note) card.append(createElement("p", "", row.note));
+      const actions = createElement("div", "detail-actions");
+      actions.append(editButton("insurance", row._rowNumber, row.policy_name), deleteButton(store.getInsuranceSheetName(), row._rowNumber, row.policy_name));
+      card.appendChild(actions); container.appendChild(card);
+    });
+    planningNotice(container, "วงเงินประกันแสดงแยกรายกรมธรรม์ ไม่รวมต่างประเภทเป็นวงเงินเดียว และไม่ถือเป็นสินทรัพย์ใน Net Worth");
+  }
+
+  function renderRetirementPlanning(container) {
+    if (!store.isRetirementSheetReady()) { planningNotice(container, "สร้างชีต RetirementPlans ตาม WEALTH_LIFETIME_MIGRATION.md ก่อนบันทึก"); return; }
+    const info = state.viewModel.retirement;
+    if (info.plan) {
+      const metrics = createElement("div", "wealth-overview-summary");
+      planningMetric(metrics, "เงินต้นเพื่อเกษียณ", formatCurrency(info.retirementPrincipal), "เฉพาะการลงทุนที่เลือกวัตถุประสงค์เกษียณ");
+      planningMetric(metrics, "เวลาถึงเกษียณ", `${info.yearsToRetirement.toFixed(1)} ปี`, `อายุปัจจุบัน ${info.currentAge} · เกษียณ ${info.retirementAge}`);
+      planningMetric(metrics, "เป้าหมายเงินก้อน ณ เกษียณ", formatCurrency(info.targetFund), `ค่าใช้จ่ายประมาณ ${formatCurrency(info.monthlyExpenseAtRetirement)}/เดือน ณ เกษียณ`);
+      planningMetric(metrics, "ยอดคาดการณ์ ณ เกษียณ", formatCurrency(info.projectedFund), `ช่องว่างประมาณ ${formatCurrency(info.gap)}`);
+      container.appendChild(metrics);
+      planningNotice(container, `สมมติฐาน: เงินเฟ้อ ${formatPercent(info.inflationRate, 1)} · ผลตอบแทน ${formatPercent(info.expectedReturn, 1)} · ถอนใช้ ${formatPercent(info.withdrawalRate, 1)} · สะสม ${formatCurrency(info.monthlyContribution)}/เดือน ยอดนี้เป็นประมาณการตามสมมติฐาน`);
+      if (info.investmentOverview.unknownPrincipalCount) planningNotice(container, "มีเงินต้นที่ยังไม่ได้ยืนยัน ไปที่การลงทุน > รายละเอียด เพื่อเติมข้อมูลก่อนใช้ตัวเลขแผน");
+    } else planningNotice(container, "ยังไม่มีแผนเกษียณที่ใช้งาน กดเพิ่มแผน และกำหนดวัตถุประสงค์เกษียณให้สินทรัพย์ที่ต้องการนับ");
+    (state.data.retirementPlans || []).forEach((row) => {
+      const card = createElement("article", "detail-card");
+      card.append(createElement("h3", "", row.plan_name), createElement("p", "", row.status === "Paused" ? "พักแผน" : "ใช้งาน"));
+      const actions = createElement("div", "detail-actions");
+      actions.append(editButton("retirement", row._rowNumber, row.plan_name), deleteButton(store.getRetirementSheetName(), row._rowNumber, row.plan_name));
+      card.appendChild(actions); container.appendChild(card);
+    });
+  }
+
   function renderWealthList() {
     const container = qs("#wealthList");
     container.replaceChildren();
     const data = state.viewModel?.data;
     if (!data) return;
+    if (state.wealthTab === "investments") { renderInvestmentPlanning(container); return; }
+    if (state.wealthTab === "insurance") { renderInsurancePlanning(container); return; }
+    if (state.wealthTab === "retirement") { renderRetirementPlanning(container); return; }
     if (state.wealthTab === "overview") {
       renderWealthOverview(container);
       return;
@@ -1212,9 +1341,8 @@
         rows: data.liabilities,
         sheet: config.SHEETS.liabilities,
         name: (row) => row.liability_name || "หนี้สิน",
-        meta: (row) => store.isCreditCardLiability(row)
-          ? "บัตรเครดิต · หนี้ระยะสั้น"
-          : `ค่างวด ${formatCurrency(row.monthly_payment || 0)}/เดือน`,
+        meta: (row) => `${store.isCreditCardLiability(row) ? "บัตรเครดิต · หนี้ระยะสั้น" : `ค่างวด ${formatCurrency(row.monthly_payment || 0)}/เดือน`} · ดอกเบี้ย ${row.interest_rate === "" || row.interest_rate == null ? "—" : `${row.interest_rate}%/ปี`} · วันชำระ ${row.payment_day || "—"} · ครบกำหนด ${formatDate(analytics.parseDate(row.due_date))}${row.linked_asset ? ` · ${row.linked_asset}` : ""}`,
+
         value: (row) => row.total_amount,
         icon: "−",
         className: "liability"
@@ -1961,7 +2089,8 @@
         liability: "liabilities",
         goal: "goals",
         budget: "budgets",
-        sinkingFund: "sinkingFunds"
+        sinkingFund: "sinkingFunds",
+        investmentMeta: "investments", insurance: "insurancePolicies", retirement: "retirementPlans"
       };
       const collection = collectionMap[edit.dataset.editType];
       const record = (state.data?.[collection] || []).find((row) => row._rowNumber === Number(edit.dataset.editRow));
@@ -2080,11 +2209,12 @@
     } else if (state.wealthTab === "sinkingFunds") {
       button.lastChild.textContent = " เพิ่มเงินเตรียม";
     } else {
-      button.lastChild.textContent = " เพิ่มข้อมูล";
+      button.lastChild.textContent = state.wealthTab === "insurance" ? " เพิ่มกรมธรรม์" : state.wealthTab === "retirement" ? " เพิ่มแผน" : " เพิ่มข้อมูล";
     }
   }
 
   function openWealthAdd() {
+    if (["insurance", "retirement"].includes(state.wealthTab)) { openForm(state.wealthTab); return; }
     if (state.wealthTab === "budgets") {
       openForm("budget");
       return;
@@ -2255,7 +2385,66 @@
     return options.join("");
   }
 
+
+  function choiceField(record, key, label, options, fallback = "", required = true) {
+    const selected = String(record?.[key] ?? fallback);
+    return `<label class="field"><span>${label}</span><select name="${key}" ${required ? "required" : ""}><option value="">เลือก${label}</option>${options.map(([value, text]) => `<option value="${value}" ${selected === value ? "selected" : ""}>${text}</option>`).join("")}</select></label>`;
+  }
+
+  function detailField(record, key, label, type = "text", fallback = "", required = false) {
+    const value = type === "date" ? inputDate(record, key, fallback) : inputValue(record, key, fallback);
+    return `<label class="field"><span>${label}</span><input name="${key}" type="${type}" value="${value}" ${type === "number" ? 'min="0" step="any" inputmode="decimal"' : ""} ${required ? "required" : ""}></label>`;
+  }
+
+  function investmentPlanningFields(record, profile = false) {
+    return choiceField(record, "investment_purpose", "วัตถุประสงค์", INVESTMENT_PURPOSES)
+      + choiceField(record, "asset_class", "สินทรัพย์จริงที่ลงทุน", ASSET_CLASSES)
+      + `<p class="security-note">RMF / PVD / ETF เป็นรูปแบบผลิตภัณฑ์ ให้เลือกสินทรัพย์ที่ลงทุนจริง หากมีหลายประเภทให้เลือกกองทุนผสม</p>`
+      + detailField(record, "time_horizon_years", "ระยะเวลาที่ตั้งใจลงทุน (ปี)", "number", "", true)
+      + choiceField(record, "risk_source", "การกำหนดความเสี่ยง", [["Auto", "อัตโนมัติตามประเภทสินทรัพย์"], ["Manual", "กำหนดเอง"]], "Auto")
+      + choiceField(record, "risk_level", "ระดับความเสี่ยงเบื้องต้น", [["1", "1 ต่ำที่สุด"], ["2", "2 ต่ำ"], ["3", "3 ค่อนข้างต่ำ"], ["4", "4 ปานกลาง"], ["5", "5 ค่อนข้างสูง"], ["6", "6 สูง"], ["7", "7 สูงที่สุด"]], "", false)
+      + `<p class="security-note" data-risk-help>ค่าเริ่มต้นของแอปเป็นเพียงค่าประเมินตามประเภทสินทรัพย์ ไม่ใช่คะแนนจากหนังสือชี้ชวนหรือผลประเมินความเหมาะสมส่วนบุคคล</p>`
+      + (profile ? detailField(record, "principal_amount", "เงินต้นสะสมจริงทั้งหมด (บาท)", "number", "", true)
+        + `<p class="security-note">รวมเงินต้นเดิมก่อนใช้แอป การแก้ช่องนี้ไม่หักหรือคืนเงินบัญชี</p>`
+        + choiceField(record, "valuation_mode", "ยอดที่ใช้ในความมั่งคั่ง", [["Principal", "เงินต้น — ไม่ต้องอัปเดตราคาตลาด"], ["Market", "มูลค่าปัจจุบัน — แสดงกำไร/ขาดทุน"]], "Principal")
+        + `<div data-market-fields>`
+        + detailField(record, "current_value", "มูลค่าปัจจุบัน (เลือกกรอก)", "number")
+        + detailField(record, "valuation_date", "วันที่อัปเดตมูลค่า", "date") + `</div>`
+        + detailField(record, "income_received", "ปันผล/ดอกเบี้ยที่รับจริงสะสม (เลือกกรอก)", "number")
+        + `<p class="security-note">ช่องนี้เป็นยอดสะสมสำหรับติดตามเท่านั้น หากต้องการเพิ่มเงินเข้าบัญชี ให้บันทึก Income หนึ่งครั้ง ไม่รวมยอดนี้ในเงินต้นหรือ Net Worth ซ้ำ</p>`
+        : `<div data-principal-opening>${detailField(record, "principal_amount", "เงินต้นสะสมก่อนเพิ่มเงินรอบนี้ (บาท)", "number", "", true)}<p class="security-note">กรอกเงินต้นเดิมทั้งหมด เพื่อไม่ให้เงินลงทุนก่อนใช้แอปหายไป</p></div>`);
+  }
+
+  function extraWealthTemplate(type, record) {
+    const submit = '<button class="primary-button full-width" type="submit">บันทึกข้อมูล</button>';
+    const note = detailField(record, "note", "หมายเหตุ");
+    if (type === "investmentMeta") return investmentPlanningFields(record, true) + note + submit;
+    if (type === "insurance") return       detailField(record, "policy_name", "ชื่อกรมธรรม์", "text", "", true)
+      + choiceField(record, "insurance_type", "ประเภทประกัน", [["Life", "ชีวิต"], ["Health", "สุขภาพ"], ["CriticalIllness", "โรคร้ายแรง"], ["Accident", "อุบัติเหตุ"], ["Vehicle", "รถยนต์"], ["Property", "ทรัพย์สิน"], ["Other", "อื่น ๆ"]])
+      + detailField(record, "insurer", "บริษัทประกัน")
+      + detailField(record, "insured_person", "ผู้เอาประกัน / สิ่งที่คุ้มครอง")
+      + detailField(record, "coverage_amount", "วงเงินตามกรมธรรม์ (บาท)", "number")
+      + detailField(record, "annual_premium", "เบี้ยประกันรวมต่อปี (บาท)", "number")
+      + detailField(record, "start_date", "วันเริ่มคุ้มครอง", "date")
+      + detailField(record, "renewal_date", "วันชำระเบี้ยครั้งถัดไป", "date")
+      + detailField(record, "end_date", "วันสิ้นสุดคุ้มครอง", "date")
+      + choiceField(record, "status", "สถานะ", [["Active", "มีผล"], ["Expired", "หมดอายุ"], ["Cancelled", "ยกเลิก"]], "Active")
+      + `<p class="security-note">วงเงินแต่ละกรมธรรม์มีเงื่อนไขต่างกัน ดูรายละเอียดในหมายเหตุ การบันทึกกรมธรรม์ไม่สร้างรายการจ่ายเบี้ยอัตโนมัติ</p>` + note + submit;
+    if (type === "retirement") return       detailField(record, "plan_name", "ชื่อแผน", "text", "แผนเกษียณของฉัน", true)
+      + detailField(record, "birth_date", "วันเกิด", "date", "", true)
+      + detailField(record, "retirement_age", "อายุเกษียณ (ปี)", "number", "60", true)
+      + detailField(record, "monthly_expense_today", "ค่าใช้จ่ายหลังเกษียณต่อเดือน ในค่าเงินวันนี้", "number", "", true)
+      + detailField(record, "monthly_contribution", "เงินที่วางแผนลงทุนต่อเดือน", "number", "0", true)
+      + detailField(record, "inflation_rate", "สมมติฐานเงินเฟ้อ (% ต่อปี)", "number", "2", true)
+      + detailField(record, "expected_return", "สมมติฐานผลตอบแทนสุทธิหลังค่าธรรมเนียม (% ต่อปี)", "number", "0", true)
+      + detailField(record, "withdrawal_rate", "สมมติฐานอัตราถอนใช้ต่อปี (%)", "number", "4", true)
+      + choiceField(record, "status", "สถานะแผน", [["Active", "ใช้งาน"], ["Paused", "พักแผน"]], "Active")
+      + `<p class="security-note">ประมาณการเริ่มจากเงินต้นที่กำหนดวัตถุประสงค์ “เกษียณ” อัตราถอนใช้เป็นสมมติฐานที่แก้ได้ ไม่รับรองว่าเงินจะพอทุกช่วงตลาด ค่าตั้งต้นผลตอบแทน 0% เน้นการสะสมเงินต้น</p>` + note + submit;
+    return "";
+  }
+
   function formTemplate(type, record) {
+    if (["investmentMeta", "insurance", "retirement"].includes(type)) return extraWealthTemplate(type, record);
     const saveLabel = record ? "บันทึกการแก้ไข" : "บันทึกข้อมูล";
     const note = (placeholder = "รายละเอียดเพิ่มเติม") => `
       <label class="field"><span>บันทึกช่วยจำ</span>
@@ -2400,6 +2589,7 @@
         <label class="field"><span>ใช้เงินจากบัญชี</span><select name="account_from" required>${accountOptions(record?.account_from, "เลือกบัญชีที่ใช้ลงทุน")}</select></label>
         <label class="field"><span>ยอดเงินที่ลงทุนเพิ่ม (บาท)</span><input name="funded_amount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="เช่น 5000" required></label>
         <p class="security-note">ระบบจะหักเฉพาะยอดเงินรอบนี้จากบัญชี และเพิ่มเข้ามูลค่าสินทรัพย์เดิม โดยไม่นับเป็นรายจ่ายใน Cash Flow</p>
+        ${investmentPlanningFields(record)}
         <button class="primary-button full-width" type="submit">เพิ่มเงินลงทุน</button>`;
     }
 
@@ -2450,7 +2640,15 @@
           <label class="field"><span>ยอดหนี้คงเหลือ</span><input name="total_amount" type="number" min="0" step="0.01" inputmode="decimal" value="${inputValue(record, "total_amount")}" required></label>
           <label class="field" data-monthly-payment-field><span>ค่างวดต่อเดือน</span><input name="monthly_payment" type="number" min="0" step="0.01" inputmode="decimal" value="${inputValue(record, "monthly_payment")}"></label>
         </div>
-        ${note("หากต้องการติดตามดอกเบี้ย ให้ระบุไว้ชั่วคราวในช่องนี้")}
+        ${choiceField(record, "debt_category", "ประเภทหนี้", [["Mortgage", "บ้าน"], ["Auto", "รถ"], ["CreditCard", "บัตรเครดิต"], ["Personal", "ส่วนบุคคล"], ["Education", "การศึกษา"], ["Business", "ธุรกิจ"], ["Other", "อื่น ๆ"]], liabilityType === "CreditCard" ? "CreditCard" : "Other")}
+        ${detailField(record, "original_amount", "ยอดกู้เริ่มต้น (เลือกกรอก)", "number")}
+        ${detailField(record, "interest_rate", "ดอกเบี้ยตามสัญญา (% ต่อปี)", "number")}
+        ${detailField(record, "start_date", "วันที่เริ่มสัญญา", "date")}
+        ${detailField(record, "due_date", "วันครบกำหนดสัญญา", "date")}
+        ${detailField(record, "payment_day", "วันชำระแต่ละเดือน (1–31)", "number")}
+        ${detailField(record, "credit_limit", "วงเงินบัตรเครดิต (เลือกกรอก)", "number")}
+        ${detailField(record, "linked_asset", "ทรัพย์สินที่เกี่ยวข้อง (ชื่อหรือรายละเอียด)")}
+        ${note("เงื่อนไขดอกเบี้ย เช่น คงที่ / ลอยตัว / แบบ Flat rate")}
         ${submit}`;
     }
 
@@ -2508,6 +2706,27 @@
   }
 
   function bindFormBehavior(type) {
+    if (["investment", "investmentMeta"].includes(type)) {
+      const form = qs("#dynamicForm");
+      const syncRisk = () => {
+        const auto = form.elements.risk_source.value !== "Manual";
+        if (auto) form.elements.risk_level.value = analytics.defaultRiskForAssetClass(form.elements.asset_class.value) || "";
+        form.elements.risk_level.disabled = auto;
+        const fields = qs("[data-market-fields]", form);
+        if (fields) {
+          const market = form.elements.valuation_mode.value === "Market";
+          fields.hidden = !market;
+          // Preserve stored market values when optional tracking is hidden.
+          form.elements.current_value.required = market;
+        }
+      };
+      form.elements.risk_source.addEventListener("change", syncRisk);
+      form.elements.asset_class.addEventListener("change", syncRisk);
+      form.elements.valuation_mode?.addEventListener("change", syncRisk);
+      form._syncRisk = syncRisk;
+      syncRisk();
+      if (type === "investmentMeta") return;
+    }
     if (type === "sinkingFund") {
       const form = qs("#dynamicForm");
       const updateSource = () => {
@@ -2576,6 +2795,15 @@
         newAssetField.hidden = !isNew;
         newAssetInput.disabled = !isNew;
         newAssetInput.required = isNew;
+        const basis = selectedRecord || {};
+        ["investment_purpose", "asset_class", "risk_source", "risk_level", "time_horizon_years", "principal_amount"].forEach((key) => {
+          form.elements[key].value = basis[key] ?? (key === "risk_source" ? "Auto" : "");
+        });
+        const opening = qs("[data-principal-opening]", form);
+        opening.hidden = isNew;
+        form.elements.principal_amount.disabled = isNew;
+        form.elements.principal_amount.required = !isNew;
+        form._syncRisk();
 
         if (accountSelect.dataset.locked === "true") accountSelect.value = "";
         accountSelect.disabled = false;
@@ -2854,6 +3082,14 @@
         await store.updateSinkingFundRecord(state.activeRecord._rowNumber, state.activeRecord, values);
       } else if (type === "sinkingFund") {
         await store.appendSinkingFund(values);
+      } else if (type === "investmentMeta") {
+        await store.updateInvestmentProfile(state.activeRecord._rowNumber, state.activeRecord, values);
+      } else if (type === "insurance") {
+        if (state.activeRecord?._rowNumber) await store.updateInsuranceRecord(state.activeRecord._rowNumber, state.activeRecord, values);
+        else await store.appendInsurance(values);
+      } else if (type === "retirement") {
+        if (state.activeRecord?._rowNumber) await store.updateRetirementRecord(state.activeRecord._rowNumber, state.activeRecord, values);
+        else await store.appendRetirement(values);
       } else if (type === "investment") {
         await store.addInvestmentContribution(values);
       } else if (type === "liability" && state.activeRecord?._rowNumber) {

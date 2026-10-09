@@ -1,3 +1,12 @@
+# ข้อกำหนดล่าสุด v2.12.0 (มีลำดับเหนือข้อมูลรุ่นก่อนด้านล่าง)
+
+อ่าน WEALTH_LIFETIME_MIGRATION.md และ PROJECT_STATE.md ก่อนแก้ระบบ
+เงินต้นสะสมใช้ principal_amount เท่านั้น ไม่ใช้ funded_amount เป็นเงินต้นตลอดชีวิตและไม่ใช้มูลค่าตลาดเดาเงินต้น
+funded_amount ยังคงเป็นยอดที่แอปหักจาก Account เพื่อรองรับ rollback เดิม การแก้ profile ไม่เปลี่ยนยอดนี้
+valuation_mode Principal/Market ต้องสอดคล้องกับ MONTH_END_SNAPSHOT.gs
+ความเสี่ยงเป็นค่าเริ่มต้นคร่าว ๆ ที่ผู้ใช้ปรับเองได้ ไม่มีคะแนนมาตรฐานสากลจากชนิดสินทรัพย์อย่างเดียว
+สร้างสองชีตใหม่ InsurancePolicies / RetirementPlans และเพิ่ม Header ต่อท้ายตามคู่มือ ห้ามเปลี่ยน Header เดิม
+
 # TasuyaWay AI Agent — Master Prompt
 
 ไฟล์นี้เป็นรายละเอียดและความจำหลักสำหรับ AI Agent ที่ดูแลโครงการ TasuyaWay (เดิม Personal Wealth) ของหมอโย  

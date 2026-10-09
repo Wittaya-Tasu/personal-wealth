@@ -1,6 +1,14 @@
-# ติดตั้ง Snapshot สิ้นเดือนอัตโนมัติ — v2.7.0
+# ติดตั้ง Snapshot สิ้นเดือนอัตโนมัติ — v2.12.0
 
 GitHub Pages และ PWA ไม่สามารถทำงานเองเมื่อปิดแอป รุ่นนี้จึงใช้ Google Apps Script ที่ผูกกับ Google Sheet เพื่อบันทึก Snapshot แม้ไม่ได้เปิด WebApp
+
+## อัปเดตจากรุ่นเดิม
+
+หากติดตั้ง Trigger ไว้แล้ว ให้เปิดไฟล์ Script เดิมที่มี `runMonthEndSnapshot` แล้วแทนโค้ดทั้งหมดด้วย `MONTH_END_SNAPSHOT.gs` จาก ZIP v2.12.0 จากนั้น Save ไม่ต้องสร้างไฟล์ที่มีฟังก์ชันซ้ำหรือรันติดตั้ง Trigger ใหม่
+
+รุ่นนี้ทำให้ Investments โหมด Principal ใช้เงินต้น ส่วนโหมด Market ใช้มูลค่าที่กรอก รวมถึงมูลค่า 0 เพื่อให้ยอด Snapshot ตรงกับหน้าเว็บ
+
+ดูการเพิ่มคอลัมน์และรายละเอียดใน [WEALTH_LIFETIME_MIGRATION.md](WEALTH_LIFETIME_MIGRATION.md)
 
 ## วิธีติดตั้งครั้งเดียว
 

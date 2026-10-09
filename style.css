@@ -2416,3 +2416,20 @@ svg {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Lifetime planning: readable figures and controls on narrow screens. */
+.detail-card, .investment-composition { min-width: 0; margin-top: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; }
+.detail-card h3, .investment-composition h3 { margin: 0 0 10px; font-size: 16px; overflow-wrap: anywhere; }
+.detail-main { display: block; font-size: 21px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.detail-card p { margin: 8px 0; color: var(--muted-2); line-height: 1.6; font-size: 13px; overflow-wrap: anywhere; }
+.detail-card small { color: var(--muted-2); }
+.detail-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.detail-actions button { min-height: 44px; min-width: 44px; }
+.composition-item { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; margin: 14px 0; font-size: 13px; }
+.composition-item strong { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.composition-item .planning-progress { margin-top: 4px; }
+.tier-title h3 { white-space: normal; overflow: visible; }
+.tier-heading { flex-wrap: wrap; }
+.wealth-tabs { overflow-x: auto; }
+.wealth-tabs button { flex-shrink: 0; }
+.planning-summary div { white-space: normal; overflow-wrap: anywhere; }

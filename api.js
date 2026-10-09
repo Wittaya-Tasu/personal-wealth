@@ -9,6 +9,7 @@
   const MONEY_PRECISION = 100;
   const GOAL_METADATA_HEADERS = ["goal_type", "progress_source", "linked_account", "status"];
   const INVESTMENT_FUNDING_HEADERS = ["account_from", "funded_amount"];
+  const INVESTMENT_PLANNING_HEADERS = ["investment_purpose", "asset_class", "risk_source", "risk_level", "time_horizon_years", "income_received", "principal_amount", "valuation_mode", "valuation_date"];
   const TRANSACTION_ITEM_HEADERS = ["item_name"];
   const CREDIT_CARD_TRANSACTION_HEADERS = ["payment_method", "credit_card"];
   const ACCOUNT_ROLE_HEADERS = ["account_role"];
@@ -16,6 +17,9 @@
   const BUDGET_HEADERS = ["budget_id", "month", "expense_group", "budget_amount", "note", "created_at", "updated_at"];
   const SINKING_FUND_HEADERS = ["fund_id", "fund_name", "target_amount", "current_amount", "due_date", "progress_source", "linked_account", "expense_group", "status", "note", "created_at", "updated_at"];
   const LIABILITY_TYPE_HEADERS = ["liability_type"];
+  const LIABILITY_DETAIL_HEADERS = ["debt_category", "original_amount", "interest_rate", "start_date", "due_date", "payment_day", "credit_limit", "linked_asset"];
+  const INSURANCE_HEADERS = ["policy_id", "policy_name", "insurance_type", "insurer", "coverage_amount", "annual_premium", "start_date", "renewal_date", "end_date", "insured_person", "status", "note", "created_at", "updated_at"];
+  const RETIREMENT_HEADERS = ["retirement_id", "plan_name", "birth_date", "retirement_age", "monthly_expense_today", "inflation_rate", "expected_return", "withdrawal_rate", "monthly_contribution", "status", "note", "created_at", "updated_at"];
   const GRATITUDE_HEADERS = ["gratitude_id", "date", "slot", "category", "gratitude_text", "created_at", "updated_at"];
   const TODO_HEADERS = ["todo_id", "date", "category", "task_text", "is_important", "is_completed", "completed_at", "created_at", "updated_at", "parent_todo_id"];
   const HABIT_HEADERS = ["habit_id", "habit_name", "frequency", "active", "created_at", "updated_at"];
@@ -27,6 +31,14 @@
   const EXPENSE_GROUPS = new Set(["Personal", "Family", "HomeDebt", "Health", "Protection"]);
   const SINKING_FUND_SOURCES = new Set(["Manual", "Account"]);
   const SINKING_FUND_STATUSES = new Set(["Active", "Paused", "Completed"]);
+  const ASSET_CLASSES = new Set(["Cash", "FixedIncome", "Equity", "Mixed", "Gold", "RealEstate", "Crypto", "Alternative", "Other"]);
+  const INVESTMENT_PURPOSES = new Set(["Retirement", "Growth", "Income", "Preservation", "Other"]);
+  const RISK_SOURCES = new Set(["Auto", "Manual"]);
+  const DEFAULT_ASSET_RISK = Object.freeze({ Cash: 1, FixedIncome: 2, Mixed: 4, Gold: 4, RealEstate: 4, Equity: 5, Alternative: 5, Crypto: 7, Other: null });
+  const DEBT_CATEGORIES = new Set(["Mortgage", "Auto", "CreditCard", "Personal", "Education", "Business", "Other"]);
+  const INSURANCE_TYPES = new Set(["Life", "Health", "CriticalIllness", "Accident", "Vehicle", "Property", "Other"]);
+  const INSURANCE_STATUSES = new Set(["Active", "Expired", "Cancelled"]);
+  const RETIREMENT_STATUSES = new Set(["Active", "Paused"]);
 
   function waitFor(predicate, timeoutMs = 15000) {
     return new Promise((resolve, reject) => {
@@ -141,10 +153,97 @@
     return "Loan";
   }
 
+  function normalizeAssetClass(value) {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    const aliases = {
+      cash: "Cash", money_market: "Cash", "เงินสด": "Cash", "ตลาดเงิน": "Cash",
+      fixedincome: "FixedIncome", fixed_income: "FixedIncome", bond: "FixedIncome", "ตราสารหนี้": "FixedIncome",
+      equity: "Equity", stock: "Equity", "หุ้น": "Equity",
+      mixed: "Mixed", balanced: "Mixed", "กองทุนผสม": "Mixed",
+      gold: "Gold", commodity: "Gold", "ทอง": "Gold", "ทองคำ": "Gold",
+      realestate: "RealEstate", real_estate: "RealEstate", reit: "RealEstate", "อสังหาริมทรัพย์": "RealEstate",
+      crypto: "Crypto", digital_asset: "Crypto", "คริปโท": "Crypto", "สินทรัพย์ดิจิทัล": "Crypto",
+      alternative: "Alternative", "สินทรัพย์ทางเลือก": "Alternative",
+      other: "Other", "อื่น ๆ": "Other"
+    };
+    return aliases[normalized] || "";
+  }
+
+  function normalizeInvestmentPurpose(value) {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    if (["retirement", "เกษียณ"].includes(normalized)) return "Retirement";
+    if (["growth", "เติบโต"].includes(normalized)) return "Growth";
+    if (["income", "สร้างรายได้"].includes(normalized)) return "Income";
+    if (["preservation", "รักษาเงินต้น"].includes(normalized)) return "Preservation";
+    if (["other", "อื่น ๆ"].includes(normalized)) return "Other";
+    return "";
+  }
+
+  function normalizeRiskSource(value) {
+    return String(value ?? "").trim().toLowerCase() === "manual" ? "Manual" : "Auto";
+  }
+
+  function hasCellValue(value) {
+    return value !== "" && value !== null && value !== undefined;
+  }
+
   function investmentValue(record) {
-    const explicitValue = toMoney(record?.current_value);
-    if (explicitValue > 0) return explicitValue;
-    return roundMoney(toMoney(record?.units) * toMoney(record?.current_price));
+    if (hasCellValue(record?.current_value)) return Math.max(roundMoney(record.current_value), 0);
+    const unitsValue = roundMoney(toMoney(record?.units) * toMoney(record?.current_price));
+    if (unitsValue > 0) return unitsValue;
+    return Math.max(roundMoney(record?.funded_amount), 0);
+  }
+
+  function isValidIsoDate(value, allowBlank = true) {
+    const text = normalizeName(value);
+    if (!text) return allowBlank;
+    const parts = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!parts) return false;
+    const date = new Date(Date.UTC(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3])));
+    return date.getUTCFullYear() === Number(parts[1])
+      && date.getUTCMonth() === Number(parts[2]) - 1
+      && date.getUTCDate() === Number(parts[3]);
+  }
+
+  function validateInvestmentPlanning(record, { requireFields = true } = {}) {
+    for (const field of ["principal_amount", "current_value", "income_received", "time_horizon_years", "risk_level"]) {
+      const value = record?.[field];
+      if (hasCellValue(value) && !Number.isFinite(Number(String(value).replace(/[,฿\s]/g, "")))) throw new Error(`ข้อมูลตัวเลขไม่ถูกต้อง: ${field}`);
+    }
+    const purpose = normalizeInvestmentPurpose(record?.investment_purpose);
+    const assetClass = normalizeAssetClass(record?.asset_class);
+    const riskSource = normalizeRiskSource(record?.risk_source);
+    const requestedRisk = toMoney(record?.risk_level);
+    const horizon = normalizeName(record?.time_horizon_years) === "" ? "" : Number(record.time_horizon_years);
+    const incomeReceived = normalizeName(record?.income_received) === "" ? "" : roundMoney(record.income_received);
+    const currentValue = normalizeName(record?.current_value) === "" ? "" : roundMoney(record.current_value);
+    const principal = normalizeName(record?.principal_amount) === "" ? "" : roundMoney(record.principal_amount);
+    const valuationMode = record?.valuation_mode || "Principal";
+    if (principal === "" || principal < 0) throw new Error("กรุณาระบุเงินต้นสะสมจริง รวมเงินต้นเดิมก่อนเริ่มใช้แอป");
+    if (!["Principal", "Market"].includes(valuationMode)) throw new Error("รูปแบบมูลค่าไม่ถูกต้อง");
+    if (valuationMode === "Market" && currentValue === "") throw new Error("กรุณากรอกมูลค่าปัจจุบัน หรือเลือกใช้เงินต้น");
+    if (!isValidIsoDate(record?.valuation_date, true)) throw new Error("วันที่มูลค่าไม่ถูกต้อง");
+    if (requireFields && !INVESTMENT_PURPOSES.has(purpose)) throw new Error("กรุณาเลือกเป้าหมายการลงทุน");
+    if (requireFields && !ASSET_CLASSES.has(assetClass)) throw new Error("กรุณาเลือกประเภทสินทรัพย์จริง");
+    if (!RISK_SOURCES.has(riskSource)) throw new Error("แหล่งระดับความเสี่ยงไม่ถูกต้อง");
+    const riskLevel = riskSource === "Auto" ? (DEFAULT_ASSET_RISK[assetClass] || "") : requestedRisk;
+    if (riskSource === "Manual" && !(Number.isInteger(riskLevel) && riskLevel >= 1 && riskLevel <= 7)) throw new Error("ระดับความเสี่ยงต้องอยู่ระหว่าง 1–7");
+    if (horizon !== "" && (!Number.isInteger(horizon) || horizon < 1 || horizon > 100)) throw new Error("ระยะเวลาลงทุนต้องอยู่ระหว่าง 1–100 ปี");
+    if (requireFields && horizon === "") throw new Error("กรุณาระบุระยะเวลาการลงทุน");
+    if (incomeReceived !== "" && incomeReceived < 0) throw new Error("เงินปันผลหรือดอกเบี้ยสะสมติดลบไม่ได้");
+    if (currentValue !== "" && currentValue < 0) throw new Error("มูลค่าปัจจุบันติดลบไม่ได้");
+    return {
+      investment_purpose: purpose,
+      asset_class: assetClass,
+      risk_source: riskSource,
+      risk_level: riskLevel,
+      time_horizon_years: horizon,
+      income_received: incomeReceived,
+      current_value: currentValue,
+      principal_amount: principal,
+      valuation_mode: valuationMode,
+      valuation_date: normalizeName(record?.valuation_date)
+    };
   }
 
   function normalizeGoalType(value) {
@@ -233,6 +332,8 @@
       this.habitLogLoadError = null;
       this.budgetLoadError = null;
       this.sinkingFundLoadError = null;
+      this.insuranceLoadError = null;
+      this.retirementLoadError = null;
     }
 
     async init() {
@@ -380,7 +481,7 @@
     }
 
     async loadAll() {
-      const optionalKeys = new Set(["gratitude", "todos", "habits", "habitLogs", "budgets", "sinkingFunds"]);
+      const optionalKeys = new Set(["gratitude", "todos", "habits", "habitLogs", "budgets", "sinkingFunds", "insurancePolicies", "retirementPlans"]);
       const entries = Object.entries(this.config.SHEETS).filter(([key]) => !optionalKeys.has(key));
       const ranges = entries.map(([, sheetName]) => `${quoteSheet(sheetName)}!A:Z`);
       const response = await this.request("/values:batchGet", {
@@ -418,6 +519,8 @@
       await this.loadOptionalSheet(data, "habitLogs", this.getHabitLogSheetName(), "G", "habitLogLoadError");
       await this.loadOptionalSheet(data, "budgets", this.getBudgetSheetName(), "G", "budgetLoadError");
       await this.loadOptionalSheet(data, "sinkingFunds", this.getSinkingFundSheetName(), "L", "sinkingFundLoadError");
+      await this.loadOptionalSheet(data, "insurancePolicies", this.getInsuranceSheetName(), "N", "insuranceLoadError");
+      await this.loadOptionalSheet(data, "retirementPlans", this.getRetirementSheetName(), "M", "retirementLoadError");
 
       this.currentData = data;
       return data;
@@ -442,6 +545,10 @@
       return this.getMissingHeaders(this.config.SHEETS.investments, INVESTMENT_FUNDING_HEADERS);
     }
 
+    getMissingInvestmentPlanningHeaders() {
+      return this.getMissingHeaders(this.config.SHEETS.investments, INVESTMENT_PLANNING_HEADERS);
+    }
+
     getMissingTransactionItemHeaders() {
       return this.getMissingHeaders(this.config.SHEETS.transactions, TRANSACTION_ITEM_HEADERS);
     }
@@ -460,6 +567,10 @@
 
     getMissingLiabilityTypeHeaders() {
       return this.getMissingHeaders(this.config.SHEETS.liabilities, LIABILITY_TYPE_HEADERS);
+    }
+
+    getMissingLiabilityDetailHeaders() {
+      return this.getMissingHeaders(this.config.SHEETS.liabilities, LIABILITY_DETAIL_HEADERS);
     }
 
     getMissingCreditCardHeaders() {
@@ -502,6 +613,14 @@
       return this.config.SHEETS.sinkingFunds || "SinkingFunds";
     }
 
+    getInsuranceSheetName() {
+      return this.config.SHEETS.insurancePolicies || "InsurancePolicies";
+    }
+
+    getRetirementSheetName() {
+      return this.config.SHEETS.retirementPlans || "RetirementPlans";
+    }
+
     getMissingTodoHeaders() {
       const headers = this.headers[this.getTodoSheetName()] || [];
       return TODO_HEADERS.filter((header) => !headers.includes(header));
@@ -527,6 +646,16 @@
       return SINKING_FUND_HEADERS.filter((header) => !headers.includes(header));
     }
 
+    getMissingInsuranceHeaders() {
+      const headers = this.headers[this.getInsuranceSheetName()] || [];
+      return INSURANCE_HEADERS.filter((header) => !headers.includes(header));
+    }
+
+    getMissingRetirementHeaders() {
+      const headers = this.headers[this.getRetirementSheetName()] || [];
+      return RETIREMENT_HEADERS.filter((header) => !headers.includes(header));
+    }
+
     isTodoSheetReady() {
       return !this.todoLoadError && this.getMissingTodoHeaders().length === 0;
     }
@@ -546,6 +675,14 @@
       return !this.sinkingFundLoadError && this.getMissingSinkingFundHeaders().length === 0;
     }
 
+    isInsuranceSheetReady() {
+      return !this.insuranceLoadError && this.getMissingInsuranceHeaders().length === 0;
+    }
+
+    isRetirementSheetReady() {
+      return !this.retirementLoadError && this.getMissingRetirementHeaders().length === 0;
+    }
+
     buildRow(sheetName, record) {
       const headers = this.getHeaders(sheetName);
       const primaryIdHeader = headers[0];
@@ -555,13 +692,18 @@
       });
     }
 
+    rowInputOption(sheetName) {
+      // Keep ISO dates and product/policy names literal in the new planning records.
+      return [this.getInsuranceSheetName(), this.getRetirementSheetName(), this.config.SHEETS.investments, this.config.SHEETS.liabilities].includes(sheetName) ? "RAW" : "USER_ENTERED";
+    }
+
     async append(sheetName, record) {
       const row = this.buildRow(sheetName, record);
       const range = `${quoteSheet(sheetName)}!A1`;
       const result = await this.request(`/values/${encodeURIComponent(range)}:append`, {
         method: "POST",
         query: {
-          valueInputOption: "USER_ENTERED",
+          valueInputOption: this.rowInputOption(sheetName),
           insertDataOption: "INSERT_ROWS"
         },
         body: { majorDimension: "ROWS", values: [row] }
@@ -579,7 +721,7 @@
       const range = `${quoteSheet(sheetName)}!A${rowNumber}:${endColumn}${rowNumber}`;
       return this.request(`/values/${encodeURIComponent(range)}`, {
         method: "PUT",
-        query: { valueInputOption: "USER_ENTERED" },
+        query: { valueInputOption: this.rowInputOption(sheetName) },
         body: { majorDimension: "ROWS", values: [row] }
       });
     }
@@ -809,7 +951,10 @@
     }
 
     validateLiabilityRecord(record, existingRecord = null) {
-      const missingHeaders = this.getMissingLiabilityTypeHeaders();
+      const missingHeaders = [
+        ...this.getMissingLiabilityTypeHeaders(),
+        ...this.getMissingLiabilityDetailHeaders()
+      ];
       if (missingHeaders.length) {
         const error = new Error(
           `ชีต Liabilities ยังขาด Header: ${missingHeaders.join(", ")} `
@@ -842,13 +987,36 @@
       const liabilityType = normalizeLiabilityType(record?.liability_type, name);
       const totalAmount = roundMoney(record?.total_amount);
       const monthlyPayment = liabilityType === "CreditCard" ? 0 : roundMoney(record?.monthly_payment);
-      if (totalAmount < 0 || monthlyPayment < 0) throw new Error("ยอดหนี้และค่างวดต้องไม่ติดลบ");
+      const categoryRaw = normalizeName(record?.debt_category);
+      const categoryAliases = { mortgage: "Mortgage", auto: "Auto", creditcard: "CreditCard", credit_card: "CreditCard", personal: "Personal", education: "Education", business: "Business", other: "Other" };
+      const debtCategory = liabilityType === "CreditCard"
+        ? "CreditCard"
+        : categoryAliases[categoryRaw.toLowerCase()] || categoryRaw;
+      const originalAmount = roundMoney(record?.original_amount);
+      const interestRate = hasCellValue(record?.interest_rate) ? toMoney(record.interest_rate) : "";
+      const paymentDay = normalizeName(record?.payment_day) ? Number(record.payment_day) : "";
+      const creditLimit = liabilityType === "CreditCard" ? roundMoney(record?.credit_limit) : "";
+      const startDate = normalizeName(record?.start_date);
+      const dueDate = normalizeName(record?.due_date);
+      if (!DEBT_CATEGORIES.has(debtCategory)) throw new Error("กรุณาเลือกประเภทหนี้");
+      if (totalAmount < 0 || monthlyPayment < 0 || originalAmount < 0 || creditLimit < 0) throw new Error("ยอดหนี้ ค่างวด เงินต้นเดิม และวงเงินต้องไม่ติดลบ");
+      if (interestRate < 0 || interestRate > 100) throw new Error("อัตราดอกเบี้ยต้องอยู่ระหว่าง 0–100% ต่อปี");
+      if (paymentDay !== "" && (!Number.isInteger(paymentDay) || paymentDay < 1 || paymentDay > 31)) throw new Error("วันชำระต้องอยู่ระหว่างวันที่ 1–31");
+      if (!isValidIsoDate(startDate, true) || !isValidIsoDate(dueDate, true)) throw new Error("วันที่เริ่มหรือวันครบกำหนดหนี้ไม่ถูกต้อง");
       return {
         ...record,
         liability_name: name,
         liability_type: liabilityType,
         total_amount: totalAmount,
-        monthly_payment: monthlyPayment
+        monthly_payment: monthlyPayment,
+        debt_category: debtCategory,
+        original_amount: originalAmount,
+        interest_rate: interestRate,
+        start_date: startDate,
+        due_date: dueDate,
+        payment_day: paymentDay,
+        credit_limit: creditLimit,
+        linked_asset: normalizeName(record?.linked_asset)
       };
     }
 
@@ -1223,6 +1391,126 @@
       );
     }
 
+    getInsuranceRows() {
+      return this.currentData?.insurancePolicies || [];
+    }
+
+    validateInsuranceRecord(record, existingRecord = null) {
+      if (!this.isInsuranceSheetReady()) {
+        const error = new Error(`ระบบประกันยังไม่พร้อม กรุณาสร้างชีต InsurancePolicies และ Header: ${INSURANCE_HEADERS.join(", ")}`);
+        error.code = "INSURANCE_SCHEMA_MIGRATION_REQUIRED";
+        error.missingHeaders = this.getMissingInsuranceHeaders();
+        throw error;
+      }
+      const policyName = normalizeName(record?.policy_name);
+      const insuranceType = normalizeName(record?.insurance_type);
+      const status = normalizeName(record?.status || "Active");
+      const coverageAmount = roundMoney(record?.coverage_amount);
+      const annualPremium = roundMoney(record?.annual_premium);
+      const startDate = normalizeName(record?.start_date);
+      const renewalDate = normalizeName(record?.renewal_date);
+      const endDate = normalizeName(record?.end_date);
+      if (!policyName) throw new Error("กรุณาระบุชื่อกรมธรรม์");
+      if (!INSURANCE_TYPES.has(insuranceType)) throw new Error("กรุณาเลือกประเภทประกัน");
+      if (!INSURANCE_STATUSES.has(status)) throw new Error("สถานะกรมธรรม์ไม่ถูกต้อง");
+      if (coverageAmount < 0 || annualPremium < 0) throw new Error("วงเงินคุ้มครองและเบี้ยประกันต้องไม่ติดลบ");
+      if (![startDate, renewalDate, endDate].every((date) => isValidIsoDate(date, true))) throw new Error("วันที่กรมธรรม์ไม่ถูกต้อง");
+      if (startDate && endDate && endDate < startDate) throw new Error("วันสิ้นสุดกรมธรรม์ต้องไม่ก่อนวันเริ่ม");
+      const duplicate = this.getInsuranceRows().find((row) => {
+        return row._rowNumber !== existingRecord?._rowNumber
+          && accountKey(row.policy_name) === accountKey(policyName);
+      });
+      if (duplicate) throw new Error(`มีกรมธรรม์ชื่อ “${policyName}” อยู่แล้ว`);
+      const now = new Date().toISOString();
+      return {
+        ...(existingRecord || {}),
+        ...record,
+        policy_id: existingRecord?.policy_id || record?.policy_id || `policy-${createShortId()}`,
+        policy_name: policyName,
+        insurance_type: insuranceType,
+        insurer: normalizeName(record?.insurer),
+        coverage_amount: coverageAmount,
+        annual_premium: annualPremium,
+        start_date: startDate,
+        renewal_date: renewalDate,
+        end_date: endDate,
+        insured_person: normalizeName(record?.insured_person),
+        status,
+        note: normalizeName(record?.note),
+        created_at: existingRecord?.created_at || record?.created_at || now,
+        updated_at: now
+      };
+    }
+
+    async appendInsurance(record) {
+      return this.append(this.getInsuranceSheetName(), this.validateInsuranceRecord(record));
+    }
+
+    async updateInsuranceRecord(rowNumber, existingRecord, record) {
+      return this.update(this.getInsuranceSheetName(), rowNumber, this.validateInsuranceRecord({ ...existingRecord, ...record }, existingRecord));
+    }
+
+    getRetirementRows() {
+      return this.currentData?.retirementPlans || [];
+    }
+
+    validateRetirementRecord(record, existingRecord = null) {
+      if (!this.isRetirementSheetReady()) {
+        const error = new Error(`ระบบแผนเกษียณยังไม่พร้อม กรุณาสร้างชีต RetirementPlans และ Header: ${RETIREMENT_HEADERS.join(", ")}`);
+        error.code = "RETIREMENT_SCHEMA_MIGRATION_REQUIRED";
+        error.missingHeaders = this.getMissingRetirementHeaders();
+        throw error;
+      }
+      const planName = normalizeName(record?.plan_name);
+      const birthDate = normalizeName(record?.birth_date);
+      const retirementAge = Number(record?.retirement_age);
+      const monthlyExpense = roundMoney(record?.monthly_expense_today);
+      const inflationRate = toMoney(record?.inflation_rate);
+      const expectedReturn = toMoney(record?.expected_return);
+      const withdrawalRate = toMoney(record?.withdrawal_rate);
+      const monthlyContribution = roundMoney(record?.monthly_contribution);
+      const status = normalizeName(record?.status || "Active");
+      if (!planName) throw new Error("กรุณาระบุชื่อแผนเกษียณ");
+      if (!isValidIsoDate(birthDate, false) || birthDate > new Date().toISOString().slice(0, 10)) throw new Error("วันเกิดไม่ถูกต้อง");
+      if (!Number.isInteger(retirementAge) || retirementAge < 40 || retirementAge > 80) throw new Error("อายุเกษียณต้องอยู่ระหว่าง 40–80 ปี");
+      if (!(monthlyExpense > 0)) throw new Error("ค่าใช้จ่ายต่อเดือนหลังเกษียณต้องมากกว่า 0 บาท");
+      if ([inflationRate, expectedReturn].some((rate) => rate < 0 || rate > 30)) throw new Error("เงินเฟ้อและผลตอบแทนคาดหวังต้องอยู่ระหว่าง 0–30%");
+      if (!(withdrawalRate > 0 && withdrawalRate <= 20)) throw new Error("อัตราถอนใช้ต้องมากกว่า 0 และไม่เกิน 20%");
+      if (monthlyContribution < 0) throw new Error("เงินลงทุนต่อเดือนติดลบไม่ได้");
+      if (!RETIREMENT_STATUSES.has(status)) throw new Error("สถานะแผนเกษียณไม่ถูกต้อง");
+      const duplicateActive = status === "Active" && this.getRetirementRows().find((row) => {
+        return row._rowNumber !== existingRecord?._rowNumber
+          && normalizeName(row.status || "Active") === "Active";
+      });
+      if (duplicateActive) throw new Error("มีแผนเกษียณ Active อยู่แล้ว กรุณาพักแผนเดิมก่อนสร้างแผนใหม่");
+      const now = new Date().toISOString();
+      return {
+        ...(existingRecord || {}),
+        ...record,
+        retirement_id: existingRecord?.retirement_id || record?.retirement_id || `retire-${createShortId()}`,
+        plan_name: planName,
+        birth_date: birthDate,
+        retirement_age: retirementAge,
+        monthly_expense_today: monthlyExpense,
+        inflation_rate: inflationRate,
+        expected_return: expectedReturn,
+        withdrawal_rate: withdrawalRate,
+        monthly_contribution: monthlyContribution,
+        status,
+        note: normalizeName(record?.note),
+        created_at: existingRecord?.created_at || record?.created_at || now,
+        updated_at: now
+      };
+    }
+
+    async appendRetirement(record) {
+      return this.append(this.getRetirementSheetName(), this.validateRetirementRecord(record));
+    }
+
+    async updateRetirementRecord(rowNumber, existingRecord, record) {
+      return this.update(this.getRetirementSheetName(), rowNumber, this.validateRetirementRecord({ ...existingRecord, ...record }, existingRecord));
+    }
+
     validateGoalRecord(record) {
       const missingHeaders = this.getMissingGoalMetadataHeaders();
       if (missingHeaders.length) {
@@ -1299,7 +1587,10 @@
     }
 
     validateInvestmentRecord(record, existingRecord = null) {
-      const missingHeaders = this.getMissingInvestmentFundingHeaders();
+      const missingHeaders = [
+        ...this.getMissingInvestmentFundingHeaders(),
+        ...this.getMissingInvestmentPlanningHeaders()
+      ];
       if (missingHeaders.length) {
         const error = new Error(
           `ชีต Investments ยังขาด Header: ${missingHeaders.join(", ")} `
@@ -1314,6 +1605,7 @@
       if (!assetName) throw new Error("กรุณาระบุชื่อสินทรัพย์ลงทุน");
       const accountFrom = normalizeName(record?.account_from);
       const fundedAmount = roundMoney(record?.funded_amount);
+      const planning = validateInvestmentPlanning(record, { requireFields: true });
       const isLegacyUnlinked = Boolean(
         existingRecord
         && !normalizeName(existingRecord.account_from)
@@ -1326,7 +1618,7 @@
           error.code = "INVESTMENT_ACCOUNT_REQUIRED";
           throw error;
         }
-        return { ...record, asset_name: assetName, account_from: "", funded_amount: "" };
+        return { ...record, ...planning, asset_name: assetName, account_from: "", funded_amount: "" };
       }
       if (!(fundedAmount > 0)) {
         const error = new Error("จำนวนเงินที่ใช้ลงทุนต้องมากกว่า 0 บาท");
@@ -1337,6 +1629,7 @@
       const account = this.findAccountByName(accountFrom);
       return {
         ...record,
+        ...planning,
         asset_name: assetName,
         account_from: normalizeName(account.account_name),
         funded_amount: fundedAmount
@@ -1390,7 +1683,10 @@
     }
 
     async addInvestmentContribution(record) {
-      const missingHeaders = this.getMissingInvestmentFundingHeaders();
+      const missingHeaders = [
+        ...this.getMissingInvestmentFundingHeaders(),
+        ...this.getMissingInvestmentPlanningHeaders()
+      ];
       if (missingHeaders.length) {
         const error = new Error(
           `ชีต Investments ยังขาด Header: ${missingHeaders.join(", ")} `
@@ -1430,11 +1726,16 @@
           error.code = "INVESTMENT_ACCOUNT_MISMATCH";
           throw error;
         }
+        const planning = validateInvestmentPlanning({ ...existing, ...record, current_value: existing.current_value }, { requireFields: true });
         const updated = {
           ...existing,
+          ...planning,
           account_from: existingAccount || accountName,
+          principal_amount: roundMoney(planning.principal_amount + amount),
           funded_amount: roundMoney((existingAccount ? toMoney(existing.funded_amount) : 0) + amount),
-          current_value: roundMoney(investmentValue(existing) + amount)
+          current_value: hasCellValue(existing.current_value)
+            ? roundMoney(toMoney(existing.current_value) + amount)
+            : ""
         };
         action = () => this.update(this.config.SHEETS.investments, existing._rowNumber, updated);
         actionLabel = `การเพิ่มเงินใน ${existing.asset_name || "Investment"}`;
@@ -1449,17 +1750,19 @@
           error.code = "DUPLICATE_INVESTMENT_NAME";
           throw error;
         }
+        const planning = validateInvestmentPlanning({ ...record, principal_amount: amount, valuation_mode: "Principal", current_value: "", income_received: "" }, { requireFields: true });
         const investment = {
           asset_name: assetName,
           category: "เงินลงทุน",
           units: "",
           avg_cost: "",
           current_price: "",
-          current_value: amount,
+          current_value: "",
           tax_deductible: "",
           note: "",
           account_from: accountName,
-          funded_amount: amount
+          funded_amount: amount,
+          ...planning
         };
         action = () => this.append(this.config.SHEETS.investments, investment);
         actionLabel = `การเพิ่ม ${assetName}`;
@@ -1471,6 +1774,22 @@
       } catch (error) {
         return this.rollbackAccountChanges(changes, error, actionLabel);
       }
+    }
+
+    async updateInvestmentProfile(rowNumber, existingRecord, record) {
+      const missingHeaders = this.getMissingInvestmentPlanningHeaders();
+      if (missingHeaders.length) {
+        const error = new Error(`ชีต Investments ยังขาด Header: ${missingHeaders.join(", ")}`);
+        error.code = "INVESTMENT_PLANNING_MIGRATION_REQUIRED";
+        error.missingHeaders = missingHeaders;
+        throw error;
+      }
+      const planning = validateInvestmentPlanning({ ...existingRecord, ...record }, { requireFields: true });
+      return this.update(this.config.SHEETS.investments, rowNumber, {
+        ...existingRecord,
+        ...planning,
+        note: normalizeName(record?.note ?? existingRecord?.note)
+      });
     }
 
     validateTransactionAccounts(record, { requireExpenseItem = true } = {}) {
