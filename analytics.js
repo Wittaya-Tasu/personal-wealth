@@ -380,33 +380,48 @@
     };
     addMonth(anchor);
     (transactions || []).forEach((tx) => {
-      if (normalizeType(tx.type) === "expense") addMonth(parseDate(tx.date));
+      if (["expense", "income"].includes(normalizeType(tx.type))) addMonth(parseDate(tx.date));
     });
     return [...months.values()].sort((a, b) => b.date - a.date);
   }
 
-  function buildExpenseBreakdown(transactions, selectedMonthKey) {
+  function buildTransactionMix(transactions, selectedMonthKey, type) {
+    const expenseGroups = {
+      Personal: ["ส่วนตัว", "#45d18b"], Family: ["ครอบครัว", "#e7c66b"],
+      HomeDebt: ["บ้าน รถ และหนี้", "#7ea4e8"],
+      Protection: ["สุขภาพและการป้องกัน", "#cc91dd"],
+      Unclassified: ["ยังไม่จัดกลุ่ม", "#91a49b"]
+    };
     const buckets = new Map();
     (transactions || []).forEach((tx) => {
-      if (normalizeType(tx.type) !== "expense") return;
-      if (monthKey(parseDate(tx.date)) !== selectedMonthKey) return;
-      if (isLegacyCreditCardCategory(tx)) return;
-      const name = expenseGroupLabel(tx.expense_group);
-      const key = name.toLocaleLowerCase("th-TH");
-      const existing = buckets.get(key) || { name, value: 0 };
-      existing.value += Math.abs(toNumber(tx.amount));
-      buckets.set(key, existing);
+      if (normalizeType(tx.type) !== type || monthKey(parseDate(tx.date)) !== selectedMonthKey) return;
+      if (type === "expense" && isLegacyCreditCardCategory(tx)) return;
+      let key, name, color;
+      if (type === "expense") {
+        key = normalizeExpenseGroup(tx.expense_group) || "Unclassified";
+        if (key === "Health") key = "Protection";
+        [name, color] = expenseGroups[key];
+      } else {
+        name = String(tx.category || "").trim() || "ยังไม่ระบุประเภทรายได้";
+        key = name.toLocaleLowerCase("th-TH");
+      }
+      const entry = buckets.get(key) || { name, value: 0, color };
+      entry.value += Math.abs(toNumber(tx.amount));
+      buckets.set(key, entry);
     });
-
-    const total = [...buckets.values()].reduce((sumValue, item) => sumValue + item.value, 0);
-    const rows = [...buckets.values()]
-      .sort((a, b) => b.value - a.value)
-      .map((item, index) => ({
-        ...item,
-        percentage: total > 0 ? item.value / total : 0,
-        color: COLORS[index % COLORS.length]
-      }));
+    const total = [...buckets.values()].reduce((sum, row) => sum + row.value, 0);
+    const rows = [...buckets.values()].filter((row) => row.value > 0)
+      .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name, "th"))
+      .map((row, index) => ({ ...row, color: row.color || COLORS[index % COLORS.length], percentage: total > 0 ? row.value / total : 0 }));
     return { total, rows };
+  }
+
+  function buildExpenseBreakdown(transactions, selectedMonthKey) {
+    return buildTransactionMix(transactions, selectedMonthKey, "expense");
+  }
+
+  function buildIncomeBreakdown(transactions, selectedMonthKey) {
+    return buildTransactionMix(transactions, selectedMonthKey, "income");
   }
 
   function buildBudgetOverview(budgets, transactions, selectedMonthKey) {
@@ -1167,6 +1182,7 @@
     getTransactionYears,
     getExpenseMonthOptions,
     buildExpenseBreakdown,
+    buildIncomeBreakdown,
     buildBudgetOverview,
     buildSinkingFundOverview,
     buildDebtOverview,

@@ -64,6 +64,12 @@
     retirement: { title: "แผนเกษียณ", eyebrow: "RETIREMENT", sheet: config.SHEETS.retirementPlans || "RetirementPlans" }
   };
 
+  const INCOME_CATEGORIES = [
+    "เงินเดือน", "เบี้ยเลี้ยง", "โบนัส", "เงินปันผล", "รายได้พิเศษ", "ดอกเบี้ย",
+    "ค่าล่วงเวลา", "ค่าคอมมิชชัน", "ค่าจ้างและค่าบริการ", "รายได้จากธุรกิจ",
+    "ค่าเช่า", "ค่าลิขสิทธิ์", "บำนาญและเงินเกษียณ", "เงินสนับสนุนและของขวัญ", "อื่น ๆ"
+  ];
+
   const EXPENSE_CATEGORIES = [
     "อาหาร", "เครื่องดื่ม", "หนังสือ", "ทำบุญ", "ของใช้ส่วนตัว",
     "ค่าเดินทาง", "ครอบครัว", "สุขภาพ", "อิเล็กทรอนิกส์", "อื่น ๆ"
@@ -200,7 +206,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js?v=2.12.0").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.13.0").catch(() => {});
     }
   }
 
@@ -389,7 +395,7 @@
   function renderSignedOutState() {
     [
       "netWorthValue", "monthlySpendingBalanceValue", "savingsRateValue", "emergencyMonthsValue",
-      "debtServiceValue", "totalAssetsCenter", "expenseBreakdownTotal", "txIncomeSummary", "txExpenseSummary",
+      "debtServiceValue", "totalAssetsCenter", "expenseBreakdownTotal", "incomeBreakdownTotal", "txIncomeSummary", "txExpenseSummary",
       "txBalanceSummary", "wealthAssetsSummary", "wealthLiabilitiesSummary", "wealthNetSummary"
     ].forEach((id) => setText(id, id === "emergencyMonthsValue" ? "— เดือน" : "฿—"));
     setText("netWorthStatus", "รอเชื่อมต่อ");
@@ -400,7 +406,7 @@
     });
     renderToday();
     renderCashflowTable([]);
-    qs("#expenseBreakdownLegend").replaceChildren();
+    ["expenseBreakdownLegend", "incomeBreakdownLegend", "expenseBreakdownStack", "incomeBreakdownStack"].forEach((id) => qs(`#${id}`).replaceChildren());
     destroyCharts();
   }
 
@@ -789,68 +795,47 @@
     });
   }
 
+  function renderPercentStack(container, rows, emptyMessage) {
+    container.replaceChildren();
+    const positive = rows.filter((row) => row.percentage > 0);
+    if (!positive.length) { container.appendChild(createElement("p", "wealth-scope-note", emptyMessage)); return; }
+    const bar = createElement("div", "percent-stack");
+    bar.setAttribute("role", "img");
+    bar.setAttribute("aria-label", positive.map((row) => `${row.name} ${formatExpensePercent(row.percentage)}`).join(" · "));
+    positive.forEach((row) => {
+      const segment = createElement("span", "percent-stack-segment");
+      segment.style.width = `${row.percentage * 100}%`;
+      segment.style.backgroundColor = row.color;
+      segment.title = `${row.name} · ${formatExpensePercent(row.percentage)} · ${formatCurrency(row.value ?? row.principal)}`;
+      if (row.percentage >= 0.1) segment.textContent = formatExpensePercent(row.percentage);
+      bar.appendChild(segment);
+    });
+    container.appendChild(bar);
+  }
+
+  function renderMixLegend(container, rows) {
+    container.replaceChildren();
+    rows.forEach((row) => {
+      const item = createElement("div", "legend-row");
+      const dot = createElement("span", "legend-dot"); dot.style.backgroundColor = row.color;
+      item.append(dot, createElement("span", "", row.name), createElement("strong", "", `${formatExpensePercent(row.percentage)} · ${formatCurrency(row.value ?? row.principal)}`));
+      container.appendChild(item);
+    });
+  }
+
   function renderExpenseBreakdownChart() {
     state.charts.expenseBreakdown?.destroy();
     state.charts.expenseBreakdown = null;
-    const legend = qs("#expenseBreakdownLegend");
-    const empty = qs("#expenseBreakdownEmpty");
-    const center = qs("#expenseBreakdownCenter");
-    legend.replaceChildren();
     if (!state.viewModel) return;
-
     const selectedMonth = qs("#expenseMonth").value || analytics.monthKey(new Date());
-    const breakdown = analytics.buildExpenseBreakdown(state.data?.transactions, selectedMonth);
-    setText("expenseBreakdownTotal", formatCurrency(breakdown.total));
-    empty.hidden = breakdown.rows.length > 0;
-    center.hidden = breakdown.rows.length === 0;
-
-    breakdown.rows.forEach((row) => {
-      const item = createElement("div", "legend-row");
-      const dot = createElement("span", "legend-dot");
-      dot.style.backgroundColor = row.color;
-      item.append(
-        dot,
-        createElement("span", "", row.name),
-        createElement("strong", "", `${formatExpensePercent(row.percentage)} · ${formatCurrency(row.value)}`)
-      );
-      legend.appendChild(item);
-    });
-    if (!breakdown.rows.length || !global.Chart) return;
-
-    state.charts.expenseBreakdown = new global.Chart(qs("#expenseBreakdownChart"), {
-      type: "doughnut",
-      data: {
-        labels: breakdown.rows.map((row) => row.name),
-        datasets: [{
-          data: breakdown.rows.map((row) => row.value),
-          backgroundColor: breakdown.rows.map((row) => row.color),
-          borderColor: "#10251f",
-          borderWidth: 3,
-          hoverOffset: 3
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        cutout: "68%",
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: "#071410",
-            titleColor: "#91a49b",
-            bodyColor: "#f5f7f2",
-            borderColor: "rgba(226,238,232,.16)",
-            borderWidth: 1,
-            callbacks: {
-              label: (context) => {
-                const row = breakdown.rows[context.dataIndex];
-                return ` ${formatCurrency(context.raw)} (${formatExpensePercent(row.percentage)})`;
-              }
-            }
-          }
-        }
-      }
-    });
+    for (const [kind, breakdown] of [
+      ["income", analytics.buildIncomeBreakdown(state.data?.transactions, selectedMonth)],
+      ["expense", analytics.buildExpenseBreakdown(state.data?.transactions, selectedMonth)]
+    ]) {
+      setText(`${kind}BreakdownTotal`, formatCurrency(breakdown.total));
+      renderPercentStack(qs(`#${kind}BreakdownStack`), breakdown.rows, kind === "income" ? "ยังไม่มีรายรับในเดือนนี้" : "ยังไม่มีรายจ่ายในเดือนนี้");
+      renderMixLegend(qs(`#${kind}BreakdownLegend`), breakdown.rows);
+    }
   }
 
   function renderAllocationChart() {
@@ -1218,30 +1203,37 @@
     container.appendChild(metrics);
     const composition = createElement("div", "investment-composition");
     composition.appendChild(createElement("h3", "", "สัดส่วนเงินต้นตามสินทรัพย์จริง"));
-    summary.allocation.forEach((row) => {
-      const line = createElement("div", "composition-item");
-      line.append(createElement("span", "", row.name), createElement("strong", "", `${formatCurrency(row.principal)} · ${formatPercent(row.percentage, 1)}`));
-      const track = createElement("div", "planning-progress");
-      const bar = createElement("span"); bar.style.width = `${row.percentage * 100}%`; bar.style.background = row.color; track.appendChild(bar);
-      line.appendChild(track); composition.appendChild(line);
-    });
+    renderPercentStack(composition, summary.allocation, "ยังไม่มีเงินต้นที่ยืนยันแล้ว");
+    composition.prepend(createElement("h3", "", "สัดส่วนเงินต้นตามสินทรัพย์จริง"));
+    const legend = createElement("div", "legend-list"); renderMixLegend(legend, summary.allocation); composition.appendChild(legend);
     container.appendChild(composition);
     if (!summary.rows.length) container.appendChild(emptyState());
-    summary.rows.forEach((row) => {
-      const card = createElement("article", "detail-card");
-      card.append(createElement("h3", "", row.asset_name || "การลงทุน"));
-      card.append(createElement("strong", "detail-main", row.principal === null ? "ยังไม่ได้ยืนยันเงินต้น" : `เงินต้น ${formatCurrency(row.principal)}`));
-      const purpose = INVESTMENT_PURPOSES.find(([key]) => key === row.purpose)?.[1] || "ยังไม่ระบุวัตถุประสงค์";
-      card.append(createElement("p", "", `${row.assetClassLabel} · ${purpose} · ${row.time_horizon_years ? `${row.time_horizon_years} ปี` : "ยังไม่ระบุระยะเวลา"}`));
-      card.append(createElement("p", "", `ความเสี่ยงเบื้องต้น ${row.risk.level ? `${row.risk.level}/7 ${row.risk.label}` : "ยังไม่ระบุ"} (${row.risk.source === "Manual" ? "กำหนดเอง" : "อัตโนมัติ"})`));
-      if (row.hasMarketValue) {
-        card.append(createElement("p", "", `มูลค่าปัจจุบัน ${formatCurrency(row.currentValue)} · กำไร/ขาดทุน ${row.profitLoss === null ? "—" : formatCurrency(row.profitLoss)}`));
-        card.append(createElement("small", "", `วันที่มูลค่า ${row.valuation_date ? formatDate(analytics.parseDate(row.valuation_date)) : "ยังไม่ระบุ"}`));
-      } else if (!row.valuation_mode) planningNotice(card, "ข้อมูลเดิม: ความมั่งคั่งยังใช้ยอดเดิมจนกว่าจะบันทึกรายละเอียดและเลือกใช้เงินต้น");
-      const actions = createElement("div", "detail-actions");
-      actions.append(editButton("investment", row._rowNumber, row.asset_name, "เพิ่มเงิน"), editButton("investmentMeta", row._rowNumber, row.asset_name, "รายละเอียด"), deleteButton(config.SHEETS.investments, row._rowNumber, row.asset_name));
-      card.appendChild(actions); container.appendChild(card);
-    });
+    else {
+      const wrap = createElement("div", "investment-table-wrap"); wrap.setAttribute("tabindex", "0"); wrap.setAttribute("role", "region"); wrap.setAttribute("aria-label", "ตารางการลงทุน เลื่อนแนวนอนเพื่อดูรายละเอียด");
+      const table = createElement("table", "investment-table");
+      table.appendChild(createElement("caption", "", "รายการลงทุน · บนมือถือเลื่อนตารางแนวนอนเพื่อดูทุกคอลัมน์"));
+      const head = document.createElement("thead"), header = document.createElement("tr");
+      ["สินทรัพย์", "เงินต้นสะสม", "ประเภทสินทรัพย์", "วัตถุประสงค์", "ระยะเวลา", "ความเสี่ยง", "มูลค่าปัจจุบัน", "กำไร / ขาดทุน", "ปันผล / ดอกเบี้ย", "จัดการ"].forEach((name) => { const th = createElement("th", "", name); th.scope = "col"; header.appendChild(th); });
+      head.appendChild(header); table.appendChild(head);
+      const body = document.createElement("tbody");
+      summary.rows.forEach((row) => {
+        const tr = document.createElement("tr");
+        const nameCell = createElement("th", "", row.asset_name || "การลงทุน"); nameCell.scope = "row"; tr.appendChild(nameCell);
+        const purpose = INVESTMENT_PURPOSES.find(([key]) => key === row.purpose)?.[1] || "ยังไม่ระบุ";
+        const values = [row.principal === null ? "ยังไม่ยืนยัน" : formatCurrency(row.principal), row.assetClassLabel, purpose,
+          row.time_horizon_years ? `${row.time_horizon_years} ปี` : "—",
+          row.risk.level ? `${row.risk.level}/7 · ${row.risk.source === "Manual" ? "กำหนดเอง" : "Auto"}` : "ยังไม่ระบุ",
+          row.hasMarketValue ? formatCurrency(row.currentValue) : "—",
+          row.hasMarketValue && row.profitLoss !== null ? formatCurrency(row.profitLoss) : "—", formatCurrency(row.incomeReceived)];
+        values.forEach((value) => tr.appendChild(createElement("td", "", value)));
+        if (row.hasMarketValue) tr.children[6].appendChild(createElement("small", "table-detail", row.valuation_date ? formatDate(analytics.parseDate(row.valuation_date)) : "ยังไม่ระบุวันที่"));
+        else if (!row.valuation_mode) tr.children[6].appendChild(createElement("small", "table-detail", "ข้อมูลเดิมยังใช้ยอดเดิมในความมั่งคั่ง"));
+        const cell = document.createElement("td"), actions = createElement("div", "detail-actions");
+        actions.append(editButton("investment", row._rowNumber, row.asset_name, "เพิ่มเงิน"), editButton("investmentMeta", row._rowNumber, row.asset_name, "รายละเอียด"), deleteButton(config.SHEETS.investments, row._rowNumber, row.asset_name));
+        cell.appendChild(actions); tr.appendChild(cell); body.appendChild(tr);
+      });
+      table.appendChild(body); wrap.appendChild(table); container.appendChild(wrap);
+    }
     planningNotice(container, "ค่าความเสี่ยงอัตโนมัติเป็นค่าตั้งต้นของแอปตามประเภทสินทรัพย์ ดูข้อมูลผลิตภัณฑ์จริงเพื่อปรับเองได้ เงินต้นไม่ใช่มูลค่าที่ขายได้ ณ วันนี้");
   }
 
@@ -2314,7 +2306,7 @@
     const defaults = normalizedType === "expense"
       ? EXPENSE_CATEGORIES
       : normalizedType === "income"
-        ? ["เงินเดือน", "รายได้พิเศษ", "เงินปันผล", "ดอกเบี้ย", "อื่น ๆ"]
+        ? INCOME_CATEGORIES
         : ["โอนเงิน", "ย้ายเงิน", "อื่น ๆ"];
     const names = [...defaults];
     (state.data?.categories || []).forEach((row) => {
@@ -2324,7 +2316,7 @@
     });
     const current = String(selectedValue || "").trim();
     if (current && !names.includes(current)) names.push(current);
-    const options = [`<option value="">เลือกหมวดหมู่</option>`];
+    const options = [`<option value="">${normalizedType === "income" ? "เลือกประเภทรายได้" : "เลือกหมวดหมู่"}</option>`];
     names.forEach((name) => {
       const value = inputValue({ value: name }, "value");
       options.push(`<option value="${value}" ${name === current ? "selected" : ""}>${value}</option>`);
@@ -2496,7 +2488,8 @@
           </select>
           <small>ใช้คำนวณค่าใช้จ่ายจำเป็นเฉลี่ยและเงินสำรองฉุกเฉิน</small>
         </label>
-        <label class="field" data-general-category-field ${isExpense ? "hidden" : ""}><span>หมวดหมู่</span><input name="category" value="${isExpense ? "" : inputValue(record, "category")}" placeholder="เช่น เงินเดือน หรือ โอนเงิน" ${isExpense ? "disabled" : "required"}></label>
+        <label class="field" data-income-category-field ${currentType === "income" ? "" : "hidden"}><span>ประเภทรายได้</span><select name="category" data-income-category ${currentType === "income" ? "required" : "disabled"}>${transactionCategoryOptions("Income", currentType === "income" ? record?.category : "")}</select></label>
+        <label class="field" data-general-category-field ${currentType === "transfer" ? "" : "hidden"}><span>หมวดหมู่การโอน</span><input name="category" value="${currentType === "transfer" ? inputValue(record, "category") : ""}" placeholder="เช่น โอนเงิน" ${currentType === "transfer" ? "required" : "disabled"}></label>
         <label class="field" data-payment-method-field ${isExpense ? "" : "hidden"}><span>ช่องทางการจ่าย</span>
           <select name="payment_method" ${isExpense ? "required" : "disabled"}>
             <option value="Account" ${usesCreditCard ? "" : "selected"}>บัญชีเงิน / เงินสด</option>
@@ -2871,6 +2864,8 @@
       const expenseItem = qs("#dynamicForm input[name='item_name']");
       const essentialField = qs("#dynamicForm [data-essential-field]");
       const essentialSelect = qs("#dynamicForm select[name='is_essential']");
+      const incomeCategoryField = qs("#dynamicForm [data-income-category-field]");
+      const incomeCategory = qs("#dynamicForm [data-income-category]");
       const generalCategoryField = qs("#dynamicForm [data-general-category-field]");
       const generalCategory = qs("#dynamicForm [data-general-category-field] input[name='category']");
       const paymentMethodField = qs("#dynamicForm [data-payment-method-field]");
@@ -2900,9 +2895,12 @@
       essentialField.hidden = !isExpense;
       essentialSelect.disabled = !isExpense;
       essentialSelect.required = isExpense;
-      generalCategoryField.hidden = isExpense;
-      generalCategory.disabled = isExpense;
-      generalCategory.required = !isExpense;
+      incomeCategoryField.hidden = selected !== "income";
+      incomeCategory.disabled = selected !== "income";
+      incomeCategory.required = selected === "income";
+      generalCategoryField.hidden = selected !== "transfer";
+      generalCategory.disabled = selected !== "transfer";
+      generalCategory.required = selected === "transfer";
       paymentMethodField.hidden = !isExpense;
       paymentMethod.disabled = !isExpense;
       paymentMethod.required = isExpense;
