@@ -1,4 +1,4 @@
-const APP_VERSION = "2.14.0";
+const APP_VERSION = "2.14.1";
 const CACHE_NAME = `tasuya-way-shell-v${APP_VERSION}`;
 const STATIC_ASSETS = [
   "./",
@@ -10,6 +10,7 @@ const STATIC_ASSETS = [
   `./app.js?v=${APP_VERSION}`,
   `./report.js?v=${APP_VERSION}`,
   `./manifest.json?v=${APP_VERSION}`,
+  "./assets/monthly-report-background.png",
   "./icons/wealth-icon.svg",
   "./icons/icon-192.png",
   "./icons/icon-512.png"
