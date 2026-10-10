@@ -1,3 +1,10 @@
+# TasuyaWay v2.14.0 — Monthly Four-tier Report
+
+เพิ่มภาพสรุปรายเดือนดาวน์โหลด PNG และตารางประกัน
+อ่าน [MONTHLY_REPORT_MIGRATION.md](MONTHLY_REPORT_MIGRATION.md) ก่อน Deploy: เพิ่ม MonthlySnapshots.report_json และแทน Apps Script เดิม
+
+## คู่มือรุ่นฐาน v2.13.0
+
 # TasuyaWay v2.13.0 — Monthly Mix & Investment Table
 
 อ่าน [UPDATE_V2.13.0.md](UPDATE_V2.13.0.md) สำหรับสิ่งที่เปลี่ยนและการ Deploy รุ่นนี้

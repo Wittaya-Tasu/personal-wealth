@@ -206,7 +206,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js?v=2.13.0").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.14.0").catch(() => {});
     }
   }
 
@@ -1245,18 +1245,55 @@
     planningMetric(metrics, "เบี้ยต่อปี", formatCurrency(info.annualPremium), `เฉลี่ย ${formatCurrency(info.monthlyPremium)}/เดือน`);
     container.appendChild(metrics);
     if (!info.rows.length) container.appendChild(emptyState());
-    info.rows.forEach((row) => {
-      const card = createElement("article", "detail-card");
-      card.append(createElement("h3", "", row.policy_name), createElement("p", "", `${row.insurer || "ไม่ระบุบริษัท"} · ${row.insured_person || "ไม่ระบุผู้เอาประกัน"}`));
-      card.append(createElement("strong", "detail-main", `วงเงิน ${formatCurrency(row.coverage)}`));
-      card.append(createElement("p", "", `เบี้ย ${formatCurrency(row.annualPremium)}/ปี · ครั้งถัดไป ${formatDate(row.renewalDate)}`));
-      card.append(createElement("p", "", `สถานะ ${row.status === "Active" ? "มีผล" : row.status === "Expired" ? "หมดอายุ" : "ยกเลิก"}`));
-      if (row.note) card.append(createElement("p", "", row.note));
-      const actions = createElement("div", "detail-actions");
-      actions.append(editButton("insurance", row._rowNumber, row.policy_name), deleteButton(store.getInsuranceSheetName(), row._rowNumber, row.policy_name));
-      card.appendChild(actions); container.appendChild(card);
-    });
+    if (info.rows.length) {
+      const wrap = createElement("div", "investment-table-wrap"); wrap.tabIndex = 0; wrap.setAttribute("role","region"); wrap.setAttribute("aria-label","ตารางประกัน เลื่อนแนวนอนเพื่อดูทุกคอลัมน์");
+      const table = createElement("table", "investment-table insurance-table");
+      table.appendChild(createElement("caption", "", "กรมธรรม์ประกัน · บนมือถือเลื่อนตารางแนวนอน"));
+      const head = document.createElement("thead"), header = document.createElement("tr");
+      ["กรมธรรม์","ประเภท","บริษัท","ผู้เอาประกัน","วงเงินคุ้มครอง","เบี้ยรายปี","จ่ายเบี้ยครั้งถัดไป","สิ้นสุดคุ้มครอง","สถานะ","หมายเหตุ","จัดการ"].forEach((label) => { const th = createElement("th","",label); th.scope="col"; header.appendChild(th); });
+      head.appendChild(header); table.appendChild(head); const body = document.createElement("tbody");
+      const types = {Life:"ชีวิต",Health:"สุขภาพ",CriticalIllness:"โรคร้ายแรง",Accident:"อุบัติเหตุ",Vehicle:"รถ",Property:"ทรัพย์สิน",Other:"อื่น ๆ"};
+      info.rows.forEach((row) => {
+        const tr=document.createElement("tr"), name=createElement("th","",row.policy_name); name.scope="row"; tr.appendChild(name);
+        [types[row.insurance_type] || row.insurance_type || "—", row.insurer || "—",row.insured_person || "—",formatCurrency(row.coverage),formatCurrency(row.annualPremium),formatDate(row.renewalDate),formatDate(analytics.parseDate(row.end_date)),row.status === "Active" ? "มีผล" : row.status === "Expired" ? "หมดอายุ" : "ยกเลิก",row.note || "—"].forEach((value)=>tr.appendChild(createElement("td","",value)));
+        const cell=document.createElement("td"),actions=createElement("div","detail-actions");
+        actions.append(editButton("insurance",row._rowNumber,row.policy_name),deleteButton(store.getInsuranceSheetName(),row._rowNumber,row.policy_name));cell.appendChild(actions);tr.appendChild(cell);body.appendChild(tr);
+      });
+      table.appendChild(body);wrap.appendChild(table);container.appendChild(wrap);
+    }
     planningNotice(container, "วงเงินประกันแสดงแยกรายกรมธรรม์ ไม่รวมต่างประเภทเป็นวงเงินเดียว และไม่ถือเป็นสินทรัพย์ใน Net Worth");
+  }
+
+  function renderMonthlyReportPanel(container) {
+    const controls=createElement("div","report-controls");
+    const label=createElement("label","field");label.appendChild(createElement("span","","เดือนของภาพสรุป"));
+    const select=document.createElement("select"); select.id="monthlyReportMonth";
+    const now=new Date(), current=analytics.monthKey(now);
+    const keys=new Set([current]);
+    (state.data.transactions || []).forEach((row)=>{ const d=analytics.parseDate(row.date);if(d)keys.add(analytics.monthKey(d)); });
+    (state.data.snapshots || []).forEach((row)=>{ const d=analytics.parseDate(row.snapshot_month);if(d)keys.add(analytics.monthKey(d)); });
+    [...keys].filter(key=>key<=current).sort().reverse().forEach((key)=>{const option=document.createElement("option");option.value=key;option.textContent=analytics.parseDate(`${key}-01`).toLocaleDateString("th-TH",{month:"long",year:"numeric"});select.appendChild(option);});
+    select.value=keys.has(state.reportMonth) ? state.reportMonth : current;label.appendChild(select);
+    const download=createElement("button","primary-button","ดาวน์โหลด PNG");download.type="button";
+    const status=createElement("p","wealth-scope-note"), preview=createElement("div","monthly-report-preview");
+    controls.append(label,download);container.append(controls,status,preview);
+    let svg;
+    const update=()=>{
+      state.reportMonth=select.value;
+      const report=analytics.monthlyReportFor(state.data,config.DEFAULTS,select.value,now);
+      svg=global.WealthReportGraphic.render(report);
+      preview.innerHTML=svg;
+      const captured=analytics.parseDate(report.capturedAt);
+      status.textContent=report.kind === "Live" ? "เดือนปัจจุบัน: ข้อมูลล่าสุด ยังไม่ใช่ยอดปิดสิ้นเดือน" : report.warning || `${report.kind === "MonthEnd" ? "Snapshot สิ้นเดือน" : "Snapshot ระหว่างเดือน"} · บันทึก ${formatDate(captured)}`;
+      if (!store.headers[config.SHEETS.snapshots]?.includes("report_json")) status.textContent += " · เพิ่ม Header report_json ใน MonthlySnapshots เพื่อเก็บรายละเอียดเดือนถัดไป";
+    };
+    select.addEventListener("change",update);
+    download.addEventListener("click",async()=>{
+      download.disabled=true;
+      try {await global.WealthReportGraphic.download(svg,`TasuyaWay-${select.value}.png`);showToast("สร้าง PNG แล้ว หาก iPhone ไม่ดาวน์โหลด ให้บันทึกจากภาพที่เปิด");} catch(error){handleError(error);} finally{download.disabled=false;}
+    });
+    update();
+    planningNotice(container,"ท่อด้านบนแสดงรายรับและรายจ่ายของเดือน รวมรายการใช้บัตรเครดิต ไม่ใช่การเคลื่อนเงินสดทุกบัญชี ยอดสะสมด้านล่างแยกไว้ ไม่เดาการแบ่งเงินเหลือไปลงทุนหรือคงในบัญชี");
   }
 
   function renderRetirementPlanning(container) {
@@ -1286,6 +1323,7 @@
     container.replaceChildren();
     const data = state.viewModel?.data;
     if (!data) return;
+    if (state.wealthTab === "monthlyReport") { renderMonthlyReportPanel(container); return; }
     if (state.wealthTab === "investments") { renderInvestmentPlanning(container); return; }
     if (state.wealthTab === "insurance") { renderInsurancePlanning(container); return; }
     if (state.wealthTab === "retirement") { renderRetirementPlanning(container); return; }
@@ -2196,6 +2234,7 @@
   function updateWealthAddButton() {
     const button = qs("#wealthAddButton");
     if (!button) return;
+    button.hidden = state.wealthTab === "monthlyReport";
     if (state.wealthTab === "budgets") {
       button.lastChild.textContent = " ตั้งงบ";
     } else if (state.wealthTab === "sinkingFunds") {
@@ -3147,6 +3186,7 @@
       net_worth: vm.totals.netWorth,
       monthly_cashflow: vm.currentMonth.cashflow,
       savings_rate: vm.savingsRate === null ? "" : vm.savingsRate,
+      report_json: JSON.stringify(analytics.captureMonthlyReport(state.data, config.DEFAULTS, new Date(), "Manual")),
       note: "บันทึกจาก TasuyaWay WebApp"
     };
     const action = existing ? "อัปเดต" : "บันทึก";

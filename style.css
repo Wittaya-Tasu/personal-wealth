@@ -2458,3 +2458,10 @@ svg {
 }
 
 .mix-pair .legend-row span:nth-child(2), .investment-composition .legend-row span:nth-child(2) { white-space: normal; overflow-wrap: anywhere; }
+
+.report-controls { display:flex; align-items:end; flex-wrap:wrap; gap:16px; margin-bottom:12px; }
+.report-controls .field { flex:1; min-width:180px; }
+.monthly-report-preview { overflow-x:auto; background:white; border-radius:12px; }
+.monthly-report-preview svg { display:block; width:100%; min-width:850px; height:auto; }
+.monthly-report-preview:focus { outline:2px solid #e7c66b; }
+.insurance-table { min-width:1400px; }

@@ -1158,7 +1158,68 @@
     };
   }
 
+  function captureMonthlyReport(data, defaults, anchor = new Date(), kind = "Manual") {
+    const vm = buildViewModel(data, defaults, anchor);
+    const key = monthKey(anchor);
+    const transactions = (data.transactions || []).filter((tx) => monthKey(parseDate(tx.date)) === key);
+    const income = buildIncomeBreakdown(transactions, key);
+    // Include legacy expense categories in the report so the total matches Cash Flow.
+    const expenses = transactions.filter((tx) => normalizeType(tx.type) === "expense");
+    const groups = new Map();
+    expenses.forEach((tx) => {
+      let group = normalizeExpenseGroup(tx.expense_group) || "Unclassified";
+      if (group === "Health") group = "Protection";
+      const labels = {Personal:"ส่วนตัว", Family:"ครอบครัว", HomeDebt:"บ้าน รถ และหนี้", Protection:"สุขภาพและการป้องกัน", Unclassified:"ยังไม่จัดกลุ่ม"};
+      const row = groups.get(group) || {group, name:labels[group], value:0};
+      row.value += Math.abs(toNumber(tx.amount)); groups.set(group,row);
+    });
+    const order = ["Personal","Family","HomeDebt","Protection","Unclassified"];
+    const expenseRows = order.filter((key) => groups.has(key)).map((key) => groups.get(key));
+    const expense = expenses.reduce((total, tx) => total + Math.abs(toNumber(tx.amount)),0);
+    const assetIncomeNames = new Set(["เงินปันผล","ปันผล","ดอกเบี้ย","ค่าเช่า","รายได้จากค่าเช่า"]);
+    const workNames = new Set(["เงินเดือน","เบี้ยเลี้ยง","โบนัส","ค่าล่วงเวลา","ค่าคอมมิชชัน","ค่าจ้างและค่าบริการ","รายได้จากธุรกิจ","รายได้พิเศษ"]);
+    const assetIncome = income.rows.filter((row) => assetIncomeNames.has(row.name)).reduce((t,row)=>t+row.value,0);
+    const workIncome = income.rows.filter((row) => workNames.has(row.name)).reduce((t,row)=>t+row.value,0);
+    return {
+      version:1, month:key, capturedAt:anchor.toISOString(), kind,
+      income:income.total, incomeRows:income.rows, assetIncome, workIncome,
+      otherIncome:income.total-assetIncome-workIncome,
+      expense, expenseRows, remaining:income.total-expense,
+      emergency:{balance:vm.emergencyFund.balance, essential:vm.essentialExpense, months:vm.emergencyMonths, targetMonths:vm.emergencyFund.targetMonths, targetAmount:vm.emergencyFund.targetAmount, unclassified:vm.expenseClassification.unclassified},
+      investments:{principal:vm.investmentOverview.totalPrincipal, unknown:vm.investmentOverview.unknownPrincipalCount, allocation:vm.investmentOverview.allocation},
+      retirement:{principal:vm.retirement.retirementPrincipal, target:vm.retirement.plan ? vm.retirement.targetFund : null},
+      debt:vm.totals.liabilities, insurancePremium:vm.insurance.annualPremium,
+      stocksAvailable:true
+    };
+  }
+
+  function monthlyReportFor(data, defaults, key, anchor = new Date()) {
+    if (key === monthKey(anchor)) return captureMonthlyReport(data, defaults, anchor, "Live");
+    const matches = (data.snapshots || []).filter((row) => monthKey(parseDate(row.snapshot_month)) === key);
+    if (matches.length === 1 && matches[0].report_json) {
+      try {
+        const report = JSON.parse(matches[0].report_json);
+        const validRows = (rows, field) => Array.isArray(rows) && rows.every((row) => row && typeof row.name === "string" && Number.isFinite(row[field]));
+        if (report.version === 1 && report.month === key && parseDate(report.capturedAt)
+          && validRows(report.incomeRows,"value") && validRows(report.expenseRows,"value")
+          && report.emergency && Number.isFinite(report.emergency.balance)
+          && report.investments && Number.isFinite(report.investments.principal) && validRows(report.investments.allocation,"principal")
+          && report.retirement && Number.isFinite(report.retirement.principal)
+          && [report.income,report.expense,report.remaining,report.assetIncome,report.workIncome,report.otherIncome].every(Number.isFinite)) return report;
+      } catch (_) { /* Invalid/old payload falls back to known monthly flows only. */ }
+    }
+    // Never borrow today's stock balances or settings to fill historical gaps.
+    const date = parseDate(`${key}-01`);
+    const report = captureMonthlyReport({transactions:data.transactions || []}, defaults, date, "Incomplete");
+    report.emergency = null; report.investments = null; report.retirement = null;
+    report.debt = null; report.insurancePremium = null; report.stocksAvailable = false;
+    report.warning = matches.length > 1 ? "พบ Snapshot เดือนนี้ซ้ำ — ไม่เลือกยอดสะสมให้" : "ไม่มี Snapshot รายละเอียดของเดือนนี้ — แสดงเฉพาะรายรับและรายจ่าย";
+    return report;
+  }
+
   global.WealthAnalytics = Object.freeze({
+    captureMonthlyReport,
+    monthlyReportFor,
     toNumber,
     parseDate,
     monthKey,

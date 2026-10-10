@@ -1,3 +1,24 @@
+# TasuyaWay v2.14.0 — สถานะล่าสุด
+
+เพิ่มแท็บ monthlyReport ใน Wealth, report.js วาด SVG/PNG 16:9, ตารางประกัน
+Migration: MonthlySnapshots.report_json (H1 สำหรับโครงเดิม) และแทน MONTH_END_SNAPSHOT.gs ทั้งไฟล์
+รายงาน current=Live, historical=report_json ถ้าอ่านได้; ไม่ครบให้เฉพาะ flows และไม่แสดง stocks วันนี้แทน
+รายได้จากสินทรัพย์นับตาม Income.category ชุดที่กำหนด ไม่ใช้ income_received สะสม
+ไม่วาดการแบ่งเงินเหลือเป็น investment contribution เพราะฐานเดิมไม่มี ledger รายครั้ง
+Apps Script รวมสำเนา analytics.js โดยเปลี่ยน scope เป็น PW_REPORT_SCOPE ต้องรักษาสำเนาให้ตรงเมื่อแก้สูตร
+
+| ตรวจ | ผล |
+|---|---|
+| สูตรรายงาน / Snapshot / ไม่ยืมยอดปัจจุบัน / ข้อมูลขาด | ผ่าน Mock |
+| ตารางประกัน / ภาพรายเดือน / ฟอร์มเดิม | ผ่าน DOM |
+| สูตรบัญชี/เงินต้น/ประกัน/เกษียณ/เงินฉุกเฉินเดิม | ผ่าน Regression Mock |
+| Syntax / ภาพ PNG ที่เรนเดอร์จาก SVG | ผ่าน |
+| Google Sheet / Trigger / iPhone ดาวน์โหลดจริง | ยังไม่ทดสอบ |
+
+อ่าน MONTHLY_REPORT_MIGRATION.md สำหรับข้อจำกัดและ Deploy
+
+## สถานะฐาน v2.13.0
+
 # TasuyaWay v2.13.0 — สถานะล่าสุด
 
 เพิ่ม Dropdown รายได้ 15 ประเภทและประเภทจาก Categories เดิม ใช้ Transactions.category เดิม

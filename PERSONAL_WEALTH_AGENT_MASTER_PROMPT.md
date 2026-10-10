@@ -1,3 +1,11 @@
+# ข้อกำหนดล่าสุด v2.14.0
+
+อ่าน MONTHLY_REPORT_MIGRATION.md และ PROJECT_STATE.md ก่อนแก้
+ภาพรายเดือนใช้ report_json เก็บ frozen flows+stocks ไม่ยืมยอดปัจจุบันไปเติมย้อนหลัง
+MONTH_END_SNAPSHOT.gs รวม analytics.js scope PW_REPORT_SCOPE ต้อง sync สูตรให้ตรง
+ไม่เดารายการลงทุนรายเดือนจาก funded_amount หรือ principal_amount สะสม
+ประกันแสดงตารางพร้อมกติกาเดิม ข้อมูลเก่าคงไว้
+
 # ข้อกำหนดล่าสุด v2.13.0
 
 อ่าน UPDATE_V2.13.0.md และ PROJECT_STATE.md ก่อนแก้ระบบ

@@ -1,3 +1,10 @@
+# Snapshot อัตโนมัติ v2.14.0
+
+เพิ่ม Header report_json ต่อท้าย MonthlySnapshots และแทนไฟล์ Apps Script เดิมด้วย MONTH_END_SNAPSHOT.gs ทั้งไฟล์ ไม่สร้างฟังก์ชันซ้ำ ไม่ติดตั้ง Trigger ซ้ำหากมีอยู่แล้ว
+อ่าน [MONTHLY_REPORT_MIGRATION.md](MONTHLY_REPORT_MIGRATION.md) ก่อนทำ
+
+## คู่มือการติดตั้งพื้นฐานเดิม
+
 # ติดตั้ง Snapshot สิ้นเดือนอัตโนมัติ — v2.12.0
 
 GitHub Pages และ PWA ไม่สามารถทำงานเองเมื่อปิดแอป รุ่นนี้จึงใช้ Google Apps Script ที่ผูกกับ Google Sheet เพื่อบันทึก Snapshot แม้ไม่ได้เปิด WebApp
