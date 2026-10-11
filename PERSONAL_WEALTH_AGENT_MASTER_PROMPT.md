@@ -1,3 +1,13 @@
+# ข้อกำหนดล่าสุด v2.15.0
+
+BuyWish เป็น optional sheet ชื่อ BuyWish, schema อยู่ใน BUY_WISH_MIGRATION.md
+Account tracking อ่าน balance เท่านั้น ห้ามปรับยอดบัญชีจาก BuyWish
+ห้ามให้บัญชีเดียวเชื่อม BuyWish ที่ยังเปิดหลายรายการ และต้องรักษาการป้องกัน Rename/Delete Account
+Purchased ไม่สร้าง Transaction อัตโนมัติ ผู้ใช้ต้องบันทึกรายจ่ายจริงแยกต่างหาก
+BuyWish อยู่ในหน้า Goals เพื่อไม่เพิ่ม bottom navigation บนมือถือ
+
+## ข้อกำหนดฐาน v2.14.1
+
 # ข้อกำหนดล่าสุด v2.14.1
 
 report.js ใช้ assets/monthly-report-background.png เป็นแม่แบบจริง วางข้อความด้วย SVG ใน viewBox 1672×941 และส่งออก PNG 3840×2160

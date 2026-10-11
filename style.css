@@ -2432,6 +2432,47 @@ svg {
 .tier-heading { flex-wrap: wrap; }
 .wealth-tabs { overflow-x: auto; }
 .wealth-tabs button { flex-shrink: 0; }
+
+/* v2.15.0: BuyWish */
+.goals-tabs { margin-bottom: 16px; width: max-content; max-width: 100%; }
+.goals-panel[hidden] { display: none; }
+.buy-wish-summary { margin-bottom: 16px; }
+.buy-wish-list { display: grid; gap: 14px; }
+.buy-wish-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--border, #344b42);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(31, 66, 56, 0.72), rgba(10, 38, 31, 0.92));
+}
+.buy-wish-card.is-purchased,
+.buy-wish-card.is-cancelled { opacity: .68; }
+.buy-wish-heading,
+.buy-wish-amounts,
+.buy-wish-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.buy-wish-title { min-width: 0; }
+.buy-wish-title h3 { margin: 4px 0 0; overflow-wrap: anywhere; }
+.buy-wish-stars { color: #e7c66b; letter-spacing: 2px; font-size: 14px; }
+.buy-wish-amounts strong { font-size: clamp(20px, 4vw, 28px); font-variant-numeric: tabular-nums; }
+.buy-wish-amounts span { color: #e7c66b; font-weight: 700; }
+.buy-wish-progress { margin: 0; }
+.buy-wish-meta { display: flex; flex-wrap: wrap; gap: 7px 14px; color: var(--muted, #91a49b); }
+.buy-wish-meta span:not(.buy-wish-note)::before { content: "• "; color: #e7c66b; }
+.buy-wish-note { flex-basis: 100%; color: var(--text, #eef7f2); overflow-wrap: anywhere; }
+.buy-wish-actions { justify-content: flex-end; flex-wrap: wrap; }
+.buy-wish-actions a { text-decoration: none; }
+
+@media (max-width: 620px) {
+  .buy-wish-heading { align-items: flex-start; }
+  .buy-wish-summary { grid-template-columns: 1fr; }
+  .buy-wish-actions > * { flex: 1 1 auto; text-align: center; }
+}
 .planning-summary div { white-space: normal; overflow-wrap: anywhere; }
 
 /* v2.13.0: monthly 100% mixes and investment table */

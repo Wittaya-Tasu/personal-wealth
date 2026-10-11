@@ -9,16 +9,16 @@
   <meta name="apple-mobile-web-app-title" content="TasuyaWay">
   <meta name="application-name" content="TasuyaWay">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="TasuyaWay — ระบบส่วนตัวสำหรับการเงิน เป้าหมาย Todo Habit และบันทึกขอบคุณวันนี้">
+  <meta name="description" content="TasuyaWay — ระบบส่วนตัวสำหรับการเงิน เป้าหมาย BuyWish Todo Habit และบันทึกขอบคุณวันนี้">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://sheets.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; img-src 'self' data: blob:; manifest-src 'self'; worker-src 'self'">
   <title>TasuyaWay</title>
-  <link rel="manifest" href="manifest.json?v=2.14.1">
+  <link rel="manifest" href="manifest.json?v=2.15.0">
   <link rel="icon" href="icons/wealth-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.14.1">
+  <link rel="stylesheet" href="style.css?v=2.15.0">
 </head>
 <body>
   <svg class="svg-sprite" aria-hidden="true">
@@ -268,14 +268,55 @@
         <div class="view-header">
           <div>
             <p class="eyebrow">FINANCIAL PLAN</p>
-            <h2>เป้าหมายการเงินและชีวิต</h2>
+            <h2 id="goalsViewTitle">เป้าหมายการเงินและชีวิต</h2>
           </div>
-          <button class="primary-button open-add" data-form="goal" type="button">
-            <svg><use href="#i-plus"/></svg> เพิ่มเป้าหมาย
+          <button id="goalsAddButton" class="primary-button" type="button">
+            <svg><use href="#i-plus"/></svg> <span>เพิ่มเป้าหมาย</span>
           </button>
         </div>
-        <section class="panel">
+        <div class="segmented-control goals-tabs" role="tablist" aria-label="เป้าหมายและสิ่งที่อยากซื้อ">
+          <button class="is-active" type="button" data-goals-tab="goals">เป้าหมาย</button>
+          <button type="button" data-goals-tab="buyWish">BuyWish</button>
+        </div>
+        <section class="panel goals-panel" data-goals-panel="goals">
           <div id="goalList" class="goal-list"></div>
+        </section>
+        <section class="goals-panel" data-goals-panel="buyWish" hidden>
+          <section id="buyWishMigration" class="panel gratitude-migration" hidden>
+            <strong>ยังไม่ได้สร้างชีต BuyWish</strong>
+            <p>สร้างชีตและ Header ตามไฟล์ BUY_WISH_MIGRATION.md ก่อนเริ่มบันทึก</p>
+          </section>
+          <section class="summary-strip buy-wish-summary">
+            <div><span>รายการที่ยังเปิด</span><strong id="buyWishActiveCount">0</strong></div>
+            <div><span>ราคาเป้าหมายรวม</span><strong id="buyWishTargetTotal">฿0</strong></div>
+            <div><span>ยังขาดอีก</span><strong id="buyWishGapTotal">฿0</strong></div>
+          </section>
+          <section class="panel">
+            <div class="filter-row">
+              <select id="buyWishStatusFilter" class="compact-select" aria-label="กรองสถานะ BuyWish">
+                <option value="active">รายการที่ยังเปิด</option>
+                <option value="all">ทั้งหมด</option>
+                <option value="Wanted">อยากได้</option>
+                <option value="Saving">กำลังเก็บเงิน</option>
+                <option value="Ready">พร้อมซื้อ</option>
+                <option value="Purchased">ซื้อแล้ว</option>
+                <option value="Cancelled">ยกเลิก</option>
+              </select>
+              <select id="buyWishCategoryFilter" class="compact-select" aria-label="กรองหมวดหมู่ BuyWish">
+                <option value="all">ทุกหมวดหมู่</option>
+                <option value="Technology">เทคโนโลยี</option>
+                <option value="Personal">ของใช้ส่วนตัว</option>
+                <option value="Learning">การเรียนรู้</option>
+                <option value="Travel">ท่องเที่ยว</option>
+                <option value="Health">สุขภาพ</option>
+                <option value="Hobby">งานอดิเรก</option>
+                <option value="Home">บ้าน</option>
+                <option value="Gift">ของขวัญ</option>
+                <option value="Other">อื่น ๆ</option>
+              </select>
+            </div>
+            <div id="buyWishList" class="buy-wish-list"></div>
+          </section>
         </section>
       </section>
 
@@ -435,6 +476,7 @@
       <button type="button" data-form="asset"><span class="action-icon asset">◆</span><strong>ทรัพย์สิน</strong><small>บ้าน รถ และทรัพย์สินอื่น</small></button>
       <button type="button" data-form="liability"><span class="action-icon debt">−</span><strong>หนี้สิน</strong><small>ยอดหนี้และค่างวด</small></button>
       <button type="button" data-form="goal"><span class="action-icon goal">◎</span><strong>เป้าหมาย</strong><small>ติดตามเงิน บัญชี หรือ Milestone</small></button>
+      <button type="button" data-form="buyWish"><span class="action-icon goal">★</span><strong>BuyWish</strong><small>ของที่อยากซื้อและเงินที่เตรียมไว้</small></button>
       <button type="button" data-form="budget"><span class="action-icon cash">≡</span><strong>งบประมาณ</strong><small>ตั้งงบรายเดือนตามกลุ่มรายจ่าย</small></button>
       <button type="button" data-form="sinkingFund"><span class="action-icon goal">◷</span><strong>เงินเตรียมรายจ่าย</strong><small>เตรียมประกัน ภาษี และรายจ่ายก้อน</small></button>
     </div>
@@ -494,10 +536,10 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="config.js?v=2.14.1"></script>
-  <script src="analytics.js?v=2.14.1"></script>
-  <script src="api.js?v=2.14.1"></script>
-  <script src="report.js?v=2.14.1"></script>
-  <script src="app.js?v=2.14.1"></script>
+  <script src="config.js?v=2.15.0"></script>
+  <script src="analytics.js?v=2.15.0"></script>
+  <script src="api.js?v=2.15.0"></script>
+  <script src="report.js?v=2.15.0"></script>
+  <script src="app.js?v=2.15.0"></script>
 </body>
 </html>

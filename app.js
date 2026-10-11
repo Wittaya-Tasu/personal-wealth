@@ -15,6 +15,9 @@
     activeRecord: null,
     todayDate: localIsoDate(),
     todayTab: "todos",
+    goalsTab: "goals",
+    buyWishStatusFilter: "active",
+    buyWishCategoryFilter: "all",
     activeProjectId: null,
     cashflowTableMode: "percent",
     goalSchemaMissingHeaders: [],
@@ -33,6 +36,7 @@
     sinkingFundSchemaMissingHeaders: [],
     insuranceSchemaMissingHeaders: [],
     retirementSchemaMissingHeaders: [],
+    buyWishSchemaMissingHeaders: [],
     charts: {
       netWorth: null,
       cashflow: null,
@@ -61,7 +65,8 @@
     budget: { title: "งบประมาณ", eyebrow: "MONTHLY BUDGET", sheet: config.SHEETS.budgets || "Budgets" },
     sinkingFund: { title: "เงินเตรียมรายจ่าย", eyebrow: "SINKING FUND", sheet: config.SHEETS.sinkingFunds || "SinkingFunds" },
     insurance: { title: "กรมธรรม์ประกัน", eyebrow: "INSURANCE", sheet: config.SHEETS.insurancePolicies || "InsurancePolicies" },
-    retirement: { title: "แผนเกษียณ", eyebrow: "RETIREMENT", sheet: config.SHEETS.retirementPlans || "RetirementPlans" }
+    retirement: { title: "แผนเกษียณ", eyebrow: "RETIREMENT", sheet: config.SHEETS.retirementPlans || "RetirementPlans" },
+    buyWish: { title: "BuyWish", eyebrow: "WISH LIST", sheet: config.SHEETS.buyWish || "BuyWish" }
   };
 
   const INCOME_CATEGORIES = [
@@ -74,6 +79,16 @@
     "อาหาร", "เครื่องดื่ม", "หนังสือ", "ทำบุญ", "ของใช้ส่วนตัว",
     "ค่าเดินทาง", "ครอบครัว", "สุขภาพ", "อิเล็กทรอนิกส์", "อื่น ๆ"
   ];
+
+  const BUY_WISH_CATEGORY_LABELS = Object.freeze({
+    Technology: "เทคโนโลยี", Personal: "ของใช้ส่วนตัว", Learning: "การเรียนรู้",
+    Travel: "ท่องเที่ยว", Health: "สุขภาพ", Hobby: "งานอดิเรก",
+    Home: "บ้าน", Gift: "ของขวัญ", Other: "อื่น ๆ"
+  });
+  const BUY_WISH_STATUS_LABELS = Object.freeze({
+    Wanted: "อยากได้", Saving: "กำลังเก็บเงิน", Ready: "พร้อมซื้อ",
+    Purchased: "ซื้อแล้ว", Cancelled: "ยกเลิก"
+  });
 
   const ACCOUNT_ROLES = [
     ["General", "เงินทั่วไป"],
@@ -176,8 +191,10 @@
     setTimeout(() => toast.remove(), 3500);
   }
 
-  function emptyState() {
-    return qs("#emptyStateTemplate").content.firstElementChild.cloneNode(true);
+  function emptyState(message = "") {
+    const node = qs("#emptyStateTemplate").content.firstElementChild.cloneNode(true);
+    if (message) qs("p", node).textContent = message;
+    return node;
   }
 
   function setLoading(isLoading) {
@@ -206,7 +223,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js?v=2.14.1").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.15.0").catch(() => {});
     }
   }
 
@@ -225,6 +242,7 @@
     qs("#settingsButton").addEventListener("click", openSettings);
     qs("#quickAddButton").addEventListener("click", openQuickAdd);
     qs("#wealthAddButton").addEventListener("click", openWealthAdd);
+    qs("#goalsAddButton").addEventListener("click", () => openForm(state.goalsTab === "buyWish" ? "buyWish" : "goal"));
 
     qsa(".nav-item").forEach((button) => {
       button.addEventListener("click", () => navigate(button.dataset.target));
@@ -234,6 +252,20 @@
     });
     qsa(".open-add").forEach((button) => {
       button.addEventListener("click", () => openForm(button.dataset.form));
+    });
+    qsa("[data-goals-tab]").forEach((button) => {
+      button.addEventListener("click", () => {
+        state.goalsTab = button.dataset.goalsTab;
+        renderGoalsTabs();
+      });
+    });
+    qs("#buyWishStatusFilter").addEventListener("change", (event) => {
+      state.buyWishStatusFilter = event.target.value;
+      renderBuyWish();
+    });
+    qs("#buyWishCategoryFilter").addEventListener("change", (event) => {
+      state.buyWishCategoryFilter = event.target.value;
+      renderBuyWish();
     });
 
     qsa(".wealth-tabs button").forEach((button) => {
@@ -274,6 +306,7 @@
     qs("#wealthList").addEventListener("click", handleListAction);
     qs("#wealthList").addEventListener("change", handleWealthChange);
     qs("#goalList").addEventListener("click", handleListAction);
+    qs("#buyWishList").addEventListener("click", handleListAction);
     qsa(".today-tabs button").forEach((button) => {
       button.addEventListener("click", () => {
         state.todayTab = button.dataset.todayTab;
@@ -377,6 +410,7 @@
       state.sinkingFundSchemaMissingHeaders = store.getMissingSinkingFundHeaders();
       state.insuranceSchemaMissingHeaders = store.getMissingInsuranceHeaders();
       state.retirementSchemaMissingHeaders = store.getMissingRetirementHeaders();
+      state.buyWishSchemaMissingHeaders = store.getMissingBuyWishHeaders();
       state.viewModel = analytics.buildViewModel(data, config.DEFAULTS);
       populateChartFilters();
       renderAll();
@@ -400,7 +434,7 @@
     ].forEach((id) => setText(id, id === "emergencyMonthsValue" ? "— เดือน" : "฿—"));
     setText("netWorthStatus", "รอเชื่อมต่อ");
     setText("netWorthChange", "เชื่อมต่อ Google เพื่อดูข้อมูลจริง");
-    ["recentTransactions", "transactionList", "wealthList", "goalPreview", "goalList", "todoList", "projectTaskList", "habitList"].forEach((id) => {
+    ["recentTransactions", "transactionList", "wealthList", "goalPreview", "goalList", "buyWishList", "todoList", "projectTaskList", "habitList"].forEach((id) => {
       const container = document.getElementById(id);
       container.replaceChildren(emptyState());
     });
@@ -415,6 +449,8 @@
     renderTransactions();
     renderWealth();
     renderGoals();
+    renderBuyWish();
+    renderGoalsTabs();
     renderToday();
   }
 
@@ -1426,6 +1462,116 @@
     renderGoalContainer(qs("#goalList"), state.viewModel?.goals || [], true);
   }
 
+  function renderGoalsTabs() {
+    qsa("[data-goals-tab]").forEach((button) => {
+      const active = button.dataset.goalsTab === state.goalsTab;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    qsa("[data-goals-panel]").forEach((panel) => {
+      const active = panel.dataset.goalsPanel === state.goalsTab;
+      panel.hidden = !active;
+    });
+    const isWish = state.goalsTab === "buyWish";
+    setText("goalsViewTitle", isWish ? "ของที่อยากซื้อ" : "เป้าหมายการเงินและชีวิต");
+    qs("#goalsAddButton span").textContent = isWish ? "เพิ่ม BuyWish" : "เพิ่มเป้าหมาย";
+    qs("#goalsAddButton").disabled = isWish && !store.isBuyWishSheetReady();
+  }
+
+  function buyWishProgress(row) {
+    const source = String(row.progress_source || "Manual").toLowerCase();
+    if (source === "account") {
+      const key = String(row.linked_account || "").trim().toLocaleLowerCase("th-TH");
+      const matches = (state.data?.accounts || []).filter((account) => {
+        return String(account.account_name || "").trim().toLocaleLowerCase("th-TH") === key;
+      });
+      if (matches.length !== 1) return { amount: 0, error: key ? "ไม่พบบัญชีหรือชื่อบัญชีซ้ำ" : "ยังไม่ได้เลือกบัญชี" };
+      return { amount: Math.max(0, analytics.toNumber(matches[0].balance)), account: matches[0] };
+    }
+    return { amount: Math.max(0, analytics.toNumber(row.saved_amount)) };
+  }
+
+  function renderBuyWish() {
+    const container = qs("#buyWishList");
+    container.replaceChildren();
+    const ready = store.isBuyWishSheetReady();
+    qs("#buyWishMigration").hidden = ready;
+    qs("#goalsAddButton").disabled = state.goalsTab === "buyWish" && !ready;
+    const allRows = (state.data?.buyWish || []).map((row) => {
+      const progress = buyWishProgress(row);
+      const target = Math.max(0, analytics.toNumber(row.target_price));
+      const ratio = target > 0 ? Math.min(progress.amount / target, 1) : 0;
+      const effectiveStatus = ratio >= 1 && !["Purchased", "Cancelled"].includes(String(row.status)) ? "Ready" : row.status;
+      return { ...row, ...progress, target, ratio, effectiveStatus };
+    });
+    const openRows = allRows.filter((row) => !["Purchased", "Cancelled"].includes(String(row.status)));
+    const totalTarget = openRows.reduce((sum, row) => sum + row.target, 0);
+    const totalGap = openRows.reduce((sum, row) => sum + Math.max(row.target - row.amount, 0), 0);
+    setText("buyWishActiveCount", String(openRows.length));
+    setText("buyWishTargetTotal", formatCurrency(totalTarget));
+    setText("buyWishGapTotal", formatCurrency(totalGap));
+    if (!ready) {
+      container.appendChild(emptyState("สร้างชีต BuyWish ก่อนเริ่มใช้งาน"));
+      return;
+    }
+    const statusFilter = state.buyWishStatusFilter;
+    const categoryFilter = state.buyWishCategoryFilter;
+    const rows = allRows.filter((row) => {
+      const statusMatch = statusFilter === "all"
+        || (statusFilter === "active" && !["Purchased", "Cancelled"].includes(String(row.status)))
+        || row.effectiveStatus === statusFilter;
+      return statusMatch && (categoryFilter === "all" || row.category === categoryFilter);
+    }).sort((a, b) => {
+      const closedA = ["Purchased", "Cancelled"].includes(String(a.effectiveStatus)) ? 1 : 0;
+      const closedB = ["Purchased", "Cancelled"].includes(String(b.effectiveStatus)) ? 1 : 0;
+      return closedA - closedB || Number(b.priority || 0) - Number(a.priority || 0) || String(a.target_date || "9999").localeCompare(String(b.target_date || "9999"));
+    });
+    if (!rows.length) {
+      container.appendChild(emptyState("ยังไม่มี BuyWish ตามตัวกรองนี้"));
+      return;
+    }
+    rows.forEach((row) => {
+      const card = createElement("article", `buy-wish-card is-${String(row.effectiveStatus || "Wanted").toLowerCase()}`);
+      const heading = createElement("div", "buy-wish-heading");
+      const title = createElement("div", "buy-wish-title");
+      title.append(
+        createElement("span", "buy-wish-stars", "★".repeat(Math.max(1, Math.min(3, Number(row.priority) || 1)))),
+        createElement("h3", "", row.name || "BuyWish")
+      );
+      heading.append(title, createElement("span", `goal-status is-${String(row.effectiveStatus || "Wanted").toLowerCase()}`, BUY_WISH_STATUS_LABELS[row.effectiveStatus] || row.effectiveStatus || "อยากได้"));
+      const amounts = createElement("div", "buy-wish-amounts");
+      amounts.append(
+        createElement("strong", "", `${formatCurrency(row.amount)} / ${formatCurrency(row.target)}`),
+        createElement("span", "", `${Math.round(row.ratio * 100)}%`)
+      );
+      const progress = createElement("div", "goal-progress buy-wish-progress");
+      const bar = document.createElement("span");
+      bar.style.width = `${row.ratio * 100}%`;
+      progress.appendChild(bar);
+      const meta = createElement("div", "buy-wish-meta");
+      meta.append(
+        createElement("span", "", BUY_WISH_CATEGORY_LABELS[row.category] || row.category || "อื่น ๆ"),
+        createElement("span", "", row.error || (row.account ? `อ้างอิง ${row.account.account_name}` : "กรอกยอดสะสมเอง")),
+        createElement("span", "", row.target_date ? `อยากซื้อ ${formatDate(analytics.parseDate(row.target_date))}` : "ไม่กำหนดวันที่")
+      );
+      if (row.note) meta.appendChild(createElement("span", "buy-wish-note", row.note));
+      const actions = createElement("div", "buy-wish-actions");
+      if (/^https?:\/\/[^\s]+$/i.test(String(row.product_url || ""))) {
+        const link = createElement("a", "edit-button", "เปิดลิงก์สินค้า");
+        link.href = row.product_url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        actions.appendChild(link);
+      }
+      actions.append(
+        editButton("buyWish", row._rowNumber, row.name || "BuyWish"),
+        deleteButton(store.getBuyWishSheetName(), row._rowNumber, row.name || "BuyWish")
+      );
+      card.append(heading, amounts, progress, meta, actions);
+      container.appendChild(card);
+    });
+  }
+
   function gratitudeDateKey(value) {
     const date = analytics.parseDate(value);
     return date ? localIsoDate(date) : String(value || "").slice(0, 10);
@@ -2120,7 +2266,7 @@
         goal: "goals",
         budget: "budgets",
         sinkingFund: "sinkingFunds",
-        investmentMeta: "investments", insurance: "insurancePolicies", retirement: "retirementPlans"
+        investmentMeta: "investments", insurance: "insurancePolicies", retirement: "retirementPlans", buyWish: "buyWish"
       };
       const collection = collectionMap[edit.dataset.editType];
       const record = (state.data?.[collection] || []).find((row) => row._rowNumber === Number(edit.dataset.editRow));
@@ -2684,6 +2830,47 @@
         ${submit}`;
     }
 
+    if (type === "buyWish") {
+      const source = String(record?.progress_source || "Manual").toLowerCase() === "account" ? "Account" : "Manual";
+      const priority = Number(record?.priority || 2);
+      const status = String(record?.status || "Wanted");
+      return `
+        ${state.buyWishSchemaMissingHeaders.length
+          ? `<p class="form-warning">สร้างชีต BuyWish ตาม BUY_WISH_MIGRATION.md ก่อน: ${state.buyWishSchemaMissingHeaders.join(", ")}</p>`
+          : ""}
+        <label class="field"><span>สิ่งที่อยากซื้อ</span><input name="name" maxlength="200" value="${inputValue(record, "name")}" placeholder="เช่น iPad หรือทริปท่องเที่ยว" required></label>
+        <label class="field"><span>หมวดหมู่</span><select name="category" required>
+          ${Object.entries(BUY_WISH_CATEGORY_LABELS).map(([value, label]) => `<option value="${value}" ${record?.category === value ? "selected" : ""}>${label}</option>`).join("")}
+        </select></label>
+        <div class="field-row">
+          <label class="field"><span>ราคาเป้าหมาย (บาท)</span><input name="target_price" type="number" min="0.01" step="0.01" inputmode="decimal" value="${inputValue(record, "target_price")}" required></label>
+          <label class="field"><span>วันที่อยากซื้อ</span><input name="target_date" type="date" value="${inputDate(record, "target_date")}"></label>
+        </div>
+        <label class="field"><span>ติดตามเงินที่เตรียมไว้จาก</span><select name="progress_source" required>
+          <option value="Manual" ${source === "Manual" ? "selected" : ""}>กรอกยอดเอง</option>
+          <option value="Account" ${source === "Account" ? "selected" : ""}>ยอดคงเหลือในบัญชี</option>
+        </select></label>
+        <label class="field" data-buy-wish-manual-field><span>เงินที่เตรียมไว้ (บาท)</span><input name="saved_amount" type="number" min="0" step="0.01" inputmode="decimal" value="${inputValue(record, "saved_amount", "0")}"></label>
+        <label class="field" data-buy-wish-account-field><span>บัญชีที่ใช้อ้างอิง</span>
+          <select name="linked_account">${accountOptions(record?.linked_account || "", "เลือกบัญชีสำหรับ BuyWish")}</select>
+          <small>หนึ่งบัญชีเชื่อมกับ BuyWish ที่ยังเปิดได้เพียงหนึ่งรายการ เพื่อป้องกันการนับเงินซ้ำ</small>
+        </label>
+        <div class="field-row">
+          <label class="field"><span>ความสำคัญ</span><select name="priority" required>
+            <option value="1" ${priority === 1 ? "selected" : ""}>★</option>
+            <option value="2" ${priority === 2 ? "selected" : ""}>★★</option>
+            <option value="3" ${priority === 3 ? "selected" : ""}>★★★ สำคัญที่สุด</option>
+          </select></label>
+          <label class="field"><span>สถานะ</span><select name="status" required>
+            ${Object.entries(BUY_WISH_STATUS_LABELS).map(([value, label]) => `<option value="${value}" ${status === value ? "selected" : ""}>${label}</option>`).join("")}
+          </select></label>
+        </div>
+        <label class="field"><span>ลิงก์สินค้า (ไม่บังคับ)</span><input name="product_url" type="url" inputmode="url" value="${inputValue(record, "product_url")}" placeholder="https://..."></label>
+        ${note("เหตุผล รุ่น สี ร้านค้า หรือรายละเอียดที่ต้องการ")}
+        <p class="security-note">การเชื่อมบัญชีใช้เพื่ออ่านยอดคงเหลือเท่านั้น ระบบจะไม่หักเงินเมื่อเปลี่ยนสถานะเป็นซื้อแล้ว</p>
+        ${submit}`;
+    }
+
     const goalType = String(record?.goal_type || "Financial").toLowerCase() === "milestone"
       ? "Milestone"
       : "Financial";
@@ -2769,6 +2956,21 @@
         accountField.hidden = !usesAccount;
         form.elements.current_amount.disabled = usesAccount;
         form.elements.current_amount.required = !usesAccount;
+        form.elements.linked_account.disabled = !usesAccount;
+        form.elements.linked_account.required = usesAccount;
+      };
+      form.elements.progress_source.addEventListener("change", updateSource);
+      updateSource();
+      return;
+    }
+    if (type === "buyWish") {
+      const form = qs("#dynamicForm");
+      const updateSource = () => {
+        const usesAccount = form.elements.progress_source.value === "Account";
+        qs("[data-buy-wish-manual-field]", form).hidden = usesAccount;
+        qs("[data-buy-wish-account-field]", form).hidden = !usesAccount;
+        form.elements.saved_amount.disabled = usesAccount;
+        form.elements.saved_amount.required = !usesAccount;
         form.elements.linked_account.disabled = !usesAccount;
         form.elements.linked_account.required = usesAccount;
       };
@@ -2983,6 +3185,21 @@
         values.linked_account = "";
       }
     }
+    if (type === "buyWish") {
+      if (!(analytics.toNumber(values.target_price) > 0)) {
+        showToast("ราคาเป้าหมายต้องมากกว่า 0 บาท", "error");
+        return;
+      }
+      if (values.progress_source === "Account") {
+        values.saved_amount = state.activeRecord?.saved_amount || "";
+        if (!values.linked_account) {
+          showToast("กรุณาเลือกบัญชีสำหรับ BuyWish", "error");
+          return;
+        }
+      } else {
+        values.linked_account = "";
+      }
+    }
     if (type === "investment") {
       values.investment_row = form.elements.investment_target.value;
       values.account_from = form.elements.account_from.value;
@@ -3119,6 +3336,10 @@
         await store.updateSinkingFundRecord(state.activeRecord._rowNumber, state.activeRecord, values);
       } else if (type === "sinkingFund") {
         await store.appendSinkingFund(values);
+      } else if (type === "buyWish" && state.activeRecord?._rowNumber) {
+        await store.updateBuyWishRecord(state.activeRecord._rowNumber, state.activeRecord, values);
+      } else if (type === "buyWish") {
+        await store.appendBuyWish(values);
       } else if (type === "investmentMeta") {
         await store.updateInvestmentProfile(state.activeRecord._rowNumber, state.activeRecord, values);
       } else if (type === "insurance") {

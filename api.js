@@ -20,6 +20,7 @@
   const LIABILITY_DETAIL_HEADERS = ["debt_category", "original_amount", "interest_rate", "start_date", "due_date", "payment_day", "credit_limit", "linked_asset"];
   const INSURANCE_HEADERS = ["policy_id", "policy_name", "insurance_type", "insurer", "coverage_amount", "annual_premium", "start_date", "renewal_date", "end_date", "insured_person", "status", "note", "created_at", "updated_at"];
   const RETIREMENT_HEADERS = ["retirement_id", "plan_name", "birth_date", "retirement_age", "monthly_expense_today", "inflation_rate", "expected_return", "withdrawal_rate", "monthly_contribution", "status", "note", "created_at", "updated_at"];
+  const BUY_WISH_HEADERS = ["wish_id", "name", "category", "target_price", "progress_source", "saved_amount", "linked_account", "target_date", "priority", "product_url", "note", "status", "created_at", "updated_at"];
   const GRATITUDE_HEADERS = ["gratitude_id", "date", "slot", "category", "gratitude_text", "created_at", "updated_at"];
   const TODO_HEADERS = ["todo_id", "date", "category", "task_text", "is_important", "is_completed", "completed_at", "created_at", "updated_at", "parent_todo_id"];
   const HABIT_HEADERS = ["habit_id", "habit_name", "frequency", "active", "created_at", "updated_at"];
@@ -39,6 +40,9 @@
   const INSURANCE_TYPES = new Set(["Life", "Health", "CriticalIllness", "Accident", "Vehicle", "Property", "Other"]);
   const INSURANCE_STATUSES = new Set(["Active", "Expired", "Cancelled"]);
   const RETIREMENT_STATUSES = new Set(["Active", "Paused"]);
+  const BUY_WISH_CATEGORIES = new Set(["Technology", "Personal", "Learning", "Travel", "Health", "Hobby", "Home", "Gift", "Other"]);
+  const BUY_WISH_SOURCES = new Set(["Manual", "Account"]);
+  const BUY_WISH_STATUSES = new Set(["Wanted", "Saving", "Ready", "Purchased", "Cancelled"]);
 
   function waitFor(predicate, timeoutMs = 15000) {
     return new Promise((resolve, reject) => {
@@ -334,6 +338,7 @@
       this.sinkingFundLoadError = null;
       this.insuranceLoadError = null;
       this.retirementLoadError = null;
+      this.buyWishLoadError = null;
     }
 
     async init() {
@@ -481,7 +486,7 @@
     }
 
     async loadAll() {
-      const optionalKeys = new Set(["gratitude", "todos", "habits", "habitLogs", "budgets", "sinkingFunds", "insurancePolicies", "retirementPlans"]);
+      const optionalKeys = new Set(["gratitude", "todos", "habits", "habitLogs", "budgets", "sinkingFunds", "insurancePolicies", "retirementPlans", "buyWish"]);
       const entries = Object.entries(this.config.SHEETS).filter(([key]) => !optionalKeys.has(key));
       const ranges = entries.map(([, sheetName]) => `${quoteSheet(sheetName)}!A:Z`);
       const response = await this.request("/values:batchGet", {
@@ -521,6 +526,7 @@
       await this.loadOptionalSheet(data, "sinkingFunds", this.getSinkingFundSheetName(), "L", "sinkingFundLoadError");
       await this.loadOptionalSheet(data, "insurancePolicies", this.getInsuranceSheetName(), "N", "insuranceLoadError");
       await this.loadOptionalSheet(data, "retirementPlans", this.getRetirementSheetName(), "M", "retirementLoadError");
+      await this.loadOptionalSheet(data, "buyWish", this.getBuyWishSheetName(), "N", "buyWishLoadError");
 
       this.currentData = data;
       return data;
@@ -621,6 +627,10 @@
       return this.config.SHEETS.retirementPlans || "RetirementPlans";
     }
 
+    getBuyWishSheetName() {
+      return this.config.SHEETS.buyWish || "BuyWish";
+    }
+
     getMissingTodoHeaders() {
       const headers = this.headers[this.getTodoSheetName()] || [];
       return TODO_HEADERS.filter((header) => !headers.includes(header));
@@ -656,6 +666,11 @@
       return RETIREMENT_HEADERS.filter((header) => !headers.includes(header));
     }
 
+    getMissingBuyWishHeaders() {
+      const headers = this.headers[this.getBuyWishSheetName()] || [];
+      return BUY_WISH_HEADERS.filter((header) => !headers.includes(header));
+    }
+
     isTodoSheetReady() {
       return !this.todoLoadError && this.getMissingTodoHeaders().length === 0;
     }
@@ -681,6 +696,10 @@
 
     isRetirementSheetReady() {
       return !this.retirementLoadError && this.getMissingRetirementHeaders().length === 0;
+    }
+
+    isBuyWishSheetReady() {
+      return !this.buyWishLoadError && this.getMissingBuyWishHeaders().length === 0;
     }
 
     buildRow(sheetName, record) {
@@ -822,11 +841,20 @@
       });
     }
 
+    isAccountReferencedByBuyWish(name) {
+      const key = accountKey(name);
+      return (this.currentData?.buyWish || []).some((wish) => {
+        return normalizeGoalProgressSource(wish.progress_source) === "Account"
+          && accountKey(wish.linked_account) === key;
+      });
+    }
+
     isAccountReferenced(name) {
       return this.isAccountReferencedByTransaction(name)
         || this.isAccountReferencedByGoal(name)
         || this.isAccountReferencedByInvestment(name)
-        || this.isAccountReferencedBySinkingFund(name);
+        || this.isAccountReferencedBySinkingFund(name)
+        || this.isAccountReferencedByBuyWish(name);
     }
 
     accountReferenceLabel(name) {
@@ -835,6 +863,7 @@
       if (this.isAccountReferencedByGoal(name)) references.push("Goal");
       if (this.isAccountReferencedByInvestment(name)) references.push("Investment");
       if (this.isAccountReferencedBySinkingFund(name)) references.push("Sinking Fund");
+      if (this.isAccountReferencedByBuyWish(name)) references.push("BuyWish");
       return references.join(" และ ") || "ข้อมูลอื่น";
     }
 
@@ -1253,6 +1282,92 @@
       };
       if (existing?._rowNumber) return this.update(this.getHabitLogSheetName(), existing._rowNumber, record);
       return this.append(this.getHabitLogSheetName(), record);
+    }
+
+    getBuyWishRows() {
+      return this.currentData?.buyWish || [];
+    }
+
+    validateBuyWishRecord(record, existingRecord = null) {
+      if (!this.isBuyWishSheetReady()) {
+        const error = new Error(`ระบบ BuyWish ยังไม่พร้อม กรุณาสร้างชีต BuyWish และ Header: ${BUY_WISH_HEADERS.join(", ")}`);
+        error.code = "BUY_WISH_SCHEMA_MIGRATION_REQUIRED";
+        error.missingHeaders = this.getMissingBuyWishHeaders();
+        throw error;
+      }
+      const name = normalizeName(record?.name);
+      const category = normalizeName(record?.category);
+      const targetPrice = roundMoney(record?.target_price);
+      const source = normalizeGoalProgressSource(record?.progress_source);
+      const savedAmount = roundMoney(record?.saved_amount);
+      const targetDate = normalizeName(record?.target_date);
+      const priority = Number(record?.priority);
+      const status = normalizeName(record?.status || "Wanted");
+      const productUrl = normalizeName(record?.product_url);
+      let linkedAccount = "";
+      if (!name) throw new Error("กรุณาระบุชื่อสิ่งที่อยากซื้อ");
+      if (!BUY_WISH_CATEGORIES.has(category)) throw new Error("กรุณาเลือกหมวดหมู่ BuyWish");
+      if (!(targetPrice > 0)) throw new Error("ราคาเป้าหมายต้องมากกว่า 0 บาท");
+      if (!BUY_WISH_SOURCES.has(source)) throw new Error("แหล่งติดตามเงิน BuyWish ไม่ถูกต้อง");
+      if (savedAmount < 0) throw new Error("เงินที่เตรียมไว้ติดลบไม่ได้");
+      if (![1, 2, 3].includes(priority)) throw new Error("ความสำคัญต้องอยู่ระหว่าง 1–3 ดาว");
+      if (!BUY_WISH_STATUSES.has(status)) throw new Error("สถานะ BuyWish ไม่ถูกต้อง");
+      if (targetDate) {
+        const parts = targetDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        const value = parts ? new Date(Date.UTC(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]))) : null;
+        if (!parts || value.getUTCFullYear() !== Number(parts[1]) || value.getUTCMonth() !== Number(parts[2]) - 1 || value.getUTCDate() !== Number(parts[3])) {
+          throw new Error("วันที่อยากซื้อไม่ถูกต้อง");
+        }
+      }
+      if (productUrl && !/^https?:\/\/[^\s]+$/i.test(productUrl)) throw new Error("ลิงก์สินค้าต้องขึ้นต้นด้วย http:// หรือ https://");
+      if (source === "Account") {
+        const account = this.findAccountByName(record?.linked_account);
+        linkedAccount = normalizeName(account.account_name);
+        const duplicateAccount = this.getBuyWishRows().find((row) => {
+          return row._rowNumber !== existingRecord?._rowNumber
+            && normalizeGoalProgressSource(row.progress_source) === "Account"
+            && accountKey(row.linked_account) === accountKey(linkedAccount)
+            && !["Purchased", "Cancelled"].includes(normalizeName(row.status));
+        });
+        if (duplicateAccount) throw new Error(`บัญชี “${linkedAccount}” ถูกใช้ติดตาม BuyWish อื่นอยู่แล้ว เพื่อไม่ให้นับเงินซ้ำ กรุณาใช้บัญชีแยกหรือเลือกกรอกยอดเอง`);
+      }
+      const duplicateName = this.getBuyWishRows().find((row) => {
+        return row._rowNumber !== existingRecord?._rowNumber
+          && accountKey(row.name) === accountKey(name)
+          && !["Purchased", "Cancelled"].includes(normalizeName(row.status));
+      });
+      if (duplicateName) throw new Error(`มี BuyWish ชื่อ “${name}” ที่ยังไม่ปิดรายการอยู่แล้ว`);
+      const now = new Date().toISOString();
+      return {
+        ...(existingRecord || {}),
+        ...record,
+        wish_id: existingRecord?.wish_id || record?.wish_id || `wish-${createShortId()}`,
+        name,
+        category,
+        target_price: targetPrice,
+        progress_source: source,
+        saved_amount: source === "Manual" ? savedAmount : (existingRecord?.saved_amount || ""),
+        linked_account: linkedAccount,
+        target_date: targetDate,
+        priority,
+        product_url: productUrl,
+        note: normalizeName(record?.note),
+        status,
+        created_at: existingRecord?.created_at || record?.created_at || now,
+        updated_at: now
+      };
+    }
+
+    async appendBuyWish(record) {
+      return this.append(this.getBuyWishSheetName(), this.validateBuyWishRecord(record));
+    }
+
+    async updateBuyWishRecord(rowNumber, existingRecord, record) {
+      return this.update(
+        this.getBuyWishSheetName(),
+        rowNumber,
+        this.validateBuyWishRecord({ ...existingRecord, ...record }, existingRecord)
+      );
     }
 
     getBudgetRows() {

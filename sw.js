@@ -1,4 +1,4 @@
-const APP_VERSION = "2.14.1";
+const APP_VERSION = "2.15.0";
 const CACHE_NAME = `tasuya-way-shell-v${APP_VERSION}`;
 const STATIC_ASSETS = [
   "./",

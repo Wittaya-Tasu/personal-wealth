@@ -1,3 +1,26 @@
+# TasuyaWay v2.15.0 — สถานะล่าสุด
+
+เพิ่ม optional sheet BuyWish A:N และหน้า BuyWish ภายใต้เมนูเป้าหมาย
+ติดตามยอดจาก Manual หรือ Accounts.balance โดยไม่แก้ยอดบัญชี
+หนึ่งบัญชีใช้กับ BuyWish ที่ยังเปิดได้หนึ่งรายการ ป้องกันการนับซ้ำ
+Account rename/delete ถูกบล็อกเมื่อ BuyWish อ้างถึง
+Purchased ไม่สร้าง Expense และไม่หัก Account อัตโนมัติ
+ไม่มีการเปลี่ยนสูตร Wealth, Transaction, Snapshot และ Monthly Report
+
+อ่าน BUY_WISH_MIGRATION.md และ UPDATE_V2.15.0.md ก่อน Deploy
+
+| การทดสอบ | ผล |
+|---|---|
+| BuyWish schema / Manual / Account / duplicate guard | ผ่าน |
+| ฟอร์ม เพิ่ม–แก้ไข / Filter / Priority / Product URL | ผ่าน DOM |
+| Account reference protection | ผ่าน |
+| Syntax / HTML ID / Versioned assets / Service Worker | ผ่าน |
+| Transaction / Credit Card / Investment / Wealth | ผ่าน Regression |
+| Monthly Report / Snapshot parity | ผ่าน Regression |
+| Google Sheet และ Safari บน iPhone หลัง Deploy | ต้องทดสอบจริง |
+
+## สถานะฐาน v2.14.1
+
 # TasuyaWay v2.14.1 — สถานะล่าสุด
 
 ปรับเฉพาะภาพรายเดือนเป็นแม่แบบถัง 3 มิติจริงจากภาพที่อนุมัติ + SVG ตัวเลข/progress ไม่มีทศนิยมในจำนวนเงิน
