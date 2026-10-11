@@ -24,10 +24,11 @@
   const GRATITUDE_HEADERS = ["gratitude_id", "date", "slot", "category", "gratitude_text", "created_at", "updated_at"];
   const TODO_HEADERS = ["todo_id", "date", "category", "task_text", "is_important", "is_completed", "completed_at", "created_at", "updated_at", "parent_todo_id"];
   const HABIT_HEADERS = ["habit_id", "habit_name", "frequency", "active", "created_at", "updated_at", "target_count"];
+  const HABIT_INTERVAL_HEADERS = ["interval_days", "start_date"];
   const HABIT_LOG_HEADERS = ["habit_log_id", "habit_id", "period_key", "completed_date", "completed_at", "created_at", "updated_at"];
   const GRATITUDE_CATEGORIES = new Set(["คน", "ตัวเอง", "สัตว์", "สิ่งของ", "สถานที่", "เหตุการณ์", "ประสบการณ์", "อื่น ๆ"]);
   const TODO_CATEGORIES = new Set(["เรื่องงาน", "เรื่องส่วนตัว", "โปรเจก"]);
-  const HABIT_FREQUENCIES = new Set(["Daily", "Weekly", "Monthly", "Yearly"]);
+  const HABIT_FREQUENCIES = new Set(["Daily", "Weekly", "Monthly", "Yearly", "Interval"]);
   const ACCOUNT_ROLES = new Set(["General", "Spending", "Emergency", "SinkingFund", "Investment"]);
   const EXPENSE_GROUPS = new Set(["Personal", "Family", "HomeDebt", "Health", "Protection"]);
   const SINKING_FUND_SOURCES = new Set(["Manual", "Account"]);
@@ -520,7 +521,7 @@
 
       await this.loadOptionalSheet(data, "gratitude", this.getGratitudeSheetName(), "G", "gratitudeLoadError");
       await this.loadOptionalSheet(data, "todos", this.getTodoSheetName(), "J", "todoLoadError");
-      await this.loadOptionalSheet(data, "habits", this.getHabitSheetName(), "G", "habitLoadError");
+      await this.loadOptionalSheet(data, "habits", this.getHabitSheetName(), "I", "habitLoadError");
       await this.loadOptionalSheet(data, "habitLogs", this.getHabitLogSheetName(), "G", "habitLogLoadError");
       await this.loadOptionalSheet(data, "budgets", this.getBudgetSheetName(), "G", "budgetLoadError");
       await this.loadOptionalSheet(data, "sinkingFunds", this.getSinkingFundSheetName(), "L", "sinkingFundLoadError");
@@ -646,6 +647,15 @@
       return HABIT_LOG_HEADERS.filter((header) => !headers.includes(header));
     }
 
+    getMissingHabitIntervalHeaders() {
+      const headers = this.headers[this.getHabitSheetName()] || [];
+      return HABIT_INTERVAL_HEADERS.filter((header) => !headers.includes(header));
+    }
+
+    isHabitIntervalReady() {
+      return this.isHabitSheetReady() && this.getMissingHabitIntervalHeaders().length === 0;
+    }
+
     getMissingBudgetHeaders() {
       const headers = this.headers[this.getBudgetSheetName()] || [];
       return BUDGET_HEADERS.filter((header) => !headers.includes(header));
@@ -712,6 +722,8 @@
     }
 
     rowInputOption(sheetName) {
+      // Keep the interval anchor as ISO text regardless of spreadsheet locale/date formatting.
+      if (sheetName === this.getHabitSheetName()) return "RAW";
       // Keep ISO dates and product/policy names literal in the new planning records.
       return [this.getInsuranceSheetName(), this.getRetirementSheetName(), this.config.SHEETS.investments, this.config.SHEETS.liabilities].includes(sheetName) ? "RAW" : "USER_ENTERED";
     }
@@ -1224,6 +1236,8 @@
       if (!habitName) throw new Error("กรุณาระบุชื่อ Habit");
       if (habitName.length > 200) throw new Error("ชื่อ Habit ยาวได้ไม่เกิน 200 ตัวอักษร");
       if (!HABIT_FREQUENCIES.has(frequency)) throw new Error("ความถี่ Habit ไม่ถูกต้อง");
+      if (frequency === "Interval" && !this.isHabitIntervalReady()) throw new Error("เพิ่ม interval_days ที่ Habits!H1 และ start_date ที่ I1 ตาม HABIT_INTERVAL_MIGRATION.md ก่อน");
+      const intervalDays = frequency === "Interval" ? global.HabitTracker.validateInterval(record?.interval_days, record?.start_date) : "";
       const now = new Date().toISOString();
       return {
         ...(existingRecord || {}),
@@ -1231,6 +1245,8 @@
         habit_id: existingRecord?.habit_id || record?.habit_id || `habit-${createShortId()}`,
         habit_name: habitName,
         frequency,
+        interval_days: intervalDays,
+        start_date: frequency === "Interval" ? normalizeName(record.start_date) : "",
         target_count: global.HabitTracker.validateTarget(record?.target_count ?? existingRecord?.target_count, frequency),
         active: record?.active === undefined || record?.active === "" || isYes(record?.active) ? "Yes" : "No",
         created_at: existingRecord?.created_at || record?.created_at || now,
@@ -1259,16 +1275,18 @@
       if (!this.isHabitSheetReady()) throw new Error("ระบบ Habit ยังไม่พร้อม กรุณาทำ HABIT_TRACKER_MIGRATION.md ก่อน");
       const habitId = normalizeName(habit?.habit_id);
       if (!habitId) throw new Error("Habit ไม่มี habit_id");
+      if (habit.frequency === "Interval" && !this.isHabitIntervalReady()) throw new Error("ยังไม่ได้เพิ่ม Header สำหรับ Habit ทุก N วัน กรุณาทำ HABIT_INTERVAL_MIGRATION.md ก่อน");
       const date = normalizeName(dateValue);
       const periodKey = global.HabitTracker.periodKey(date, normalizeName(habit?.frequency));
       if (date > global.HabitTracker.today()) throw new Error("ยังบันทึก Habit ในอนาคตไม่ได้");
       const start = global.HabitTracker.startDate(habit);
-      if (start && date < start) throw new Error("ยังไม่ได้เริ่ม Habit ในวันที่เลือก");
       const duplicates = this.getHabitLogRows().filter((row) => {
         return normalizeName(row.habit_id) === habitId && global.HabitTracker.logDate(row) === date;
       });
       if (duplicates.length > 1) throw new Error(`พบ HabitLogs ซ้ำสำหรับวันที่ ${date} กรุณาแก้ใน Google Sheet`);
       const existing = duplicates[0];
+      if (start && date < start && !existing) throw new Error("ยังไม่ได้เริ่ม Habit ในวันที่เลือก");
+      if (habit.frequency === "Interval" && completed && !existing && !global.HabitTracker.isDue(habit, date)) throw new Error("วันที่เลือกยังไม่ถึงกำหนด Habit นี้");
       if (!completed) {
         if (existing?._rowNumber) return this.delete(this.getHabitLogSheetName(), existing._rowNumber);
         return { skipped: true };

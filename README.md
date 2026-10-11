@@ -1,3 +1,13 @@
+# TasuyaWay v2.17.0 — Habit ทุก N วัน
+
+เพิ่มวันเว้นวัน / ทุก 2 วัน / ทุก 3 วัน และทุก N วัน (2–365) พร้อมวันเริ่มรอบ วันที่พักไม่นับว่าพลาดและไม่ตัด Streak
+
+อัปเดตจาก v2.16.0: เพิ่ม interval_days ที่ Habits!H1 และ start_date ที่ I1 โดยไม่ต้องแก้แถวเดิม
+
+อ่าน [HABIT_INTERVAL_MIGRATION.md](HABIT_INTERVAL_MIGRATION.md) และ [UPDATE_V2.17.0.md](UPDATE_V2.17.0.md) ก่อนอัปโหลดทุกไฟล์ทับของเดิม โดยเก็บ config.js เดิมไว้
+
+## คู่มือรุ่นก่อนหน้า
+
 # TasuyaWay v2.16.0 — Responsive Habit Tracker
 
 ตารางติดตาม Habit 7 วันและภาพรวมเดือน บันทึกแยกวัน ตั้งเป้าจำนวนครั้งต่อสัปดาห์/เดือน/ปี และดู Streak ตามรอบ

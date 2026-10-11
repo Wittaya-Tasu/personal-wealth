@@ -203,7 +203,7 @@
     qs("#syncButton").classList.toggle("is-spinning", isLoading);
     qsa("button[type='submit']").forEach((button) => {
       if (button.closest(".data-form, .gratitude-form, .todo-add-form, .project-task-form, .habit-add-form")) button.disabled = isLoading;
-      if (button.closest(".habit-add-form")) button.disabled = isLoading || state.habitBusy || !store.isHabitSheetReady();
+      if (button.closest(".habit-add-form")) button.disabled = isLoading || state.habitBusy || !store.isHabitSheetReady() || (qs("#habitForm").elements.frequency.value === "Interval" && !store.isHabitIntervalReady());
     });
   }
 
@@ -226,7 +226,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js?v=2.16.0").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.17.0").catch(() => {});
     }
   }
 
@@ -1945,15 +1945,28 @@
     Daily: "ทุกวัน",
     Weekly: "ทุกสัปดาห์",
     Monthly: "ทุกเดือน",
-    Yearly: "ทุกปี"
+    Yearly: "ทุกปี",
+    Interval: "ทุก N วัน"
   };
 
   function updateHabitTargetField() {
     const form = qs("#habitForm"), frequency = form.elements.frequency.value;
+    const interval = frequency === "Interval";
+    const ready = store.isHabitSheetReady() && (!interval || store.isHabitIntervalReady());
+    form.classList.toggle("is-interval", interval);
+    qs(".habit-target-field", form).hidden = interval;
+    qs(".habit-interval-field", form).hidden = !interval;
+    qs(".habit-start-field", form).hidden = !interval;
+    form.elements.interval_days.disabled = !interval || !ready || state.habitBusy;
+    form.elements.start_date.disabled = !interval || !ready || state.habitBusy;
+    if (!form.elements.start_date.value) form.elements.start_date.value = localIsoDate();
+    qs("button[type='submit']", form).disabled = !ready || state.habitBusy;
+    qs("#habitIntervalHint").hidden = !interval;
+    qs("#habitIntervalMigration").hidden = !interval || !store.isHabitSheetReady() || store.isHabitIntervalReady();
     const input = form.elements.target_count;
     input.max = global.HabitTracker.LIMITS[frequency];
-    input.disabled = frequency === "Daily" || !store.isHabitSheetReady() || state.habitBusy;
-    if (frequency === "Daily") input.value = "1";
+    input.disabled = frequency === "Daily" || interval || !ready || state.habitBusy;
+    if (frequency === "Daily" || interval) input.value = "1";
     else if (Number(input.value) > Number(input.max)) input.value = input.max;
   }
 
@@ -1981,7 +1994,7 @@
     const logs = state.data?.habitLogs || [], dates = tracker.days(state.todayDate, state.habitView);
     const month = state.habitView === "month";
     const summary = tracker.weekSummary(rows, logs, state.todayDate, now);
-    const selectedRows = rows.filter((h) => !tracker.startDate(h) || tracker.startDate(h) <= state.todayDate);
+    const selectedRows = rows.filter((h) => h.frequency === "Interval" ? tracker.isDue(h, state.todayDate) : !tracker.startDate(h) || tracker.startDate(h) <= state.todayDate);
     setText("habitTodayLabel", state.todayDate === now ? "ทำสำเร็จวันนี้" : "ทำสำเร็จวันที่เลือก");
     setText("habitTodayMetric", state.todayDate > now ? "—" : `${selectedRows.filter((h) => tracker.completed(h, logs, state.todayDate)).length}/${selectedRows.length}`);
     setText("habitWeekMetric", summary.goal ? `${summary.percent}%` : "—");
@@ -2014,14 +2027,14 @@
     });
     header.appendChild(createElement("div", "habit-row-summary", "สรุป"));
     container.appendChild(header);
-    const units = { Daily: "วัน", Weekly: "สัปดาห์", Monthly: "เดือน", Yearly: "ปี" };
+    const units = { Daily: "วัน", Weekly: "สัปดาห์", Monthly: "เดือน", Yearly: "ปี", Interval: "รอบ" };
     const statuses = { done: ["✓", "ทำแล้ว"], miss: ["×", "ไม่ได้ทำ"], pending: ["○", "วันนี้ยังไม่กด"], off: ["—", "ไม่มีกำหนด"], future: ["", "วันในอนาคต"] };
     rows.forEach((habit) => {
       const row = createElement("div", "habit-tracker-row");
       const copy = createElement("div", "habit-tracker-name");
       const result = tracker.progress(habit, logs, state.todayDate, state.habitView, now);
       const run = tracker.streak(habit, logs, state.todayDate, now);
-      const targetLabel = habit.frequency === "Daily" ? "ทุกวัน" : `${tracker.target(habit)} ครั้ง/${units[habit.frequency]}`;
+      const targetLabel = habit.frequency === "Interval" ? tracker.hasSchedule(habit) ? `ทุก ${habit.interval_days} วัน${Number(habit.interval_days) === 2 ? " · วันเว้นวัน" : ""}` : "ตรวจระยะห่าง/วันเริ่มในชีต" : habit.frequency === "Daily" ? "ทุกวัน" : `${tracker.target(habit)} ครั้ง/${units[habit.frequency]}`;
       const compactProgress = createElement("small", "habit-row-progress", `${result.done}/${result.goal} · 🔥 ${run}`);
       compactProgress.title = `ต่อเนื่อง ${run} ${units[habit.frequency]}`;
       compactProgress.setAttribute("aria-label", `${result.done}/${result.goal} · ต่อเนื่อง ${run} ${units[habit.frequency]}`);
@@ -2037,7 +2050,7 @@
         const button = createElement("button", `habit-status ${status}`, statuses[status][0]);
         button.type = "button"; button.dataset.habitRow = habit._rowNumber; button.dataset.habitDate = day;
         button.dataset.completed = String(status === "done");
-        button.disabled = state.habitBusy || status === "future" || (tracker.startDate(habit) && day < tracker.startDate(habit) && status !== "done");
+        button.disabled = state.habitBusy || status === "future" || (tracker.startDate(habit) && day < tracker.startDate(habit) && status !== "done") || (habit.frequency === "Interval" && (!tracker.isDue(habit, day) || !store.isHabitIntervalReady()) && status !== "done");
         const label = `${habit.habit_name} · ${displayDate(day)} · ${statuses[status][1]}${status === "off" && !button.disabled ? " · แตะเพื่อบันทึก" : ""}`;
         button.setAttribute("aria-label", label); button.setAttribute("aria-pressed", String(status === "done")); button.title = label;
         wrapper.appendChild(button); row.appendChild(wrapper);
@@ -2054,7 +2067,8 @@
     const form = event.currentTarget;
     try {
       state.habitBusy = true; setLoading(true);
-      await store.appendHabit({ habit_name: form.elements.habit_name.value, frequency: form.elements.frequency.value, target_count: form.elements.frequency.value === "Daily" ? 1 : form.elements.target_count.value, active: "Yes" });
+      const frequency = form.elements.frequency.value;
+      await store.appendHabit({ habit_name: form.elements.habit_name.value, frequency, target_count: ["Daily", "Interval"].includes(frequency) ? 1 : form.elements.target_count.value, interval_days: frequency === "Interval" ? form.elements.interval_days.value : "", start_date: frequency === "Interval" ? form.elements.start_date.value : "", active: "Yes" });
       form.elements.habit_name.value = "";
       await refreshData(); showToast("เพิ่ม Habit แล้ว");
     } catch (error) { handleError(error); }

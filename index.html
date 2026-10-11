@@ -12,13 +12,13 @@
   <meta name="description" content="TasuyaWay — ระบบส่วนตัวสำหรับการเงิน เป้าหมาย BuyWish Todo Habit และบันทึกขอบคุณวันนี้">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://sheets.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; img-src 'self' data: blob:; manifest-src 'self'; worker-src 'self'">
   <title>TasuyaWay</title>
-  <link rel="manifest" href="manifest.json?v=2.16.0">
+  <link rel="manifest" href="manifest.json?v=2.17.0">
   <link rel="icon" href="icons/wealth-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.16.0">
+  <link rel="stylesheet" href="style.css?v=2.17.0">
 </head>
 <body>
   <svg class="svg-sprite" aria-hidden="true">
@@ -391,10 +391,14 @@
           <section class="panel today-editor">
             <form id="habitForm" class="habit-add-form">
               <label class="field habit-name-field"><span>Habit ที่ต้องการทำ</span><input name="habit_name" type="text" maxlength="200" placeholder="เช่น อ่านหนังสือ 20 นาที" required></label>
-              <label class="field"><span>ความถี่</span><select name="frequency"><option value="Daily">ทุกวัน</option><option value="Weekly">ทุกสัปดาห์</option><option value="Monthly">ทุกเดือน</option><option value="Yearly">ทุกปี</option></select></label>
+              <label class="field"><span>ความถี่</span><select name="frequency"><option value="Daily">ทุกวัน</option><option value="Interval">ทุก N วัน</option><option value="Weekly">ทุกสัปดาห์</option><option value="Monthly">ทุกเดือน</option><option value="Yearly">ทุกปี</option></select></label>
               <label class="field habit-target-field"><span>ครั้งต่อรอบ</span><input name="target_count" type="number" min="1" max="1" step="1" value="1" required disabled></label>
+              <label class="field habit-interval-field" hidden><span>ทุกกี่วัน</span><input name="interval_days" type="number" min="2" max="365" step="1" value="2" required disabled></label>
+              <label class="field habit-start-field" hidden><span>วันเริ่มรอบ</span><input name="start_date" type="date" required disabled></label>
               <button class="primary-button" type="submit">เพิ่ม Habit</button>
             </form>
+            <p id="habitIntervalHint" class="habit-tracker-note" hidden>ทุก 2 วัน = วันเว้นวัน · ทุก 3 วัน = วันเริ่ม, อีก 3 วัน, อีก 6 วัน · รอบยึดวันเริ่มแม้พลาดบางครั้ง</p>
+            <p id="habitIntervalMigration" class="habit-tracker-note" hidden>ก่อนใช้ทุก N วัน เพิ่ม interval_days ที่ Habits!H1 และ start_date ที่ I1 แล้วกดซิงก์ ตาม HABIT_INTERVAL_MIGRATION.md</p>
           </section>
           <section class="habit-tracker-controls">
             <div><p class="eyebrow">HABIT TRACKER</p><h2>ตารางติดตาม Habit</h2></div>
@@ -407,7 +411,7 @@
           </section>
           <div class="habit-metrics">
             <article><span id="habitTodayLabel">ทำสำเร็จวันนี้</span><strong id="habitTodayMetric">0/0</strong><small>Habit ที่บันทึกในวันนั้น</small></article>
-            <article><span>อัตราสำเร็จสัปดาห์ที่เลือก</span><strong id="habitWeekMetric">—</strong><small>รายวันถึงวันนี้ + เป้ารายสัปดาห์</small></article>
+            <article><span>อัตราสำเร็จสัปดาห์ที่เลือก</span><strong id="habitWeekMetric">—</strong><small>รายวัน/ทุก N วันถึงวันนี้ + เป้ารายสัปดาห์</small></article>
             <article><span>ต่อเนื่องสูงสุด · รายวัน</span><strong id="habitStreakMetric">0 วัน</strong><small id="habitStreakName">เริ่มต้นทีละวัน</small></article>
           </div>
           <section class="panel today-list-panel habit-tracker-panel">
@@ -418,7 +422,7 @@
             </div>
             <div class="habit-tracker-scroll" tabindex="0" aria-label="ตาราง Habit"><div id="habitList" class="habit-list"></div></div>
             <div class="habit-legend"><span><i class="done">✓</i> ทำแล้ว</span><span><i class="miss">×</i> ไม่ได้ทำ</span><span><i class="pending">○</i> วันนี้ยังไม่กด</span><span><i>—</i> ไม่มีกำหนด</span></div>
-            <p class="habit-tracker-note">รายสัปดาห์/เดือน/ปีประเมินตามจำนวนครั้งต่อรอบ วันที่ไม่ได้ทำจึงไม่เป็น × · โหมดเดือนเลื่อนแนวนอนดูได้ครบทุกวัน</p>
+            <p class="habit-tracker-note">ทุก N วัน: × เฉพาะวันที่ถึงกำหนดแล้วไม่ได้ทำ ส่วนวันพักเป็น — · รายสัปดาห์/เดือน/ปีประเมินตามจำนวนครั้งต่อรอบ · โหมดเดือนเลื่อนแนวนอนดูได้ครบทุกวัน</p>
           </section>
         </section>
 
@@ -557,11 +561,11 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="config.js?v=2.16.0"></script>
-  <script src="analytics.js?v=2.16.0"></script>
-  <script src="habit-tracker.js?v=2.16.0"></script>
-  <script src="api.js?v=2.16.0"></script>
-  <script src="report.js?v=2.16.0"></script>
-  <script src="app.js?v=2.16.0"></script>
+  <script src="config.js?v=2.17.0"></script>
+  <script src="analytics.js?v=2.17.0"></script>
+  <script src="habit-tracker.js?v=2.17.0"></script>
+  <script src="api.js?v=2.17.0"></script>
+  <script src="report.js?v=2.17.0"></script>
+  <script src="app.js?v=2.17.0"></script>
 </body>
 </html>

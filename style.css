@@ -2639,3 +2639,16 @@ svg {
   .habit-period-nav { gap:4px; }
   .habit-period-nav strong { font-size:12px; }
 }
+
+/* v2.17.0 — scheduled intervals */
+.habit-add-form .field { min-width:0; }
+.habit-add-form select,.habit-add-form input { min-width:0; width:100%; }
+@media (min-width:960px) { .habit-add-form.is-interval { grid-template-columns:minmax(0,1fr) 160px 90px 150px auto; } }
+@media (min-width:760px) and (max-width:959px) {
+  .habit-add-form.is-interval { grid-template-columns:minmax(0,1fr) 100px minmax(0,1fr); }
+  .habit-add-form.is-interval .habit-name-field,.habit-add-form.is-interval > button { grid-column:1/-1; }
+}
+@media (max-width:759px) {
+  .habit-add-form.is-interval { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+  .habit-add-form.is-interval .habit-name-field,.habit-add-form.is-interval .habit-start-field,.habit-add-form.is-interval > button { grid-column:1/-1; }
+}
