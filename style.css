@@ -1485,6 +1485,12 @@ svg {
   border-radius: 14px;
 }
 
+.todo-item {
+  column-gap: 8px;
+  row-gap: 2px;
+  padding: 10px 11px;
+}
+
 .todo-item.is-important {
   border-color: rgba(226, 196, 109, 0.32);
 }
@@ -1513,6 +1519,16 @@ svg {
   display: grid;
   min-width: 0;
   gap: 3px;
+}
+
+.todo-copy {
+  gap: 1px;
+  line-height: 1.25;
+}
+
+.todo-copy strong,
+.todo-project-link {
+  line-height: 1.25;
 }
 
 .todo-copy small,
@@ -1568,7 +1584,8 @@ svg {
 
 .todo-actions {
   display: flex;
-  gap: 3px;
+  align-items: center;
+  gap: 5px;
 }
 
 .project-detail {
@@ -1684,12 +1701,36 @@ svg {
   }
 
   .todo-item {
-    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-columns: 22px 30px minmax(0, 1fr) auto;
+    column-gap: 7px;
+    padding: 8px 10px;
   }
 
   .todo-actions {
-    grid-column: 3;
+    grid-column: 4;
+    grid-row: 1;
+    align-self: center;
     justify-content: flex-end;
+  }
+
+  .todo-actions .text-button {
+    min-width: 28px;
+    min-height: 40px;
+    padding: 5px 1px;
+  }
+
+  .todo-star {
+    width: 30px;
+    min-height: 40px;
+    padding: 2px;
+  }
+
+  .todo-checkbox {
+    margin: 0;
+  }
+
+  .todo-copy small {
+    line-height: 1.2;
   }
 }
 

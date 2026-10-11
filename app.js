@@ -223,7 +223,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js?v=2.15.0").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.15.1").catch(() => {});
     }
   }
 

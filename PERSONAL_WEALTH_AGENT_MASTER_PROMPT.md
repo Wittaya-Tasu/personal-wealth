@@ -1,3 +1,11 @@
+# ข้อกำหนดล่าสุด v2.15.1
+
+Todo รายวัน โปรเจก และงานย่อยใช้การ์ดแบบกระชับบนมือถือ
+ปุ่มแก้/ลบต้องอยู่แถวเดียวกับเนื้อหาเมื่อความกว้างไม่เกิน 560px และห้ามย้อนกลับไปวางเป็นแถวใหม่โดยไม่มีเหตุผลด้าน Accessibility
+การปรับนี้เป็น Presentation-only ห้ามเปลี่ยน Todo schema, carry-forward หรือ Project parent-child behavior
+
+## ข้อกำหนดฐาน v2.15.0
+
 # ข้อกำหนดล่าสุด v2.15.0
 
 BuyWish เป็น optional sheet ชื่อ BuyWish, schema อยู่ใน BUY_WISH_MIGRATION.md

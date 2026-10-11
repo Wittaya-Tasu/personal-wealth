@@ -1,3 +1,19 @@
+# TasuyaWay v2.15.1 — สถานะล่าสุด
+
+ปรับเฉพาะ Layout ของการ์ด Todo บนมือถือให้ checkbox, ดาว, ข้อความ และปุ่มแก้/ลบอยู่แถวเดียว
+ลด padding, row gap และ line-height ของรายการรายวัน โปรเจก และงานย่อยในโปรเจก
+ไม่มีการเปลี่ยน schema, Google Sheet, Todo carry-forward หรือพฤติกรรมบันทึกข้อมูล
+Service Worker และ Static Asset URL เปลี่ยนเป็น 2.15.1 เพื่อบังคับโหลด CSS ใหม่
+
+| การทดสอบ | ผล |
+|---|---|
+| CSS layout สำหรับ Todo/Project/Project task | ผ่าน Static; ต้องยืนยันภาพจริงบน iPhone |
+| JavaScript syntax และ DOM เดิม | ผ่าน |
+| Todo carry-forward / Project navigation / Google Sheet schema | ไม่เปลี่ยน |
+| Safari บน iPhone หลัง Deploy | ต้องทดสอบจริง |
+
+## สถานะฐาน v2.15.0
+
 # TasuyaWay v2.15.0 — สถานะล่าสุด
 
 เพิ่ม optional sheet BuyWish A:N และหน้า BuyWish ภายใต้เมนูเป้าหมาย
