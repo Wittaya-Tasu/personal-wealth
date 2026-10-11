@@ -23,7 +23,7 @@
   const BUY_WISH_HEADERS = ["wish_id", "name", "category", "target_price", "progress_source", "saved_amount", "linked_account", "target_date", "priority", "product_url", "note", "status", "created_at", "updated_at"];
   const GRATITUDE_HEADERS = ["gratitude_id", "date", "slot", "category", "gratitude_text", "created_at", "updated_at"];
   const TODO_HEADERS = ["todo_id", "date", "category", "task_text", "is_important", "is_completed", "completed_at", "created_at", "updated_at", "parent_todo_id"];
-  const HABIT_HEADERS = ["habit_id", "habit_name", "frequency", "active", "created_at", "updated_at"];
+  const HABIT_HEADERS = ["habit_id", "habit_name", "frequency", "active", "created_at", "updated_at", "target_count"];
   const HABIT_LOG_HEADERS = ["habit_log_id", "habit_id", "period_key", "completed_date", "completed_at", "created_at", "updated_at"];
   const GRATITUDE_CATEGORIES = new Set(["คน", "ตัวเอง", "สัตว์", "สิ่งของ", "สถานที่", "เหตุการณ์", "ประสบการณ์", "อื่น ๆ"]);
   const TODO_CATEGORIES = new Set(["เรื่องงาน", "เรื่องส่วนตัว", "โปรเจก"]);
@@ -520,7 +520,7 @@
 
       await this.loadOptionalSheet(data, "gratitude", this.getGratitudeSheetName(), "G", "gratitudeLoadError");
       await this.loadOptionalSheet(data, "todos", this.getTodoSheetName(), "J", "todoLoadError");
-      await this.loadOptionalSheet(data, "habits", this.getHabitSheetName(), "F", "habitLoadError");
+      await this.loadOptionalSheet(data, "habits", this.getHabitSheetName(), "G", "habitLoadError");
       await this.loadOptionalSheet(data, "habitLogs", this.getHabitLogSheetName(), "G", "habitLogLoadError");
       await this.loadOptionalSheet(data, "budgets", this.getBudgetSheetName(), "G", "budgetLoadError");
       await this.loadOptionalSheet(data, "sinkingFunds", this.getSinkingFundSheetName(), "L", "sinkingFundLoadError");
@@ -1231,6 +1231,7 @@
         habit_id: existingRecord?.habit_id || record?.habit_id || `habit-${createShortId()}`,
         habit_name: habitName,
         frequency,
+        target_count: global.HabitTracker.validateTarget(record?.target_count ?? existingRecord?.target_count, frequency),
         active: record?.active === undefined || record?.active === "" || isYes(record?.active) ? "Yes" : "No",
         created_at: existingRecord?.created_at || record?.created_at || now,
         updated_at: now
@@ -1251,24 +1252,28 @@
     }
 
     habitPeriodKey(dateValue, frequency) {
-      return habitPeriodKey(dateValue, frequency);
+      return global.HabitTracker.periodKey(dateValue, frequency);
     }
 
     async setHabitCompletion(habit, dateValue, completed) {
-      if (!this.isHabitSheetReady()) throw new Error("ระบบ Habit ยังไม่พร้อม กรุณาทำ TODAY_MIGRATION.md ก่อน");
+      if (!this.isHabitSheetReady()) throw new Error("ระบบ Habit ยังไม่พร้อม กรุณาทำ HABIT_TRACKER_MIGRATION.md ก่อน");
       const habitId = normalizeName(habit?.habit_id);
       if (!habitId) throw new Error("Habit ไม่มี habit_id");
       const date = normalizeName(dateValue);
-      const periodKey = habitPeriodKey(date, normalizeName(habit?.frequency));
+      const periodKey = global.HabitTracker.periodKey(date, normalizeName(habit?.frequency));
+      if (date > global.HabitTracker.today()) throw new Error("ยังบันทึก Habit ในอนาคตไม่ได้");
+      const start = global.HabitTracker.startDate(habit);
+      if (start && date < start) throw new Error("ยังไม่ได้เริ่ม Habit ในวันที่เลือก");
       const duplicates = this.getHabitLogRows().filter((row) => {
-        return normalizeName(row.habit_id) === habitId && normalizeName(row.period_key) === periodKey;
+        return normalizeName(row.habit_id) === habitId && global.HabitTracker.logDate(row) === date;
       });
-      if (duplicates.length > 1) throw new Error(`พบ HabitLogs ซ้ำสำหรับรอบ ${periodKey} กรุณาแก้ใน Google Sheet`);
+      if (duplicates.length > 1) throw new Error(`พบ HabitLogs ซ้ำสำหรับวันที่ ${date} กรุณาแก้ใน Google Sheet`);
       const existing = duplicates[0];
       if (!completed) {
         if (existing?._rowNumber) return this.delete(this.getHabitLogSheetName(), existing._rowNumber);
         return { skipped: true };
       }
+      if (existing) return { skipped: true };
       const now = new Date().toISOString();
       const record = {
         ...(existing || {}),

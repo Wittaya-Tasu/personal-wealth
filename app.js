@@ -15,6 +15,8 @@
     activeRecord: null,
     todayDate: localIsoDate(),
     todayTab: "todos",
+    habitView: "week",
+    habitBusy: false,
     goalsTab: "goals",
     buyWishStatusFilter: "active",
     buyWishCategoryFilter: "all",
@@ -201,6 +203,7 @@
     qs("#syncButton").classList.toggle("is-spinning", isLoading);
     qsa("button[type='submit']").forEach((button) => {
       if (button.closest(".data-form, .gratitude-form, .todo-add-form, .project-task-form, .habit-add-form")) button.disabled = isLoading;
+      if (button.closest(".habit-add-form")) button.disabled = isLoading || state.habitBusy || !store.isHabitSheetReady();
     });
   }
 
@@ -223,7 +226,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js?v=2.15.1").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.16.0").catch(() => {});
     }
   }
 
@@ -327,8 +330,15 @@
     qs("#projectTaskList").addEventListener("change", handleTodoChange);
     qs("#projectTaskList").addEventListener("click", handleTodoAction);
     qs("#habitForm").addEventListener("submit", submitHabit);
-    qs("#habitList").addEventListener("change", handleHabitChange);
+    qs("#habitForm").elements.frequency.addEventListener("change", updateHabitTargetField);
     qs("#habitList").addEventListener("click", handleHabitAction);
+    qsa("[data-habit-view]").forEach((button) => button.addEventListener("click", () => {
+      state.habitView = button.dataset.habitView;
+      renderHabits();
+    }));
+    qs("#habitPreviousPeriod").addEventListener("click", () => changeHabitPeriod(-1));
+    qs("#habitNextPeriod").addEventListener("click", () => changeHabitPeriod(1));
+    qs("#habitGoToday").addEventListener("click", () => { state.todayDate = localIsoDate(); renderToday(); });
     qs("#gratitudeForm").addEventListener("submit", submitGratitude);
     qs("#gratitudeForm").addEventListener("input", updateGratitudeProgressFromForm);
     qs("#gratitudeForm").addEventListener("click", (event) => {
@@ -1938,113 +1948,141 @@
     Yearly: "ทุกปี"
   };
 
+  function updateHabitTargetField() {
+    const form = qs("#habitForm"), frequency = form.elements.frequency.value;
+    const input = form.elements.target_count;
+    input.max = global.HabitTracker.LIMITS[frequency];
+    input.disabled = frequency === "Daily" || !store.isHabitSheetReady() || state.habitBusy;
+    if (frequency === "Daily") input.value = "1";
+    else if (Number(input.value) > Number(input.max)) input.value = input.max;
+  }
+
+  function changeHabitPeriod(delta) {
+    if (state.habitView === "week") state.todayDate = global.HabitTracker.shift(state.todayDate, 7 * delta);
+    else {
+      const parsed = global.HabitTracker.date(state.todayDate);
+      const last = new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth() + delta + 1, 0));
+      state.todayDate = new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth() + delta, Math.min(parsed.getUTCDate(), last.getUTCDate()))).toISOString().slice(0, 10);
+    }
+    renderToday();
+  }
+
   function renderHabits() {
+    const tracker = global.HabitTracker, now = localIsoDate();
     const ready = store.isHabitSheetReady();
     qs("#habitMigration").hidden = ready;
-    qsa("input, select, button", qs("#habitForm")).forEach((field) => { field.disabled = !ready; });
+    qsa("input, select, button", qs("#habitForm")).forEach((field) => { field.disabled = !ready || state.habitBusy; });
+    updateHabitTargetField();
     const container = qs("#habitList");
     container.replaceChildren();
     const rows = (state.data?.habits || []).filter((row) => {
-      return (row.active === "" || valueIsYes(row.active)) && HABIT_FREQUENCY_LABELS[row.frequency];
+      return (row.active === "" || row.active == null || valueIsYes(row.active)) && HABIT_FREQUENCY_LABELS[row.frequency];
     });
-    const logs = state.data?.habitLogs || [];
-    let completedCount = 0;
-    const rendered = rows.map((habit) => {
-      const periodKey = store.habitPeriodKey(state.todayDate, habit.frequency);
-      const completed = logs.some((log) => String(log.habit_id || "").trim() === String(habit.habit_id || "").trim()
-        && String(log.period_key || "").trim() === periodKey);
-      if (completed) completedCount += 1;
-      return { habit, periodKey, completed };
+    const logs = state.data?.habitLogs || [], dates = tracker.days(state.todayDate, state.habitView);
+    const month = state.habitView === "month";
+    const summary = tracker.weekSummary(rows, logs, state.todayDate, now);
+    const selectedRows = rows.filter((h) => !tracker.startDate(h) || tracker.startDate(h) <= state.todayDate);
+    setText("habitTodayLabel", state.todayDate === now ? "ทำสำเร็จวันนี้" : "ทำสำเร็จวันที่เลือก");
+    setText("habitTodayMetric", state.todayDate > now ? "—" : `${selectedRows.filter((h) => tracker.completed(h, logs, state.todayDate)).length}/${selectedRows.length}`);
+    setText("habitWeekMetric", summary.goal ? `${summary.percent}%` : "—");
+    setText("habitSummary", `สัปดาห์ ${summary.done}/${summary.goal}`);
+    const dailyRuns = rows.filter((h) => h.frequency === "Daily").map((h) => ({ habit: h, streak: tracker.streak(h, logs, state.todayDate, now) })).sort((a, b) => b.streak - a.streak);
+    setText("habitStreakMetric", `${dailyRuns[0]?.streak || 0} วัน`);
+    setText("habitStreakName", dailyRuns[0]?.streak ? dailyRuns[0].habit.habit_name : "เริ่มต้นทีละวัน");
+    const displayDate = (key) => formatDate(new Date(`${key}T12:00:00`), { day: "numeric", month: "short" });
+    setText("habitPeriodLabel", month ? formatDate(new Date(`${state.todayDate}T12:00:00`), { month: "long", year: "numeric" }) : `${displayDate(dates[0])} – ${displayDate(dates.at(-1))}`);
+    setText("habitTrackerTitle", month ? "ภาพรวมเดือน" : "ภาพรวม 7 วัน");
+    qsa("[data-habit-view]").forEach((button) => {
+      const active = button.dataset.habitView === state.habitView;
+      button.classList.toggle("is-active", active); button.setAttribute("aria-selected", String(active));
     });
-    setText("habitSummary", `${completedCount}/${rows.length}`);
-    if (!ready) {
+    container.className = `habit-list habit-grid${month ? " is-month" : ""}`;
+    container.style.setProperty("--habit-days", dates.length);
+    if (!ready || !rows.length) {
       const empty = emptyState();
-      qs("strong", empty).textContent = "Habit ยังไม่พร้อม";
-      qs("p", empty).textContent = "สร้างชีต Habits และ HabitLogs ตาม TODAY_MIGRATION.md";
-      container.appendChild(empty);
-      return;
+      qs("strong", empty).textContent = ready ? "ยังไม่มี Habit" : "Habit ยังไม่พร้อม";
+      qs("p", empty).textContent = ready ? "เพิ่มกิจวัตรที่ต้องการทำเป็นประจำด้านบน" : "ตรวจ Header ตาม HABIT_TRACKER_MIGRATION.md แล้วกดซิงก์อีกครั้ง";
+      container.appendChild(empty); return;
     }
-    if (!rows.length) {
-      const empty = emptyState();
-      qs("strong", empty).textContent = "ยังไม่มี Habit";
-      qs("p", empty).textContent = "เพิ่มกิจวัตรที่ต้องการทำเป็นประจำด้านบน";
-      container.appendChild(empty);
-      return;
-    }
-    Object.keys(HABIT_FREQUENCY_LABELS).forEach((frequency) => {
-      const groupRows = rendered.filter((item) => item.habit.frequency === frequency);
-      if (!groupRows.length) return;
-      const group = createElement("section", "habit-group");
-      group.appendChild(createElement("h3", "habit-group-title", HABIT_FREQUENCY_LABELS[frequency]));
-      groupRows.forEach(({ habit, completed }) => {
-        const item = createElement("article", `habit-item${completed ? " is-completed" : ""}`);
-        const check = document.createElement("input");
-        check.type = "checkbox";
-        check.className = "habit-checkbox";
-        check.checked = completed;
-        check.dataset.habitRow = habit._rowNumber;
-        const copy = createElement("div", "habit-copy");
-        copy.append(createElement("strong", "", habit.habit_name), createElement("small", "", completed ? "ทำแล้วในรอบนี้" : `รอบ ${HABIT_FREQUENCY_LABELS[frequency]}`));
-        const archive = createElement("button", "text-button", "พัก");
-        archive.type = "button";
-        archive.dataset.habitArchiveRow = habit._rowNumber;
-        item.append(check, copy, archive);
-        group.appendChild(item);
+    const header = createElement("div", "habit-tracker-row habit-tracker-header");
+    header.appendChild(createElement("div", "habit-tracker-name", "Habit"));
+    const weekdays = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
+    dates.forEach((day) => {
+      const head = createElement("div", `habit-day-head${day === now ? " is-today" : ""}`);
+      head.append(createElement("span", "", weekdays[tracker.date(day).getUTCDay()]), createElement("strong", "", String(Number(day.slice(-2)))));
+      header.appendChild(head);
+    });
+    header.appendChild(createElement("div", "habit-row-summary", "สรุป"));
+    container.appendChild(header);
+    const units = { Daily: "วัน", Weekly: "สัปดาห์", Monthly: "เดือน", Yearly: "ปี" };
+    const statuses = { done: ["✓", "ทำแล้ว"], miss: ["×", "ไม่ได้ทำ"], pending: ["○", "วันนี้ยังไม่กด"], off: ["—", "ไม่มีกำหนด"], future: ["", "วันในอนาคต"] };
+    rows.forEach((habit) => {
+      const row = createElement("div", "habit-tracker-row");
+      const copy = createElement("div", "habit-tracker-name");
+      const result = tracker.progress(habit, logs, state.todayDate, state.habitView, now);
+      const run = tracker.streak(habit, logs, state.todayDate, now);
+      const targetLabel = habit.frequency === "Daily" ? "ทุกวัน" : `${tracker.target(habit)} ครั้ง/${units[habit.frequency]}`;
+      const compactProgress = createElement("small", "habit-row-progress", `${result.done}/${result.goal} · 🔥 ${run}`);
+      compactProgress.title = `ต่อเนื่อง ${run} ${units[habit.frequency]}`;
+      compactProgress.setAttribute("aria-label", `${result.done}/${result.goal} · ต่อเนื่อง ${run} ${units[habit.frequency]}`);
+      copy.append(createElement("strong", "", habit.habit_name), createElement("small", "", targetLabel), compactProgress);
+      const archive = createElement("button", "habit-archive", "พัก");
+      archive.type = "button"; archive.dataset.habitArchiveRow = habit._rowNumber;
+      archive.disabled = state.habitBusy;
+      archive.setAttribute("aria-label", `พัก Habit ${habit.habit_name}`);
+      copy.appendChild(archive); row.appendChild(copy);
+      dates.forEach((day) => {
+        const status = tracker.cell(habit, logs, day, now);
+        const wrapper = createElement("div", `habit-day-cell${day === now ? " is-today" : ""}`);
+        const button = createElement("button", `habit-status ${status}`, statuses[status][0]);
+        button.type = "button"; button.dataset.habitRow = habit._rowNumber; button.dataset.habitDate = day;
+        button.dataset.completed = String(status === "done");
+        button.disabled = state.habitBusy || status === "future" || (tracker.startDate(habit) && day < tracker.startDate(habit) && status !== "done");
+        const label = `${habit.habit_name} · ${displayDate(day)} · ${statuses[status][1]}${status === "off" && !button.disabled ? " · แตะเพื่อบันทึก" : ""}`;
+        button.setAttribute("aria-label", label); button.setAttribute("aria-pressed", String(status === "done")); button.title = label;
+        wrapper.appendChild(button); row.appendChild(wrapper);
       });
-      container.appendChild(group);
+      const tail = createElement("div", "habit-row-summary");
+      tail.append(createElement("strong", "", `${result.done}/${result.goal}`), createElement("small", "", result.goal ? `${Math.min(100, Math.round(result.done / result.goal * 100))}%` : "—"), createElement("small", "", `ต่อเนื่อง ${run} ${units[habit.frequency]}`));
+      row.appendChild(tail); container.appendChild(row);
     });
   }
 
   async function submitHabit(event) {
     event.preventDefault();
-    if (!ensureCanWrite()) return;
+    if (!ensureCanWrite() || state.habitBusy) return;
     const form = event.currentTarget;
     try {
-      setLoading(true);
-      await store.appendHabit({ habit_name: form.elements.habit_name.value, frequency: form.elements.frequency.value, active: "Yes" });
+      state.habitBusy = true; setLoading(true);
+      await store.appendHabit({ habit_name: form.elements.habit_name.value, frequency: form.elements.frequency.value, target_count: form.elements.frequency.value === "Daily" ? 1 : form.elements.target_count.value, active: "Yes" });
       form.elements.habit_name.value = "";
-      await refreshData();
-      showToast("เพิ่ม Habit แล้ว");
-    } catch (error) {
-      handleError(error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleHabitChange(event) {
-    const checkbox = event.target.closest("[data-habit-row]");
-    if (!checkbox) return;
-    const rowNumber = Number(checkbox.dataset.habitRow);
-    const habit = (state.data?.habits || []).find((item) => item._rowNumber === rowNumber);
-    if (!habit) return;
-    try {
-      setLoading(true);
-      await store.setHabitCompletion(habit, state.todayDate, checkbox.checked);
-      await refreshData();
-      showToast(checkbox.checked ? "บันทึกว่า Habit รอบนี้ทำแล้ว" : "ยกเลิกสถานะ Habit รอบนี้");
-    } catch (error) {
-      handleError(error);
-    } finally {
-      setLoading(false);
-    }
+      await refreshData(); showToast("เพิ่ม Habit แล้ว");
+    } catch (error) { handleError(error); }
+    finally { state.habitBusy = false; setLoading(false); renderHabits(); }
   }
 
   async function handleHabitAction(event) {
-    const button = event.target.closest("[data-habit-archive-row]");
-    if (!button) return;
-    const rowNumber = Number(button.dataset.habitArchiveRow);
+    const button = event.target.closest("[data-habit-row], [data-habit-archive-row]");
+    if (!button || button.disabled || state.habitBusy || !ensureCanWrite()) return;
+    const rowNumber = Number(button.dataset.habitRow || button.dataset.habitArchiveRow);
     const habit = (state.data?.habits || []).find((item) => item._rowNumber === rowNumber);
-    if (!habit || !global.confirm(`พัก Habit “${habit.habit_name}” หรือไม่?\nประวัติที่ทำไว้จะยังคงอยู่`)) return;
+    if (!habit) return;
+    const archive = button.dataset.habitArchiveRow !== undefined;
+    if (archive && !global.confirm(`พัก Habit “${habit.habit_name}” หรือไม่?\nประวัติที่ทำไว้จะยังคงอยู่`)) return;
+    const completed = button.dataset.completed !== "true";
+    const scroll = qs(".habit-tracker-scroll"), scrollLeft = scroll.scrollLeft;
     try {
-      setLoading(true);
-      await store.archiveHabit(rowNumber, habit);
+      state.habitBusy = true; setLoading(true);
+      qsa("button", qs("#habitList")).forEach((item) => { item.disabled = true; });
+      if (archive) await store.archiveHabit(rowNumber, habit);
+      else await store.setHabitCompletion(habit, button.dataset.habitDate, completed);
       await refreshData();
-      showToast("พัก Habit แล้ว");
-    } catch (error) {
-      handleError(error);
-    } finally {
-      setLoading(false);
+      showToast(archive ? "พัก Habit แล้ว" : completed ? "บันทึก Habit แล้ว" : "ยกเลิก Habit วันที่เลือกแล้ว");
+    } catch (error) { handleError(error); }
+    finally {
+      state.habitBusy = false; setLoading(false); renderHabits(); scroll.scrollLeft = scrollLeft;
+      const restored = Array.from(qsa("[data-habit-row]", qs("#habitList"))).find((item) => Number(item.dataset.habitRow) === rowNumber && item.dataset.habitDate === button.dataset.habitDate);
+      if (restored && !restored.disabled) restored.focus({ preventScroll: true });
     }
   }
 

@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Sarabun Local";
+  src: url("fonts/Sarabun-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --bg: #071410;
   --bg-soft: #0b1d18;
@@ -34,7 +42,7 @@ html {
   min-width: 320px;
   background: var(--bg);
   color-scheme: dark;
-  font-family: "Sarabun", system-ui, -apple-system, sans-serif;
+  font-family: "Sarabun Local", "Sarabun", system-ui, -apple-system, sans-serif;
   scroll-behavior: smooth;
 }
 
@@ -2547,3 +2555,87 @@ svg {
 .monthly-report-preview svg { display:block; width:100%; min-width:850px; height:auto; }
 .monthly-report-preview:focus { outline:2px solid #e7c66b; }
 .insurance-table { min-width:1400px; }
+
+/* v2.16.0 — responsive Habit Tracker */
+.habit-tracker-controls { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin:22px 0 14px; }
+.habit-tracker-controls h2 { margin:0; font-size:24px; }
+.habit-period-nav { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.habit-period-nav strong { text-align:center; font-size:13px; }
+.habit-period-nav .icon-button { width:38px; height:38px; flex-shrink:0; }
+.habit-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-bottom:14px; }
+.habit-metrics article { min-width:0; padding:16px; border:1px solid var(--line); border-radius:16px; background:var(--surface); }
+.habit-metrics span,.habit-metrics small { display:block; color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+.habit-metrics strong { display:block; color:var(--gold); font-size:28px; margin:6px 0; }
+.habit-tracker-panel { min-width:0; }
+.habit-tracker-heading { gap:8px; }
+.habit-tracker-heading h2 { font-size:20px; }
+.habit-tracker-heading p { color:var(--muted); font-size:12px; margin:5px 0 0; }
+.habit-view-tabs { display:flex; width:max-content; margin-bottom:16px; }
+.habit-tracker-scroll { overflow-x:auto; overscroll-behavior-x:contain; border:1px solid var(--line); border-radius:14px; }
+.habit-list.habit-grid { display:block; margin:0; }
+.habit-tracker-row { display:grid; grid-template-columns:minmax(140px,1.8fr) repeat(var(--habit-days,7),minmax(32px,1fr)) 120px; align-items:stretch; border-bottom:1px solid var(--line); min-height:90px; }
+.habit-tracker-row:last-child { border-bottom:0; }
+.habit-tracker-header { min-height:58px; background:rgba(7,20,16,.35); color:var(--muted); font-size:12px; }
+.habit-tracker-name { position:relative; min-width:0; padding:12px; border-right:1px solid var(--line); overflow-wrap:anywhere; }
+.habit-tracker-name strong { display:block; font-size:14px; line-height:1.4; }
+.habit-tracker-name small { display:block; color:var(--muted); font-size:11px; line-height:1.5; margin-top:3px; }
+.habit-tracker-name .habit-row-progress { color:var(--gold); }
+.habit-archive { min-height:28px; padding:2px 5px; margin:4px 0 0 -5px; border:0; background:transparent; color:var(--muted); font-size:11px; }
+.habit-archive:hover { color:var(--gold); }
+.habit-day-head,.habit-day-cell { display:flex; align-items:center; justify-content:center; min-width:0; border-right:1px solid var(--line); padding:6px 3px; }
+.habit-day-head { flex-direction:column; gap:2px; }
+.habit-day-head strong { font-size:16px; color:var(--text); }
+.habit-day-head.is-today,.habit-day-cell.is-today { background:var(--gold-soft); }
+.habit-status { display:flex; align-items:center; justify-content:center; width:100%; max-width:38px; height:38px; padding:0; border:1px solid var(--line-strong); border-radius:11px; background:transparent; color:var(--muted-2); font-size:20px; }
+.habit-status.done,.habit-legend .done { background:var(--green-soft); color:var(--green); border-color:rgba(69,209,139,.38); }
+.habit-status.miss,.habit-legend .miss { background:var(--red-soft); color:var(--red); border-color:rgba(255,116,111,.32); }
+.habit-status.pending,.habit-legend .pending { color:var(--gold); border-color:var(--gold); }
+.habit-status.off { border-color:transparent; }
+.habit-status.future { opacity:.35; }
+.habit-status:disabled { cursor:default; }
+.habit-status:not(:disabled):hover { border-color:var(--gold); }
+.habit-row-summary { display:flex; min-width:0; flex-direction:column; justify-content:center; gap:4px; padding:10px; font-size:12px; text-align:center; }
+.habit-row-summary strong { font-size:18px; color:var(--gold); }
+.habit-row-summary small { color:var(--muted); font-size:11px; }
+.habit-legend { display:flex; flex-wrap:wrap; gap:12px; margin-top:16px; color:var(--muted); font-size:11px; }
+.habit-legend span { display:flex; align-items:center; gap:5px; }
+.habit-legend i { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border:1px solid var(--line); border-radius:7px; font-style:normal; }
+.habit-tracker-note { margin:12px 0 0; color:var(--muted); font-size:11px; line-height:1.6; }
+.habit-grid.is-month { width:max-content; min-width:100%; }
+.habit-grid.is-month .habit-tracker-row { grid-template-columns:160px repeat(var(--habit-days),38px) 120px; }
+.habit-grid.is-month .habit-tracker-name { position:sticky; left:0; z-index:2; background:var(--surface); box-shadow:3px 0 8px rgba(0,0,0,.18); }
+@media (min-width:760px) { .habit-add-form { grid-template-columns:minmax(0,1fr) 150px 100px auto; } }
+@media (max-width:759px) {
+  .habit-tracker-controls h2 { font-size:21px; }
+  .habit-period-nav { width:100%; }
+  .habit-tracker-row { grid-template-columns:minmax(84px,28%) repeat(7,minmax(0,1fr)); }
+  .habit-row-summary { display:none; }
+  .habit-tracker-name { padding:8px 6px; }
+  .habit-tracker-name strong { font-size:12px; }
+  .habit-tracker-name small { font-size:10px; }
+  .habit-archive { min-height:22px; margin-top:2px; }
+  .habit-day-head,.habit-day-cell { padding:4px 1px; }
+  .habit-day-head { font-size:10px; }
+  .habit-day-head strong { font-size:13px; }
+  .habit-status { max-width:30px; height:34px; border-radius:8px; font-size:16px; }
+  .habit-metrics { gap:7px; }
+  .habit-metrics article { padding:10px 8px; border-radius:13px; }
+  .habit-metrics span { font-size:10px; min-height:30px; }
+  .habit-metrics strong { font-size:22px; }
+  .habit-metrics small { display:none; }
+  .habit-grid.is-month .habit-tracker-row { grid-template-columns:110px repeat(var(--habit-days),34px); }
+}
+@media (max-width:560px) {
+  .habit-tracker-panel { padding:12px 8px; }
+  .habit-add-form { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+  .habit-add-form > button { grid-column:1/-1; }
+  .habit-tracker-heading h2 { font-size:17px; }
+  .habit-tracker-heading p { font-size:10px; }
+  .habit-tracker-heading .today-summary { font-size:10px; padding:6px; flex-shrink:0; }
+  .habit-legend { gap:8px; font-size:10px; }
+  .habit-tracker-row { grid-template-columns:minmax(84px,28%) repeat(7,minmax(0,1fr)); }
+  .habit-tracker-name strong { font-size:11px; }
+  .habit-tracker-name small { font-size:10px; }
+  .habit-period-nav { gap:4px; }
+  .habit-period-nav strong { font-size:12px; }
+}

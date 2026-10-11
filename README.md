@@ -1,3 +1,13 @@
+# TasuyaWay v2.16.0 — Responsive Habit Tracker
+
+ตารางติดตาม Habit 7 วันและภาพรวมเดือน บันทึกแยกวัน ตั้งเป้าจำนวนครั้งต่อสัปดาห์/เดือน/ปี และดู Streak ตามรอบ
+
+**อัปเดตจาก v2.15.1:** เพิ่ม target_count ที่ Habits!G1 เท่านั้น แล้วอ่าน [HABIT_TRACKER_MIGRATION.md](HABIT_TRACKER_MIGRATION.md) และ [UPDATE_V2.16.0.md](UPDATE_V2.16.0.md)
+
+อัปโหลดทุกไฟล์และโฟลเดอร์ รวม habit-tracker.js และ fonts/ โดยเก็บ config.js เดิมไว้
+
+## คู่มือรุ่นก่อนหน้า
+
 # TasuyaWay v2.15.1 — Compact Todo Cards
 
 ปรับการ์ด Todo รายวัน โปรเจก และงานย่อยให้กระชับบนมือถือ โดยวางปุ่มแก้/ลบไว้ในแถวเดียวกับเนื้อหา ลดระยะห่างระหว่างบรรทัดและพื้นที่ภายในการ์ด

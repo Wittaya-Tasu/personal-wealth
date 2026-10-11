@@ -1,3 +1,15 @@
+# v2.16.0 — 2026-10-11
+
+- เพิ่มตาราง Habit รายสัปดาห์และรายเดือน พร้อมสถานะรายวัน
+- เพิ่ม Habits.target_count ต่อท้ายที่ G1 และ fallback เป้าหมายแถวเก่าเป็น 1
+- เปลี่ยนการบันทึก HabitLogs เป็นหนึ่ง Habit ต่อหนึ่ง completed_date รองรับหลายครั้งต่อรอบ
+- เพิ่มเป้าหมาย Weekly/Monthly/Yearly, ความคืบหน้า และ Streak ตามรอบ
+- เพิ่มสรุปวันที่เลือก อัตราสำเร็จสัปดาห์ และ Streak รายวันสูงสุด
+- ป้องกันวันอนาคต วันก่อนเริ่ม บันทึกวันซ้ำ และล็อกปุ่มระหว่างบันทึก
+- โหมด 7 วันพอดีจอ 320–1440 px; โหมดเดือนเลื่อนแนวนอนและตรึงชื่อ
+- เปลี่ยน Static Asset URL และ PWA Cache เป็น 2.16.0 เพิ่มไฟล์ helper และฟอนต์ท้องถิ่นใน Cache
+- เพิ่มคู่มือ HABIT_TRACKER_MIGRATION.md และ UPDATE_V2.16.0.md
+
 # Changelog
 
 การเปลี่ยนแปลงสำคัญของ TasuyaWay (เดิม Personal Wealth) บันทึกตามแนวทาง [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) และใช้ Semantic Versioning
