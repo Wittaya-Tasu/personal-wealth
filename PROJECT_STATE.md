@@ -1,3 +1,13 @@
+# Current release: v2.18.0
+
+ฐาน ZIP v2.17.0 เพิ่ม monthly-events.js, UI เหตุการณ์ในวันนี้, Sheets CRUD และ fallback ชื่อ MonthlyEvents ใน config เดิม ใช้ Header event_id, event_date, category, tone, title, detail, created_at, updated_at
+
+รักษา Responsive Habit Tracker 7 วัน/เดือน และ Interval ทุก N วัน ตรวจรายละเอียดและข้อจำกัดใน REGRESSION_V2.18.0.md
+
+สถานะ: Local ZIP พร้อมตรวจ ยังไม่ Deploy v2.18.0 และไม่มี Commit/Push GitHub
+
+## Previous project state
+
 # TasuyaWay v2.17.0 — สถานะล่าสุด
 
 ฐาน: v2.16.0 ซึ่งผู้ใช้ยืนยันว่าทดสอบระบบแล้วทำงานดี

@@ -17,6 +17,11 @@
     todayTab: "todos",
     habitView: "week",
     habitBusy: false,
+    loading: false,
+    eventsMonth: localIsoDate().slice(0, 7),
+    eventEditId: null,
+    eventsBusy: false,
+    eventsNeedsSync: false,
     goalsTab: "goals",
     buyWishStatusFilter: "active",
     buyWishCategoryFilter: "all",
@@ -200,6 +205,8 @@
   }
 
   function setLoading(isLoading) {
+    state.loading = isLoading;
+    updateMonthlyEventControls();
     qs("#syncButton").classList.toggle("is-spinning", isLoading);
     qsa("button[type='submit']").forEach((button) => {
       if (button.closest(".data-form, .gratitude-form, .todo-add-form, .project-task-form, .habit-add-form")) button.disabled = isLoading;
@@ -226,7 +233,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js?v=2.17.0").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.18.0").catch(() => {});
     }
   }
 
@@ -329,6 +336,13 @@
     qs("#projectTaskForm").addEventListener("submit", submitProjectTask);
     qs("#projectTaskList").addEventListener("change", handleTodoChange);
     qs("#projectTaskList").addEventListener("click", handleTodoAction);
+    qs("#eventsMonth").addEventListener("change", (event) => changeEventsMonth(event.target.value));
+    qs("#eventsPreviousMonth").addEventListener("click", () => changeEventsMonth(global.MonthlyEvents.shiftMonth(state.eventsMonth, -1)));
+    qs("#eventsNextMonth").addEventListener("click", () => changeEventsMonth(global.MonthlyEvents.shiftMonth(state.eventsMonth, 1)));
+    qs("#eventsThisMonth").addEventListener("click", () => changeEventsMonth(localIsoDate().slice(0, 7)));
+    qs("#monthlyEventForm").addEventListener("submit", submitMonthlyEvent);
+    qs("#eventCancelEdit").addEventListener("click", resetMonthlyEventForm);
+    qs("#monthlyEventGroups").addEventListener("click", handleMonthlyEventAction);
     qs("#habitForm").addEventListener("submit", submitHabit);
     qs("#habitForm").elements.frequency.addEventListener("change", updateHabitTargetField);
     qs("#habitList").addEventListener("click", handleHabitAction);
@@ -390,6 +404,8 @@
       closeSheets();
       state.data = null;
       state.viewModel = null;
+      state.eventEditId = null;
+      resetMonthlyEventForm();
       renderSignedOutState();
       setConnection("offline", "ออกจากระบบแล้ว — ยังไม่ได้เชื่อมต่อ Google Sheet", true);
       showToast("ออกจากระบบ Google แล้ว");
@@ -404,6 +420,7 @@
     try {
       const data = await store.loadAll();
       state.data = data;
+      state.eventsNeedsSync = false;
       state.goalSchemaMissingHeaders = store.getMissingGoalMetadataHeaders();
       state.investmentSchemaMissingHeaders = store.getMissingInvestmentFundingHeaders();
       state.investmentPlanningSchemaMissingHeaders = store.getMissingInvestmentPlanningHeaders();
@@ -1604,6 +1621,7 @@
     qsa(".today-tabs button").forEach((button) => {
       button.classList.toggle("is-active", button.dataset.todayTab === state.todayTab);
     });
+    qs(".today-date-nav").hidden = state.todayTab === "events";
     qsa("[data-today-panel]").forEach((panel) => {
       const active = panel.dataset.todayPanel === state.todayTab;
       panel.hidden = !active;
@@ -1619,7 +1637,166 @@
     renderTodos();
     renderHabits();
     renderGratitude();
+    renderMonthlyEvents();
   }
+
+  function eventDefaultDate() {
+    const today = localIsoDate();
+    return today.slice(0, 7) === state.eventsMonth ? today : `${state.eventsMonth}-01`;
+  }
+
+  function updateMonthlyEventControls() {
+    const form = qs("#monthlyEventForm");
+    if (!form) return;
+    const unavailable = !state.data || !store.isAuthorized() || !store.isMonthlyEventSheetReady() || state.eventsNeedsSync;
+    const busy = state.eventsBusy || state.loading;
+    qsa("input, select, textarea, button", form).forEach((field) => { field.disabled = unavailable || busy; });
+    qsa("[data-event-action]").forEach((button) => { button.disabled = unavailable || busy; });
+    ["eventCancelEdit", "eventsMonth", "eventsPreviousMonth", "eventsNextMonth", "eventsThisMonth"].forEach((id) => { qs(`#${id}`).disabled = busy; });
+    qs("#monthlyEventGroups").setAttribute("aria-busy", String(busy));
+    qs("#eventSaveButton").textContent = state.eventsBusy ? "กำลังบันทึก…" : state.eventEditId ? "บันทึกการแก้ไข" : "เพิ่มเหตุการณ์";
+  }
+
+  function resetMonthlyEventForm() {
+    state.eventEditId = null;
+    const form = qs("#monthlyEventForm");
+    form.reset();
+    form.elements.event_date.value = eventDefaultDate();
+    setText("eventFormTitle", "เพิ่มเหตุการณ์");
+    qs("#eventCancelEdit").hidden = true;
+    updateMonthlyEventControls();
+  }
+
+  function changeEventsMonth(value) {
+    if (state.eventsBusy || state.loading) return;
+    try { global.MonthlyEvents.month(value); } catch (error) { qs("#eventsMonth").value = state.eventsMonth; showToast(error.message, "error"); return; }
+    if (value === state.eventsMonth) return;
+    const form = qs("#monthlyEventForm");
+    if ((form.elements.title.value.trim() || form.elements.detail.value.trim()) && !global.confirm("เปลี่ยนเดือนและยกเลิกข้อความที่ยังไม่ได้บันทึกหรือไม่?")) {
+      qs("#eventsMonth").value = state.eventsMonth; return;
+    }
+    state.eventsMonth = value;
+    resetMonthlyEventForm();
+    renderMonthlyEvents();
+  }
+
+  function renderMonthlyEvents() {
+    const events = global.MonthlyEvents;
+    const ready = store.isMonthlyEventSheetReady();
+    qs("#eventsMonth").value = state.eventsMonth;
+    const form = qs("#monthlyEventForm");
+    if (!form.elements.event_date.value) form.elements.event_date.value = eventDefaultDate();
+    const allRows = state.data?.monthlyEvents || [];
+    const rows = events.rowsForMonth(allRows, state.eventsMonth);
+    const invalidCount = allRows.filter((row) => !events.valid(row)).length;
+    const notice = qs("#eventsNotice");
+    notice.hidden = Boolean(state.data && ready && !invalidCount && !state.eventsNeedsSync);
+    notice.textContent = !state.data ? "เชื่อมต่อ Google เพื่อดูและบันทึกเหตุการณ์รายเดือน" : !ready
+      ? `MonthlyEvents ยังไม่พร้อม ตรวจชื่อชีตและ Header: ${events.HEADERS.join(", ")} แล้วกดซิงก์`
+      : state.eventsNeedsSync ? "ข้อมูลบนหน้าจอยังไม่ใช่ข้อมูลล่าสุด กรุณากดซิงก์ก่อนทำรายการต่อ"
+      : `มี ${invalidCount} รายการที่วันที่ ประเภท หรือ Tone ไม่ถูกต้อง กรุณาตรวจในชีต MonthlyEvents รายการเหล่านี้ยังไม่รวมในรายการและสรุป`;
+    const summary = qs("#eventsSummary");
+    summary.replaceChildren();
+    const monthLabel = formatDate(new Date(`${state.eventsMonth}-01T12:00:00`), { month: "long", year: "numeric" });
+    summary.appendChild(createElement("strong", "events-month-label", `${monthLabel} · ${state.data && ready ? rows.length : "—"} เหตุการณ์`));
+    events.TONES.forEach((tone) => summary.appendChild(createElement("span", `event-tone tone-${tone.toLowerCase()}`, `${tone} · ${state.data && ready ? rows.filter((row) => events.tone(row.tone) === tone).length : "—"}`)));
+    const groups = qs("#monthlyEventGroups");
+    groups.replaceChildren();
+    events.CATEGORIES.forEach((category) => {
+      const section = createElement("section", "panel monthly-event-group");
+      const categoryRows = rows.filter((row) => events.category(row.category) === category);
+      const heading = createElement("div", "section-heading");
+      heading.append(createElement("h3", "", category), createElement("span", "today-summary", `${categoryRows.length} เรื่อง`));
+      section.appendChild(heading);
+      if (!categoryRows.length) section.appendChild(createElement("p", "events-empty", !state.data ? "รอเชื่อมต่อ Google" : !ready ? "รอโหลด MonthlyEvents" : "ยังไม่มีเหตุการณ์ในเดือนนี้"));
+      categoryRows.forEach((row) => {
+        const tone = events.tone(row.tone);
+        const card = createElement("article", `monthly-event-card tone-${tone.toLowerCase()}`);
+        const meta = createElement("div", "event-card-meta");
+        const time = createElement("time", "", formatDate(new Date(`${row.event_date}T12:00:00`), { day: "numeric", month: "short", year: "numeric" }));
+        time.dateTime = row.event_date;
+        meta.append(time, createElement("span", "event-tone", tone));
+        card.append(meta, createElement("h4", "", row.title || "(ไม่มีหัวข้อ)"));
+        if (row.detail) card.appendChild(createElement("p", "event-detail", row.detail));
+        const actions = createElement("div", "event-card-actions");
+        [ ["edit", "แก้ไข"], ["delete", "ลบ"] ].forEach(([action, label]) => {
+          const button = createElement("button", `text-button${action === "delete" ? " event-delete" : ""}`, label);
+          button.type = "button"; button.dataset.eventId = row.event_id || ""; button.dataset.eventAction = action;
+          button.setAttribute("aria-label", `${label}เหตุการณ์ ${row.title || "ไม่มีหัวข้อ"}`);
+          actions.appendChild(button);
+        });
+        card.appendChild(actions); section.appendChild(card);
+      });
+      groups.appendChild(section);
+    });
+    updateMonthlyEventControls();
+  }
+
+  async function submitMonthlyEvent(event) {
+    event.preventDefault();
+    if (state.eventsBusy || state.loading || state.eventsNeedsSync || !ensureCanWrite()) return;
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
+    const record = Object.fromEntries(new FormData(form));
+    try { store.validateMonthlyEventRecord(record); } catch (error) { showToast(error.message, "error"); return; }
+    const editId = state.eventEditId;
+    let saved = false;
+    try {
+      state.eventsBusy = true; updateMonthlyEventControls();
+      if (editId) await store.updateMonthlyEvent(editId, record);
+      else await store.appendMonthlyEvent(record);
+      saved = true;
+      state.eventsNeedsSync = true;
+      state.eventsMonth = record.event_date.slice(0, 7);
+      resetMonthlyEventForm();
+      await refreshData();
+      showToast(editId ? "แก้ไขเหตุการณ์แล้ว" : "เพิ่มเหตุการณ์แล้ว");
+    } catch (error) {
+      if (saved) showToast("บันทึกลงชีตแล้ว แต่โหลดข้อมูลล่าสุดไม่สำเร็จ กรุณากดซิงก์ก่อนทำรายการต่อ", "error");
+      else handleError(error);
+    } finally {
+      state.eventsBusy = false; renderMonthlyEvents();
+    }
+  }
+
+  async function handleMonthlyEventAction(event) {
+    const button = event.target.closest("[data-event-action]");
+    if (!button || state.eventsBusy || state.loading || state.eventsNeedsSync || !ensureCanWrite()) return;
+    const id = button.dataset.eventId;
+    const matches = (state.data?.monthlyEvents || []).filter((row) => String(row.event_id || "") === id);
+    if (!id || matches.length !== 1) { showToast("event_id ว่างหรือซ้ำ กรุณาตรวจใน Google Sheet", "error"); return; }
+    const record = matches[0], form = qs("#monthlyEventForm");
+    if (button.dataset.eventAction === "edit") {
+      if ((form.elements.title.value.trim() || form.elements.detail.value.trim()) && !global.confirm("เปิดแก้ไขรายการนี้และยกเลิกข้อความที่ยังไม่ได้บันทึกหรือไม่?")) return;
+      state.eventEditId = id;
+      ["event_date", "title", "detail"].forEach((key) => { form.elements[key].value = record[key] || ""; });
+      form.elements.category.value = global.MonthlyEvents.category(record.category);
+      form.elements.tone.value = global.MonthlyEvents.tone(record.tone);
+      setText("eventFormTitle", "แก้ไขเหตุการณ์");
+      qs("#eventCancelEdit").hidden = false;
+      updateMonthlyEventControls();
+      form.scrollIntoView({ behavior: "smooth", block: "center" });
+      form.elements.title.focus({ preventScroll: true });
+      return;
+    }
+    if (!global.confirm(`ลบเหตุการณ์ “${record.title}” หรือไม่?`)) return;
+    let deleted = false;
+    try {
+      state.eventsBusy = true; updateMonthlyEventControls();
+      await store.deleteMonthlyEvent(id);
+      deleted = true;
+      state.eventsNeedsSync = true;
+      if (state.eventEditId === id) resetMonthlyEventForm();
+      await refreshData();
+      showToast("ลบเหตุการณ์แล้ว");
+    } catch (error) {
+      if (deleted) showToast("ลบจากชีตแล้ว แต่โหลดข้อมูลล่าสุดไม่สำเร็จ กรุณากดซิงก์", "error");
+      else handleError(error);
+    } finally {
+      state.eventsBusy = false; renderMonthlyEvents();
+    }
+  }
+
 
   function todoRowsForDate(dateKey) {
     return (state.data?.todos || [])

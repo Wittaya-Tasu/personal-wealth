@@ -1,4 +1,4 @@
-const APP_VERSION = "2.17.0";
+const APP_VERSION = "2.18.0";
 const CACHE_NAME = `tasuya-way-shell-v${APP_VERSION}`;
 const STATIC_ASSETS = [
   "./",
@@ -8,6 +8,7 @@ const STATIC_ASSETS = [
   `./analytics.js?v=${APP_VERSION}`,
   `./api.js?v=${APP_VERSION}`,
   `./habit-tracker.js?v=${APP_VERSION}`,
+  `./monthly-events.js?v=${APP_VERSION}`,
   "./fonts/Sarabun-Regular.ttf",
   `./app.js?v=${APP_VERSION}`,
   `./report.js?v=${APP_VERSION}`,

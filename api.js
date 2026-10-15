@@ -487,7 +487,7 @@
     }
 
     async loadAll() {
-      const optionalKeys = new Set(["gratitude", "todos", "habits", "habitLogs", "budgets", "sinkingFunds", "insurancePolicies", "retirementPlans", "buyWish"]);
+      const optionalKeys = new Set(["gratitude", "todos", "habits", "habitLogs", "budgets", "sinkingFunds", "insurancePolicies", "retirementPlans", "buyWish", "monthlyEvents"]);
       const entries = Object.entries(this.config.SHEETS).filter(([key]) => !optionalKeys.has(key));
       const ranges = entries.map(([, sheetName]) => `${quoteSheet(sheetName)}!A:Z`);
       const response = await this.request("/values:batchGet", {
@@ -529,6 +529,7 @@
       await this.loadOptionalSheet(data, "retirementPlans", this.getRetirementSheetName(), "M", "retirementLoadError");
       await this.loadOptionalSheet(data, "buyWish", this.getBuyWishSheetName(), "N", "buyWishLoadError");
 
+      await this.loadOptionalSheet(data, "monthlyEvents", this.getMonthlyEventSheetName(), "H", "monthlyEventsLoadError");
       this.currentData = data;
       return data;
     }
@@ -723,7 +724,7 @@
 
     rowInputOption(sheetName) {
       // Keep the interval anchor as ISO text regardless of spreadsheet locale/date formatting.
-      if (sheetName === this.getHabitSheetName()) return "RAW";
+      if (sheetName === this.getHabitSheetName() || sheetName === this.getMonthlyEventSheetName()) return "RAW";
       // Keep ISO dates and product/policy names literal in the new planning records.
       return [this.getInsuranceSheetName(), this.getRetirementSheetName(), this.config.SHEETS.investments, this.config.SHEETS.liabilities].includes(sheetName) ? "RAW" : "USER_ENTERED";
     }
@@ -1215,6 +1216,61 @@
 
     async deleteTodo(rowNumber) {
       return this.delete(this.getTodoSheetName(), rowNumber);
+    }
+
+    getMonthlyEventSheetName() {
+      return this.config.SHEETS.monthlyEvents || "MonthlyEvents";
+    }
+
+    getMissingMonthlyEventHeaders() {
+      const headers = this.headers[this.getMonthlyEventSheetName()] || [];
+      return global.MonthlyEvents.HEADERS.filter((header) => !headers.includes(header));
+    }
+
+    isMonthlyEventSheetReady() {
+      return !this.monthlyEventsLoadError && this.getMissingMonthlyEventHeaders().length === 0;
+    }
+
+    validateMonthlyEventRecord(record, existingRecord = null) {
+      if (!this.isMonthlyEventSheetReady()) throw new Error("MonthlyEvents ยังไม่พร้อม กรุณาตรวจ Header ทั้ง 8 คอลัมน์แล้วกดซิงก์");
+      const eventDate = global.MonthlyEvents.date(record?.event_date);
+      const category = global.MonthlyEvents.category(record?.category);
+      const tone = global.MonthlyEvents.tone(record?.tone);
+      const title = normalizeName(record?.title), detail = normalizeName(record?.detail);
+      if (!category) throw new Error("กรุณาเลือกเรื่องงานหรือเรื่องส่วนตัว");
+      if (!tone) throw new Error("กรุณาเลือก Positive, Negative หรือ Neutral");
+      if (!title || title.length > 200) throw new Error("กรุณาระบุหัวข้อเหตุการณ์ไม่เกิน 200 ตัวอักษร");
+      if (detail.length > 5000) throw new Error("รายละเอียดเหตุการณ์ยาวได้ไม่เกิน 5,000 ตัวอักษร");
+      const now = new Date().toISOString();
+      return {
+        ...(existingRecord || {}), event_id: existingRecord?.event_id || `event-${createShortId()}`,
+        event_date: eventDate, category, tone, title, detail,
+        created_at: existingRecord?.created_at || now, updated_at: now
+      };
+    }
+
+    async appendMonthlyEvent(record) {
+      return this.append(this.getMonthlyEventSheetName(), this.validateMonthlyEventRecord(record));
+    }
+
+    async findLatestMonthlyEvent(eventId) {
+      if (!normalizeName(eventId)) throw new Error("เหตุการณ์นี้ไม่มี event_id กรุณาตรวจใน Google Sheet");
+      const data = {};
+      await this.loadOptionalSheet(data, "monthlyEvents", this.getMonthlyEventSheetName(), "H", "monthlyEventsLoadError");
+      if (!this.isMonthlyEventSheetReady()) throw new Error("MonthlyEvents ยังไม่พร้อม กรุณาซิงก์แล้วลองใหม่");
+      const rows = data.monthlyEvents.filter((row) => normalizeName(row.event_id) === normalizeName(eventId));
+      if (rows.length !== 1) throw new Error(rows.length ? "พบ event_id ซ้ำ กรุณาแก้ใน Google Sheet ก่อน" : "เหตุการณ์นี้ถูกลบไปแล้ว กรุณากดซิงก์");
+      return rows[0];
+    }
+
+    async updateMonthlyEvent(eventId, patch) {
+      const latest = await this.findLatestMonthlyEvent(eventId);
+      return this.update(this.getMonthlyEventSheetName(), latest._rowNumber, this.validateMonthlyEventRecord({ ...latest, ...patch }, latest));
+    }
+
+    async deleteMonthlyEvent(eventId) {
+      const latest = await this.findLatestMonthlyEvent(eventId);
+      return this.delete(this.getMonthlyEventSheetName(), latest._rowNumber);
     }
 
     getHabitRows() {

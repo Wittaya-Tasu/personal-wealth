@@ -2648,6 +2648,59 @@ svg {
   .habit-add-form.is-interval { grid-template-columns:minmax(0,1fr) 100px minmax(0,1fr); }
   .habit-add-form.is-interval .habit-name-field,.habit-add-form.is-interval > button { grid-column:1/-1; }
 }
+
+/* v2.18.0 — monthly moments, matching the existing green/gold theme */
+.today-tabs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); }
+.today-tabs button { min-height:44px; }
+.events-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:18px; margin:8px 0 20px; }
+.events-heading h2 { margin:4px 0 8px; font-size:24px; }
+.events-intro { margin:0; color:var(--muted); font-size:13px; line-height:1.6; }
+.events-month-nav { display:flex; align-items:end; flex-wrap:wrap; gap:8px; }
+.events-month-nav .field { min-width:0; margin:0; }
+.events-month-nav input { width:100%; min-width:0; }
+.events-month-nav button { min-height:44px; min-width:44px; }
+.events-notice { margin-bottom:16px; color:var(--gold); line-height:1.8; overflow-wrap:anywhere; }
+.events-summary { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:20px; }
+.events-month-label { margin-right:auto; font-size:15px; }
+.event-tone { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; background:var(--tone-soft); color:var(--tone-color); font-size:12px; font-weight:600; white-space:nowrap; }
+.event-tone::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+.tone-positive { --tone-color:var(--green); --tone-soft:var(--green-soft); }
+.tone-negative { --tone-color:var(--red); --tone-soft:var(--red-soft); }
+.tone-neutral { --tone-color:var(--gold); --tone-soft:var(--gold-soft); }
+.events-editor { margin-bottom:22px; }
+.events-editor h3,.monthly-event-group h3 { margin:0; font-size:18px; }
+.monthly-event-form { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+.monthly-event-form .field { min-width:0; margin:0; }
+.monthly-event-form input,.monthly-event-form select,.monthly-event-form textarea { min-width:0; width:100%; }
+.event-title-field,.event-detail-field { grid-column:1/-1; }
+.monthly-event-form > button { justify-self:start; min-height:44px; grid-column:1/-1; }
+.monthly-event-groups { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; align-items:start; }
+.monthly-event-group { min-width:0; }
+.monthly-event-card { min-width:0; padding:16px 0 12px 14px; border-left:3px solid var(--tone-color); border-bottom:1px solid var(--line); margin-top:16px; }
+.monthly-event-card:last-child { border-bottom:0; }
+.event-card-meta { display:flex; align-items:center; flex-wrap:wrap; gap:8px; justify-content:space-between; }
+.event-card-meta time { color:var(--muted); font-size:12px; }
+.monthly-event-card h4 { margin:10px 0 6px; font-size:16px; line-height:1.6; overflow-wrap:anywhere; }
+.event-detail { color:var(--muted); white-space:pre-wrap; overflow-wrap:anywhere; font-size:14px; line-height:1.75; margin:0; }
+.event-card-actions { display:flex; justify-content:flex-end; gap:4px; margin-top:6px; }
+.event-card-actions button,#eventCancelEdit { min-height:44px; min-width:44px; }
+.event-delete { color:var(--red); }
+.events-empty { color:var(--muted); font-size:14px; line-height:1.7; padding:20px 0; }
+@media (max-width:759px) {
+  .today-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .monthly-event-groups { grid-template-columns:minmax(0,1fr); }
+  .monthly-event-form { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .monthly-event-form > .field:first-child { grid-column:1/-1; }
+  .events-heading h2 { font-size:22px; }
+  .events-month-nav { width:100%; gap:6px; }
+  .events-month-nav .field { flex:1; }
+  .events-month-nav .text-button { padding:8px; }
+  .events-summary { gap:7px; }
+  .events-month-label { width:100%; margin-bottom:5px; }
+  .event-tone { padding:5px 8px; font-size:11px; }
+  .monthly-event-form > button { justify-self:stretch; }
+  .habit-status { height:44px; }
+}
 @media (max-width:759px) {
   .habit-add-form.is-interval { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
   .habit-add-form.is-interval .habit-name-field,.habit-add-form.is-interval .habit-start-field,.habit-add-form.is-interval > button { grid-column:1/-1; }
