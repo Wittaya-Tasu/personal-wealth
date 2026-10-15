@@ -2674,17 +2674,42 @@ svg {
 .monthly-event-form input,.monthly-event-form select,.monthly-event-form textarea { min-width:0; width:100%; }
 .event-title-field,.event-detail-field { grid-column:1/-1; }
 .monthly-event-form > button { justify-self:start; min-height:44px; grid-column:1/-1; }
-.monthly-event-groups { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; align-items:start; }
-.monthly-event-group { min-width:0; }
-.monthly-event-card { min-width:0; padding:16px 0 12px 14px; border-left:3px solid var(--tone-color); border-bottom:1px solid var(--line); margin-top:16px; }
-.monthly-event-card:last-child { border-bottom:0; }
-.event-card-meta { display:flex; align-items:center; flex-wrap:wrap; gap:8px; justify-content:space-between; }
-.event-card-meta time { color:var(--muted); font-size:12px; }
-.monthly-event-card h4 { margin:10px 0 6px; font-size:16px; line-height:1.6; overflow-wrap:anywhere; }
-.event-detail { color:var(--muted); white-space:pre-wrap; overflow-wrap:anywhere; font-size:14px; line-height:1.75; margin:0; }
-.event-card-actions { display:flex; justify-content:flex-end; gap:4px; margin-top:6px; }
-.event-card-actions button,#eventCancelEdit { min-height:44px; min-width:44px; }
+/* Compact table rows. Both categories use the full width for readable columns. */
+.monthly-event-groups { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; align-items:start; }
+.monthly-event-group { min-width:0; padding:16px; }
+.monthly-event-group > .section-heading { margin-bottom:8px; }
+.monthly-events-table { width:100%; table-layout:fixed; border-collapse:collapse; font-size:13px; }
+.events-table-caption { text-align:left; color:var(--muted); font-size:11px; padding:0 0 8px; }
+.event-date-column { width:76px; }
+.event-tone-column { width:92px; }
+.event-actions-column { width:116px; }
+.monthly-events-table th { text-align:left; color:var(--muted); font-size:11px; font-weight:500; padding:7px 8px; background:var(--surface-input); border:1px solid var(--line); }
+.monthly-events-table td { padding:0 8px; vertical-align:top; border:1px solid var(--line); }
+.monthly-event-row:nth-child(even) { background:rgba(145,164,155,.035); }
+.monthly-event-row:hover { background:var(--gold-soft); }
+.monthly-events-table .event-date-cell { border-left:3px solid var(--tone-color); }
+.event-date-cell time { display:flex; align-items:center; min-height:44px; font-size:11px; color:var(--muted); white-space:nowrap; }
+.event-disclosure { min-width:0; }
+.event-row-copy { display:flex; align-items:center; gap:10px; min-height:44px; cursor:pointer; list-style:none; }
+.event-row-copy::-webkit-details-marker { display:none; }
+.event-row-copy::after { content:"⌄"; color:var(--muted); margin-left:auto; flex-shrink:0; }
+.event-disclosure[open] > summary::after { content:"⌃"; }
+.event-row-copy:focus-visible { outline:2px solid var(--gold); outline-offset:1px; border-radius:3px; }
+.event-row-title { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; }
+.event-detail-preview { min-width:0; flex:1; color:var(--muted); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.event-row-copy:has(.event-detail-preview) .event-row-title { max-width:55%; }
+.event-expanded-detail { padding:0 0 10px; overflow-wrap:anywhere; line-height:1.65; }
+.event-expanded-detail strong { font-size:13px; font-weight:500; }
+.event-detail { color:var(--muted); white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; line-height:1.65; margin:4px 0 0; }
+.event-tone-cell > .event-tone { margin:10px 0; padding:3px 6px; font-size:10px; }
+.event-row-actions { display:flex; align-items:center; justify-content:center; min-height:44px; gap:4px; }
+.event-row-action { display:inline-flex; align-items:center; justify-content:center; gap:4px; min-width:42px; min-height:44px; padding:0 3px; border:0; background:transparent; color:var(--gold); font-size:11px; cursor:pointer; }
+.event-row-action svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
+.event-row-action:hover { background:var(--gold-soft); }
+.event-row-action:focus-visible { outline:2px solid var(--gold); outline-offset:-2px; }
+.event-row-action:disabled { opacity:.4; cursor:default; }
 .event-delete { color:var(--red); }
+#eventCancelEdit { min-height:44px; }
 .events-empty { color:var(--muted); font-size:14px; line-height:1.7; padding:20px 0; }
 @media (max-width:759px) {
   .today-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -2704,4 +2729,25 @@ svg {
 @media (max-width:759px) {
   .habit-add-form.is-interval { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
   .habit-add-form.is-interval .habit-name-field,.habit-add-form.is-interval .habit-start-field,.habit-add-form.is-interval > button { grid-column:1/-1; }
+}
+
+/* v2.18.1 — keep all four columns visible on phones. */
+@media (max-width:759px) {
+  .monthly-event-group { padding:12px 8px; }
+  .monthly-events-table { font-size:12px; }
+  .monthly-events-table th,.monthly-events-table td { padding-left:4px; padding-right:4px; }
+  .monthly-events-table th { font-size:10px; }
+  .event-date-column { width:51px; }
+  .event-tone-column { width:64px; }
+  .event-actions-column { width:64px; }
+  .event-date-cell time { font-size:10px; }
+  .event-row-copy { gap:3px; }
+  .event-row-title { font-size:12px; }
+  .event-detail-preview { display:none; }
+  .event-row-copy:has(.event-detail-preview) .event-row-title { max-width:none; }
+  .event-tone-cell > .event-tone { font-size:9px; padding:3px 4px; gap:3px; }
+  .event-tone::before { width:4px; height:4px; }
+  .event-row-actions { gap:0; }
+  .event-row-action { min-width:27px; width:27px; padding:0; }
+  .event-action-label { display:none; }
 }

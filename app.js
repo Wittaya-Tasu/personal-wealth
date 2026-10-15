@@ -233,7 +233,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js?v=2.18.0").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.18.1").catch(() => {});
     }
   }
 
@@ -1709,24 +1709,52 @@
       heading.append(createElement("h3", "", category), createElement("span", "today-summary", `${categoryRows.length} เรื่อง`));
       section.appendChild(heading);
       if (!categoryRows.length) section.appendChild(createElement("p", "events-empty", !state.data ? "รอเชื่อมต่อ Google" : !ready ? "รอโหลด MonthlyEvents" : "ยังไม่มีเหตุการณ์ในเดือนนี้"));
+      const table = createElement("table", "monthly-events-table");
+      const caption = createElement("caption", "events-table-caption", `${category} · ${monthLabel} · แตะชื่อเหตุการณ์เพื่อดูรายละเอียดเต็ม`);
+      table.appendChild(caption);
+      const columns = document.createElement("colgroup");
+      ["event-date-column", "event-copy-column", "event-tone-column", "event-actions-column"].forEach((name) => columns.appendChild(createElement("col", name)));
+      table.appendChild(columns);
+      const thead = document.createElement("thead"), header = document.createElement("tr");
+      ["วันที่", "เหตุการณ์ / รายละเอียด", "ลักษณะ", "จัดการ"].forEach((label) => {
+        const th = createElement("th", "", label); th.scope = "col"; header.appendChild(th);
+      });
+      thead.appendChild(header); table.appendChild(thead);
+      const body = document.createElement("tbody");
       categoryRows.forEach((row) => {
         const tone = events.tone(row.tone);
-        const card = createElement("article", `monthly-event-card tone-${tone.toLowerCase()}`);
-        const meta = createElement("div", "event-card-meta");
-        const time = createElement("time", "", formatDate(new Date(`${row.event_date}T12:00:00`), { day: "numeric", month: "short", year: "numeric" }));
-        time.dateTime = row.event_date;
-        meta.append(time, createElement("span", "event-tone", tone));
-        card.append(meta, createElement("h4", "", row.title || "(ไม่มีหัวข้อ)"));
-        if (row.detail) card.appendChild(createElement("p", "event-detail", row.detail));
-        const actions = createElement("div", "event-card-actions");
+        const tr = createElement("tr", `monthly-event-row tone-${tone.toLowerCase()}`);
+        const dateCell = createElement("td", "event-date-cell");
+        const time = createElement("time", "", formatDate(new Date(`${row.event_date}T12:00:00`), { day: "numeric", month: "short" }));
+        time.dateTime = row.event_date; dateCell.appendChild(time);
+        const copyCell = createElement("td", "event-copy-cell");
+        const disclosure = createElement("details", "event-disclosure");
+        const summary = createElement("summary", "event-row-copy");
+        summary.title = "แตะเพื่อดูรายละเอียดเต็ม";
+        summary.appendChild(createElement("span", "event-row-title", row.title || "(ไม่มีหัวข้อ)"));
+        if (row.detail) summary.appendChild(createElement("span", "event-detail-preview", String(row.detail).replace(/\s+/g, " ")));
+        const expanded = createElement("div", "event-expanded-detail");
+        expanded.append(createElement("strong", "", row.title || "(ไม่มีหัวข้อ)"), createElement("p", "event-detail", row.detail || "ไม่มีรายละเอียดเพิ่มเติม"));
+        disclosure.append(summary, expanded); copyCell.appendChild(disclosure);
+        const toneCell = createElement("td", "event-tone-cell");
+        toneCell.appendChild(createElement("span", "event-tone", tone));
+        const actionCell = createElement("td", "event-actions-cell");
+        const actions = createElement("div", "event-row-actions");
         [ ["edit", "แก้ไข"], ["delete", "ลบ"] ].forEach(([action, label]) => {
-          const button = createElement("button", `text-button${action === "delete" ? " event-delete" : ""}`, label);
+          const button = createElement("button", `event-row-action${action === "delete" ? " event-delete" : ""}`);
           button.type = "button"; button.dataset.eventId = row.event_id || ""; button.dataset.eventAction = action;
-          button.setAttribute("aria-label", `${label}เหตุการณ์ ${row.title || "ไม่มีหัวข้อ"}`);
+          button.setAttribute("aria-label", `${label}เหตุการณ์ ${row.title || "ไม่มีหัวข้อ"}`); button.title = label;
+          // Only static icon markup is inserted; all event text uses textContent.
+          button.innerHTML = action === "edit"
+            ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15z"/></svg>'
+            : '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-trash"></use></svg>';
+          button.appendChild(createElement("span", "event-action-label", label));
           actions.appendChild(button);
         });
-        card.appendChild(actions); section.appendChild(card);
+        actionCell.appendChild(actions); tr.append(dateCell, copyCell, toneCell, actionCell); body.appendChild(tr);
       });
+      table.appendChild(body);
+      if (categoryRows.length) section.appendChild(table);
       groups.appendChild(section);
     });
     updateMonthlyEventControls();

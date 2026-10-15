@@ -1,3 +1,11 @@
+# Current release: v2.18.1
+
+แสดง MonthlyEvents เป็นตารางกระชับ 4 คอลัมน์ พร้อมรายละเอียดพับได้ แยกประเภทและสีเดิม ฐานคือ v2.18.0 ไม่มีการเปลี่ยน schema หรือ API
+
+ส่งเป็น ZIP สำหรับอัปโหลดเอง ยังไม่ Deploy รุ่นนี้ผ่าน GitHub
+
+## Previous project state
+
 # Current release: v2.18.0
 
 ฐาน ZIP v2.17.0 เพิ่ม monthly-events.js, UI เหตุการณ์ในวันนี้, Sheets CRUD และ fallback ชื่อ MonthlyEvents ใน config เดิม ใช้ Header event_id, event_date, category, tone, title, detail, created_at, updated_at
