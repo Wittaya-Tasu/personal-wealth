@@ -1,4 +1,15 @@
-# ข้อกำหนดล่าสุด v2.15.1
+# ข้อกำหนดล่าสุด v2.19.0
+
+รายจ่ายประจำใช้ optional sheet `RecurringExpenses` ตาม `RECURRING_EXPENSES_MIGRATION.md` และอยู่ในแท็บรายรับ–รายจ่าย
+ปุ่ม `จ่ายแล้ว` ต้องสร้าง Expense ผ่าน Transaction engine เดิม ห้ามหักบัญชีหรือเพิ่มหนี้ซ้ำด้วยโค้ดอีกชุด
+หนึ่งรอบใช้ tx_id จาก recurring_id + วันครบกำหนดเพื่อป้องกันการบันทึกซ้ำ และเลื่อน next_due_date หลัง Transaction สำเร็จเท่านั้น
+บัญชีหรือบัตรที่ RecurringExpenses อ้างถึงต้องไม่ถูกเปลี่ยนชื่อหรือลบจนกว่าจะแก้รายการอ้างอิง
+
+## ข้อกำหนดฐาน v2.18.1
+
+MonthlyEvents แสดงแบบตารางกระชับและใช้ schema 8 คอลัมน์ตาม `MONTHLY_EVENTS_MIGRATION.md`
+
+## ข้อกำหนดฐาน v2.15.1
 
 Todo รายวัน โปรเจก และงานย่อยใช้การ์ดแบบกระชับบนมือถือ
 ปุ่มแก้/ลบต้องอยู่แถวเดียวกับเนื้อหาเมื่อความกว้างไม่เกิน 560px และห้ามย้อนกลับไปวางเป็นแถวใหม่โดยไม่มีเหตุผลด้าน Accessibility
@@ -228,6 +239,7 @@ iPhone / Browser
 | `HabitLogs` | `habit_log_id`, `habit_id`, `period_key`, `completed_date`, `completed_at`, `created_at`, `updated_at` |
 | `Budgets` | `budget_id`, `month`, `expense_group`, `budget_amount`, `note`, `created_at`, `updated_at` |
 | `SinkingFunds` | `fund_id`, `fund_name`, `target_amount`, `current_amount`, `due_date`, `progress_source`, `linked_account`, `expense_group`, `status`, `note`, `created_at`, `updated_at` |
+| `RecurringExpenses` | `recurring_id`, `name`, `frequency`, `amount`, `next_due_date`, `expense_category`, `expense_group`, `is_essential`, `payment_method`, `account_from`, `credit_card`, `active`, `note`, `last_paid_date`, `created_at`, `updated_at` |
 
 ID ที่ลงท้าย `_id` ถูกสร้างอัตโนมัติเมื่อเพิ่มแถวใหม่
 

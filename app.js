@@ -13,6 +13,8 @@
     activeSheet: null,
     activeFormType: null,
     activeRecord: null,
+    transactionsTab: "history",
+    recurringExpenseFilter: "active",
     todayDate: localIsoDate(),
     todayTab: "todos",
     habitView: "week",
@@ -44,6 +46,7 @@
     insuranceSchemaMissingHeaders: [],
     retirementSchemaMissingHeaders: [],
     buyWishSchemaMissingHeaders: [],
+    recurringExpenseSchemaMissingHeaders: [],
     charts: {
       netWorth: null,
       cashflow: null,
@@ -63,6 +66,8 @@
   const formMeta = {
     transaction: { title: "รายรับ–รายจ่าย", eyebrow: "CASH FLOW", sheet: config.SHEETS.transactions },
     creditCardPayment: { title: "ชำระบัตรเครดิต", eyebrow: "CREDIT CARD", sheet: config.SHEETS.transactions },
+    recurringExpense: { title: "รายจ่ายประจำ", eyebrow: "RECURRING EXPENSE", sheet: config.SHEETS.recurringExpenses || "RecurringExpenses" },
+    recurringPayment: { title: "บันทึกว่าจ่ายแล้ว", eyebrow: "PAY RECURRING EXPENSE", sheet: config.SHEETS.transactions },
     investment: { title: "เงินลงทุน", eyebrow: "PORTFOLIO", sheet: config.SHEETS.investments },
     investmentMeta: { title: "รายละเอียดการลงทุน", eyebrow: "INVESTMENT PROFILE", sheet: config.SHEETS.investments },
     account: { title: "บัญชีเงิน", eyebrow: "CASH & BANK", sheet: config.SHEETS.accounts },
@@ -208,6 +213,9 @@
     state.loading = isLoading;
     updateMonthlyEventControls();
     qs("#syncButton").classList.toggle("is-spinning", isLoading);
+    const recurringAdd = qs("#addRecurringExpense");
+    if (recurringAdd) recurringAdd.disabled = isLoading || !store.isRecurringExpenseSheetReady();
+    qs("#recurringExpenseList")?.setAttribute("aria-busy", String(isLoading));
     qsa("button[type='submit']").forEach((button) => {
       if (button.closest(".data-form, .gratitude-form, .todo-add-form, .project-task-form, .habit-add-form")) button.disabled = isLoading;
       if (button.closest(".habit-add-form")) button.disabled = isLoading || state.habitBusy || !store.isHabitSheetReady() || (qs("#habitForm").elements.frequency.value === "Interval" && !store.isHabitIntervalReady());
@@ -233,7 +241,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js?v=2.18.1").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.19.0").catch(() => {});
     }
   }
 
@@ -303,6 +311,16 @@
     qs("#expenseMonth").addEventListener("change", renderExpenseBreakdownChart);
     qs("#transactionSearch").addEventListener("input", renderTransactions);
     qs("#transactionTypeFilter").addEventListener("change", renderTransactions);
+    qsa("[data-transactions-tab]").forEach((button) => button.addEventListener("click", () => {
+      state.transactionsTab = button.dataset.transactionsTab;
+      renderTransactionTabs();
+    }));
+    qs("#addRecurringExpense").addEventListener("click", () => openForm("recurringExpense"));
+    qs("#recurringExpenseFilter").addEventListener("change", (event) => {
+      state.recurringExpenseFilter = event.target.value;
+      renderRecurringExpenses();
+    });
+    qs("#recurringExpenseList").addEventListener("click", handleRecurringExpenseAction);
     qs("#modalOverlay").addEventListener("click", closeSheets);
     qsa(".close-sheet").forEach((button) => button.addEventListener("click", closeSheets));
     qs("#formBackButton").addEventListener("click", openQuickAdd);
@@ -438,6 +456,7 @@
       state.insuranceSchemaMissingHeaders = store.getMissingInsuranceHeaders();
       state.retirementSchemaMissingHeaders = store.getMissingRetirementHeaders();
       state.buyWishSchemaMissingHeaders = store.getMissingBuyWishHeaders();
+      state.recurringExpenseSchemaMissingHeaders = store.getMissingRecurringExpenseHeaders();
       state.viewModel = analytics.buildViewModel(data, config.DEFAULTS);
       populateChartFilters();
       renderAll();
@@ -461,7 +480,7 @@
     ].forEach((id) => setText(id, id === "emergencyMonthsValue" ? "— เดือน" : "฿—"));
     setText("netWorthStatus", "รอเชื่อมต่อ");
     setText("netWorthChange", "เชื่อมต่อ Google เพื่อดูข้อมูลจริง");
-    ["recentTransactions", "transactionList", "wealthList", "goalPreview", "goalList", "buyWishList", "todoList", "projectTaskList", "habitList"].forEach((id) => {
+    ["recentTransactions", "transactionList", "recurringExpenseList", "wealthList", "goalPreview", "goalList", "buyWishList", "todoList", "projectTaskList", "habitList"].forEach((id) => {
       const container = document.getElementById(id);
       container.replaceChildren(emptyState());
     });
@@ -961,6 +980,7 @@
   function renderTransactions() {
     const vm = state.viewModel;
     if (!vm) return;
+    renderTransactionTabs();
     setText("txIncomeSummary", formatCurrency(vm.currentMonth.income));
     setText("txExpenseSummary", formatCurrency(vm.currentMonth.expense));
     const spendingBalance = vm.monthlySpending.status === "available"
@@ -984,6 +1004,160 @@
       return matchesQuery && matchesType;
     });
     renderTransactionContainer(qs("#transactionList"), rows, true);
+    renderRecurringExpenses();
+  }
+
+  function renderTransactionTabs() {
+    qsa("[data-transactions-tab]").forEach((button) => {
+      const active = button.dataset.transactionsTab === state.transactionsTab;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    qsa("[data-transactions-panel]").forEach((panel) => {
+      panel.hidden = panel.dataset.transactionsPanel !== state.transactionsTab;
+    });
+  }
+
+  function recurringExpenseById(id) {
+    const matches = (state.data?.recurringExpenses || []).filter((row) => String(row.recurring_id || "").trim() === String(id || "").trim());
+    if (matches.length !== 1) {
+      showToast(matches.length ? "พบ recurring_id ซ้ำ กรุณาแก้ใน Google Sheet" : "ไม่พบรายการ กรุณากดซิงก์", "error");
+      return null;
+    }
+    return matches[0];
+  }
+
+  function recurringDueLabel(row, todayKey) {
+    let days;
+    try { days = global.RecurringExpenses.daysUntil(row.next_due_date, todayKey); } catch (_error) { return "วันครบกำหนดไม่ถูกต้อง"; }
+    if (days < 0) return `เลยกำหนด ${Math.abs(days)} วัน`;
+    if (days === 0) return "ครบกำหนดวันนี้";
+    return `อีก ${days} วัน`;
+  }
+
+  function renderRecurringExpenses() {
+    const ready = store.isRecurringExpenseSheetReady();
+    const migration = qs("#recurringExpenseMigration");
+    migration.hidden = ready;
+    qs("#addRecurringExpense").disabled = !ready || state.loading;
+    if (!ready) {
+      qs("#recurringMigrationDetail").textContent = state.recurringExpenseSchemaMissingHeaders.length
+        ? `Header ที่ยังขาด: ${state.recurringExpenseSchemaMissingHeaders.join(", ")}`
+        : "สร้างชีต RecurringExpenses ตาม RECURRING_EXPENSES_MIGRATION.md แล้วกดซิงก์";
+    }
+
+    const todayKey = localIsoDate();
+    const rows = (state.data?.recurringExpenses || []).filter((row) => {
+      if (state.recurringExpenseFilter === "all") return true;
+      if (state.recurringExpenseFilter === "paused") return !global.RecurringExpenses.isActive(row.active);
+      return global.RecurringExpenses.isActive(row.active);
+    });
+    const activeRows = (state.data?.recurringExpenses || []).filter((row) => global.RecurringExpenses.isActive(row.active));
+    const overdueCount = activeRows.filter((row) => global.RecurringExpenses.status(row, todayKey) === "overdue").length;
+    const dueCount = activeRows.filter((row) => global.RecurringExpenses.status(row, todayKey) === "due").length;
+    const upcomingCount = activeRows.filter((row) => global.RecurringExpenses.status(row, todayKey) === "upcoming").length;
+    setText("recurringOverdueCount", String(overdueCount));
+    setText("recurringDueCount", String(dueCount));
+    setText("recurringUpcomingCount", String(upcomingCount));
+
+    const container = qs("#recurringExpenseList");
+    container.replaceChildren();
+    if (!ready) {
+      container.appendChild(emptyState("สร้างชีตและ Header ก่อนเริ่มใช้งาน"));
+      return;
+    }
+    if (!rows.length) {
+      container.appendChild(emptyState(state.recurringExpenseFilter === "active" ? "ยังไม่มีรายจ่ายประจำที่เปิดใช้งาน" : "ไม่พบรายการตามตัวกรอง"));
+      return;
+    }
+
+    const order = { overdue: 0, due: 1, upcoming: 2, future: 3, paused: 4, invalid: 5 };
+    const sorted = [...rows].sort((a, b) => {
+      const statusDifference = order[global.RecurringExpenses.status(a, todayKey)] - order[global.RecurringExpenses.status(b, todayKey)];
+      return statusDifference || String(a.next_due_date || "").localeCompare(String(b.next_due_date || "")) || String(a.name || "").localeCompare(String(b.name || ""), "th");
+    });
+
+    [["Monthly", "จ่ายประจำเดือน"], ["Yearly", "จ่ายประจำปี"]].forEach(([frequency, label]) => {
+      const groupRows = sorted.filter((row) => global.RecurringExpenses.frequency(row.frequency) === frequency);
+      if (!groupRows.length) return;
+      const group = createElement("section", "recurring-group");
+      const heading = createElement("div", "recurring-group-heading");
+      heading.append(createElement("h3", "", label), createElement("span", "", `${groupRows.length} รายการ`));
+      group.appendChild(heading);
+      const list = createElement("div", "recurring-card-list");
+      groupRows.forEach((row) => {
+        const status = global.RecurringExpenses.status(row, todayKey);
+        const active = global.RecurringExpenses.isActive(row.active);
+        const card = createElement("article", `recurring-card status-${status}`);
+        const top = createElement("div", "recurring-card-top");
+        const title = createElement("div", "recurring-card-title");
+        title.append(
+          createElement("strong", "", row.name || "—"),
+          createElement("span", "", `${row.expense_category || "ไม่ระบุหมวด"} · ${analytics.expenseGroupLabel(row.expense_group)}`)
+        );
+        const amount = createElement("strong", "recurring-amount", formatCurrency(row.amount));
+        top.append(title, amount);
+
+        const due = createElement("div", "recurring-due-row");
+        const dateText = analytics.parseDate(row.next_due_date)
+          ? formatDate(analytics.parseDate(row.next_due_date), { day: "numeric", month: "short", year: "numeric" })
+          : row.next_due_date || "—";
+        due.append(
+          createElement("span", `recurring-status status-${status}`, active ? recurringDueLabel(row, todayKey) : "พักรายการ"),
+          createElement("span", "", `กำหนด ${dateText}`)
+        );
+        const paymentLabel = row.payment_method === "CreditCard"
+          ? `บัตรเครดิต ${row.credit_card || "—"}`
+          : `บัญชี ${row.account_from || "—"}`;
+        const meta = createElement("p", "recurring-meta", `${paymentLabel} · ${valueIsYes(row.is_essential) ? "รายจ่ายจำเป็น" : "รายจ่ายไม่จำเป็น"}${row.last_paid_date ? ` · จ่ายล่าสุด ${formatDate(analytics.parseDate(row.last_paid_date), { day: "numeric", month: "short", year: "numeric" })}` : ""}`);
+        if (row.note) meta.appendChild(createElement("span", "recurring-note", row.note));
+
+        const actions = createElement("div", "recurring-actions");
+        const pay = createElement("button", "primary-button compact-action", status === "overdue" || status === "due" ? "จ่ายแล้ว" : "ยังไม่ถึงกำหนด");
+        pay.type = "button";
+        pay.dataset.recurringPay = row.recurring_id;
+        pay.disabled = !active || !["overdue", "due"].includes(status);
+        const edit = createElement("button", "secondary-button compact-action", "แก้ไข");
+        edit.type = "button";
+        edit.dataset.recurringEdit = row.recurring_id;
+        const toggle = createElement("button", "text-button", active ? "พัก" : "เปิดใช้");
+        toggle.type = "button";
+        toggle.dataset.recurringToggle = row.recurring_id;
+        const remove = createElement("button", "text-button danger-text", "ลบ");
+        remove.type = "button";
+        remove.dataset.recurringDelete = row.recurring_id;
+        actions.append(pay, edit, toggle, remove);
+        card.append(top, due, meta, actions);
+        list.appendChild(card);
+      });
+      group.appendChild(list);
+      container.appendChild(group);
+    });
+  }
+
+  async function handleRecurringExpenseAction(event) {
+    const button = event.target.closest("[data-recurring-pay], [data-recurring-edit], [data-recurring-toggle], [data-recurring-delete]");
+    if (!button || button.disabled || state.loading || !ensureCanWrite()) return;
+    const id = button.dataset.recurringPay || button.dataset.recurringEdit || button.dataset.recurringToggle || button.dataset.recurringDelete;
+    const row = recurringExpenseById(id);
+    if (!row) return;
+    if (button.dataset.recurringPay) { openForm("recurringPayment", row); return; }
+    if (button.dataset.recurringEdit) { openForm("recurringExpense", row); return; }
+    if (button.dataset.recurringDelete && !global.confirm(`ลบรายจ่ายประจำ “${row.name}” หรือไม่?\nTransaction ที่เคยจ่ายแล้วจะไม่ถูกลบ`)) return;
+    try {
+      setLoading(true);
+      if (button.dataset.recurringToggle) {
+        await store.setRecurringExpenseActive(row.recurring_id, !global.RecurringExpenses.isActive(row.active));
+      } else {
+        await store.deleteRecurringExpense(row.recurring_id);
+      }
+      await refreshData();
+      showToast(button.dataset.recurringToggle ? (global.RecurringExpenses.isActive(row.active) ? "พักรายการแล้ว" : "เปิดใช้งานรายการแล้ว") : "ลบรายจ่ายประจำแล้ว");
+    } catch (error) {
+      handleError(error);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function transactionLabel(row) {
@@ -2690,6 +2864,8 @@
         ? record
           ? `เพิ่มเงินใน ${record.asset_name || "สินทรัพย์ลงทุน"}`
           : "บันทึกเงินลงทุน"
+        : type === "recurringPayment"
+          ? "ยืนยันการจ่ายรายจ่ายประจำ"
         : `${record ? "แก้ไข" : "เพิ่ม"}${meta.title}`
     );
     qs("#dynamicForm").innerHTML = formTemplate(type, record);
@@ -2969,6 +3145,70 @@
         <button class="primary-button full-width" type="submit">ยืนยันการชำระบัตร</button>`;
     }
 
+    if (type === "recurringExpense") {
+      const frequency = global.RecurringExpenses.frequency(record?.frequency) || "Monthly";
+      const paymentMethod = String(record?.payment_method || "Account") === "CreditCard" ? "CreditCard" : "Account";
+      const essential = valueIsYes(record?.is_essential) ? "Yes" : record ? "No" : "";
+      const active = record ? global.RecurringExpenses.isActive(record.active) : true;
+      return `
+        ${state.recurringExpenseSchemaMissingHeaders.length
+          ? `<p class="form-warning">สร้างชีต RecurringExpenses ก่อน: ${state.recurringExpenseSchemaMissingHeaders.join(", ")}</p>`
+          : ""}
+        <label class="field"><span>ชื่อรายจ่ายประจำ</span><input name="name" value="${inputValue(record, "name")}" maxlength="200" placeholder="เช่น ค่าอินเทอร์เน็ต หรือประกันรถยนต์" required></label>
+        <div class="field-row">
+          <label class="field"><span>ความถี่</span><select name="frequency" required>
+            <option value="Monthly" ${frequency === "Monthly" ? "selected" : ""}>จ่ายประจำเดือน</option>
+            <option value="Yearly" ${frequency === "Yearly" ? "selected" : ""}>จ่ายประจำปี</option>
+          </select></label>
+          <label class="field"><span>วันครบกำหนดครั้งถัดไป</span><input name="next_due_date" type="date" value="${inputDate(record, "next_due_date", localIsoDate())}" required></label>
+        </div>
+        <label class="field"><span>ยอดประมาณการ (บาท)</span><input name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="${inputValue(record, "amount")}" placeholder="0" required></label>
+        <label class="field"><span>กลุ่มรายจ่ายระดับบน</span><select name="expense_group" required>${expenseGroupOptions(record?.expense_group)}</select></label>
+        <label class="field"><span>หมวดหมู่รายจ่าย</span><select name="expense_category" required>${transactionCategoryOptions("Expense", record?.expense_category)}</select></label>
+        <label class="field"><span>ความจำเป็นของรายจ่าย</span><select name="is_essential" required>
+          <option value="">เลือกความจำเป็น</option>
+          <option value="Yes" ${essential === "Yes" ? "selected" : ""}>จำเป็น</option>
+          <option value="No" ${essential === "No" ? "selected" : ""}>ไม่จำเป็น</option>
+        </select><small>ใช้คำนวณเงินสำรองฉุกเฉินเมื่อสร้าง Expense จริง</small></label>
+        <label class="field"><span>ช่องทางจ่ายเริ่มต้น</span><select name="payment_method" required>
+          <option value="Account" ${paymentMethod === "Account" ? "selected" : ""}>บัญชีเงิน / เงินสด</option>
+          <option value="CreditCard" ${paymentMethod === "CreditCard" ? "selected" : ""}>บัตรเครดิต</option>
+        </select></label>
+        <label class="field" data-recurring-account-field><span>จ่ายจากบัญชี</span><select name="account_from">${accountOptions(record?.account_from, "เลือกบัญชีที่ใช้จ่าย")}</select></label>
+        <label class="field" data-recurring-card-field><span>บัตรเครดิต</span><select name="credit_card">${creditCardOptions(record?.credit_card)}</select></label>
+        <label class="field"><span>สถานะ</span><select name="active" required>
+          <option value="Yes" ${active ? "selected" : ""}>ใช้งาน</option>
+          <option value="No" ${active ? "" : "selected"}>พักไว้</option>
+        </select></label>
+        ${note("เช่น จ่ายจากโบนัสวันที่ 25 ธันวาคมของทุกปี")}
+        <p class="security-note">การสร้างรายการนี้ยังไม่หักเงิน ระบบจะหักเมื่อกด “จ่ายแล้ว” เท่านั้น</p>
+        ${submit}`;
+    }
+
+    if (type === "recurringPayment") {
+      const paymentMethod = String(record?.payment_method || "Account") === "CreditCard" ? "CreditCard" : "Account";
+      const nextDue = global.RecurringExpenses.nextDue(record.next_due_date, record.frequency);
+      return `
+        <div class="recurring-payment-summary">
+          <span>${global.RecurringExpenses.frequency(record.frequency) === "Monthly" ? "จ่ายประจำเดือน" : "จ่ายประจำปี"}</span>
+          <strong>${inputValue(record, "name")}</strong>
+          <small>ครบกำหนด ${formatDate(analytics.parseDate(record.next_due_date), { day: "numeric", month: "long", year: "numeric" })} · รอบถัดไป ${formatDate(analytics.parseDate(nextDue), { day: "numeric", month: "long", year: "numeric" })}</small>
+        </div>
+        <div class="field-row">
+          <label class="field"><span>วันที่จ่ายจริง</span><input name="date" type="date" min="${inputValue(record, "next_due_date")}" value="${localIsoDate()}" required></label>
+          <label class="field"><span>ยอดที่จ่ายจริง (บาท)</span><input name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="${inputValue(record, "amount")}" required></label>
+        </div>
+        <label class="field"><span>ช่องทางที่จ่ายจริง</span><select name="payment_method" required>
+          <option value="Account" ${paymentMethod === "Account" ? "selected" : ""}>บัญชีเงิน / เงินสด</option>
+          <option value="CreditCard" ${paymentMethod === "CreditCard" ? "selected" : ""}>บัตรเครดิต</option>
+        </select></label>
+        <label class="field" data-recurring-account-field><span>จ่ายจากบัญชี</span><select name="account_from">${accountOptions(record?.account_from, "เลือกบัญชีที่ใช้จ่าย")}</select></label>
+        <label class="field" data-recurring-card-field><span>บัตรเครดิต</span><select name="credit_card">${creditCardOptions(record?.credit_card)}</select></label>
+        ${note(record?.note || "")}
+        <p class="security-note">เมื่อยืนยัน ระบบจะสร้าง Expense ในวันที่และยอดจริง พร้อมปรับยอดบัญชีหรือหนี้บัตร และเลื่อนกำหนดรอบถัดไป</p>
+        <button class="primary-button full-width" type="submit">ยืนยันว่าจ่ายแล้ว</button>`;
+    }
+
     if (type === "budget") {
       return `
         ${state.budgetSchemaMissingHeaders.length
@@ -3203,6 +3443,23 @@
       syncRisk();
       if (type === "investmentMeta") return;
     }
+    if (["recurringExpense", "recurringPayment"].includes(type)) {
+      const form = qs("#dynamicForm");
+      const updatePaymentMethod = () => {
+        const usesCard = form.elements.payment_method.value === "CreditCard";
+        const accountField = qs("[data-recurring-account-field]", form);
+        const cardField = qs("[data-recurring-card-field]", form);
+        accountField.hidden = usesCard;
+        cardField.hidden = !usesCard;
+        form.elements.account_from.disabled = usesCard;
+        form.elements.account_from.required = !usesCard;
+        form.elements.credit_card.disabled = !usesCard;
+        form.elements.credit_card.required = usesCard;
+      };
+      form.elements.payment_method.addEventListener("change", updatePaymentMethod);
+      updatePaymentMethod();
+      return;
+    }
     if (type === "sinkingFund") {
       const form = qs("#dynamicForm");
       const updateSource = () => {
@@ -3422,6 +3679,14 @@
     const type = state.activeFormType;
     const meta = formMeta[type];
     const values = Object.fromEntries(new FormData(form).entries());
+    if (["recurringExpense", "recurringPayment"].includes(type)) {
+      if (!(analytics.toNumber(values.amount) > 0)) {
+        showToast(type === "recurringPayment" ? "ยอดที่จ่ายจริงต้องมากกว่า 0 บาท" : "ยอดประมาณการต้องมากกว่า 0 บาท", "error");
+        return;
+      }
+      if (values.payment_method === "CreditCard") values.account_from = "";
+      else values.credit_card = "";
+    }
     if (type === "budget" && !(analytics.toNumber(values.budget_amount) > 0)) {
       showToast("วงเงินงบประมาณต้องมากกว่า 0 บาท", "error");
       return;
@@ -3569,6 +3834,12 @@
         await store.appendTransactionWithAccountEffects(values);
       } else if (type === "creditCardPayment") {
         await store.payCreditCard(values);
+      } else if (type === "recurringPayment") {
+        await store.payRecurringExpense(state.activeRecord.recurring_id, values);
+      } else if (type === "recurringExpense" && state.activeRecord?.recurring_id) {
+        await store.updateRecurringExpense(state.activeRecord.recurring_id, values);
+      } else if (type === "recurringExpense") {
+        await store.appendRecurringExpense(values);
       } else if (type === "account" && state.activeRecord?._rowNumber) {
         await store.updateAccountRecord(
           state.activeRecord._rowNumber,
@@ -3618,7 +3889,7 @@
       }
       closeSheets();
       await refreshData();
-      showToast(`บันทึก${meta.title}สำเร็จ`);
+      showToast(type === "recurringPayment" ? "บันทึกรายจ่ายและเลื่อนรอบถัดไปแล้ว" : `บันทึก${meta.title}สำเร็จ`);
     } catch (error) {
       handleError(error);
     } finally {

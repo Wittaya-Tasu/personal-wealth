@@ -340,6 +340,7 @@
       this.insuranceLoadError = null;
       this.retirementLoadError = null;
       this.buyWishLoadError = null;
+      this.recurringExpenseLoadError = null;
     }
 
     async init() {
@@ -487,7 +488,7 @@
     }
 
     async loadAll() {
-      const optionalKeys = new Set(["gratitude", "todos", "habits", "habitLogs", "budgets", "sinkingFunds", "insurancePolicies", "retirementPlans", "buyWish", "monthlyEvents"]);
+      const optionalKeys = new Set(["gratitude", "todos", "habits", "habitLogs", "budgets", "sinkingFunds", "insurancePolicies", "retirementPlans", "buyWish", "monthlyEvents", "recurringExpenses"]);
       const entries = Object.entries(this.config.SHEETS).filter(([key]) => !optionalKeys.has(key));
       const ranges = entries.map(([, sheetName]) => `${quoteSheet(sheetName)}!A:Z`);
       const response = await this.request("/values:batchGet", {
@@ -530,6 +531,7 @@
       await this.loadOptionalSheet(data, "buyWish", this.getBuyWishSheetName(), "N", "buyWishLoadError");
 
       await this.loadOptionalSheet(data, "monthlyEvents", this.getMonthlyEventSheetName(), "H", "monthlyEventsLoadError");
+      await this.loadOptionalSheet(data, "recurringExpenses", this.getRecurringExpenseSheetName(), "P", "recurringExpenseLoadError");
       this.currentData = data;
       return data;
     }
@@ -862,12 +864,21 @@
       });
     }
 
+    isAccountReferencedByRecurringExpense(name) {
+      const key = accountKey(name);
+      return (this.currentData?.recurringExpenses || []).some((item) => {
+        return normalizePaymentMethod(item.payment_method) === "Account"
+          && accountKey(item.account_from) === key;
+      });
+    }
+
     isAccountReferenced(name) {
       return this.isAccountReferencedByTransaction(name)
         || this.isAccountReferencedByGoal(name)
         || this.isAccountReferencedByInvestment(name)
         || this.isAccountReferencedBySinkingFund(name)
-        || this.isAccountReferencedByBuyWish(name);
+        || this.isAccountReferencedByBuyWish(name)
+        || this.isAccountReferencedByRecurringExpense(name);
     }
 
     accountReferenceLabel(name) {
@@ -877,6 +888,7 @@
       if (this.isAccountReferencedByInvestment(name)) references.push("Investment");
       if (this.isAccountReferencedBySinkingFund(name)) references.push("Sinking Fund");
       if (this.isAccountReferencedByBuyWish(name)) references.push("BuyWish");
+      if (this.isAccountReferencedByRecurringExpense(name)) references.push("รายจ่ายประจำ");
       return references.join(" และ ") || "ข้อมูลอื่น";
     }
 
@@ -992,6 +1004,14 @@
       });
     }
 
+    isLiabilityReferencedByRecurringExpense(name) {
+      const key = accountKey(name);
+      return (this.currentData?.recurringExpenses || []).some((item) => {
+        return normalizePaymentMethod(item.payment_method) === "CreditCard"
+          && accountKey(item.credit_card) === key;
+      });
+    }
+
     validateLiabilityRecord(record, existingRecord = null) {
       const missingHeaders = [
         ...this.getMissingLiabilityTypeHeaders(),
@@ -1020,8 +1040,8 @@
       }
 
       const oldName = normalizeName(existingRecord?.liability_name);
-      if (oldName && accountKey(oldName) !== accountKey(name) && this.isLiabilityReferencedByTransaction(oldName)) {
-        const error = new Error(`เปลี่ยนชื่อ “${oldName}” ไม่ได้ เพราะมี Transaction บัตรเครดิตอ้างถึงชื่อนี้อยู่`);
+      if (oldName && accountKey(oldName) !== accountKey(name) && (this.isLiabilityReferencedByTransaction(oldName) || this.isLiabilityReferencedByRecurringExpense(oldName))) {
+        const error = new Error(`เปลี่ยนชื่อ “${oldName}” ไม่ได้ เพราะมี Transaction หรือรายจ่ายประจำอ้างถึงชื่อนี้อยู่`);
         error.code = "LIABILITY_NAME_REFERENCED";
         throw error;
       }
@@ -1074,6 +1094,11 @@
     async deleteCreditCard(rowNumber) {
       const card = this.getCreditCardRows().find((row) => row._rowNumber === rowNumber);
       if (!card) throw new Error("ไม่พบบัตรเครดิตที่ต้องการลบ");
+      if (this.isLiabilityReferencedByRecurringExpense(card.liability_name)) {
+        const error = new Error(`ลบบัตร “${card.liability_name}” ไม่ได้ เพราะมีรายจ่ายประจำอ้างถึงบัตรนี้อยู่`);
+        error.code = "LIABILITY_REFERENCED_BY_RECURRING_EXPENSE";
+        throw error;
+      }
       return this.delete(this.config.SHEETS.liabilities, rowNumber);
     }
 
@@ -1271,6 +1296,180 @@
     async deleteMonthlyEvent(eventId) {
       const latest = await this.findLatestMonthlyEvent(eventId);
       return this.delete(this.getMonthlyEventSheetName(), latest._rowNumber);
+    }
+
+    getRecurringExpenseSheetName() {
+      return this.config.SHEETS.recurringExpenses || "RecurringExpenses";
+    }
+
+    getMissingRecurringExpenseHeaders() {
+      const headers = this.headers[this.getRecurringExpenseSheetName()] || [];
+      return global.RecurringExpenses.HEADERS.filter((header) => !headers.includes(header));
+    }
+
+    isRecurringExpenseSheetReady() {
+      return !this.recurringExpenseLoadError && this.getMissingRecurringExpenseHeaders().length === 0;
+    }
+
+    getRecurringExpenseRows() {
+      return this.currentData?.recurringExpenses || [];
+    }
+
+    validateRecurringExpenseRecord(record, existingRecord = null) {
+      if (!this.isRecurringExpenseSheetReady()) {
+        const error = new Error("ระบบรายจ่ายประจำยังไม่พร้อม กรุณาสร้างชีต RecurringExpenses และตรวจ Header ทั้ง 16 คอลัมน์");
+        error.code = "RECURRING_EXPENSE_SCHEMA_MIGRATION_REQUIRED";
+        error.missingHeaders = this.getMissingRecurringExpenseHeaders();
+        throw error;
+      }
+      const name = normalizeName(record?.name);
+      const frequency = global.RecurringExpenses.frequency(record?.frequency);
+      const amount = roundMoney(record?.amount);
+      const nextDueDate = global.RecurringExpenses.date(record?.next_due_date);
+      const expenseCategory = normalizeName(record?.expense_category);
+      const expenseGroup = normalizeExpenseGroup(record?.expense_group);
+      const essentialText = normalizeName(record?.is_essential).toLowerCase();
+      const isEssential = isYes(record?.is_essential) ? "Yes" : "No";
+      const paymentMethod = normalizePaymentMethod(record?.payment_method);
+      if (!name) throw new Error("กรุณาระบุชื่อรายจ่ายประจำ");
+      if (name.length > 200) throw new Error("ชื่อรายจ่ายประจำยาวได้ไม่เกิน 200 ตัวอักษร");
+      if (!frequency) throw new Error("กรุณาเลือกจ่ายประจำเดือนหรือจ่ายประจำปี");
+      if (!(amount > 0)) throw new Error("ยอดประมาณการต้องมากกว่า 0 บาท");
+      if (!expenseCategory) throw new Error("กรุณาเลือกหมวดหมู่รายจ่าย");
+      if (!EXPENSE_GROUPS.has(expenseGroup)) throw new Error("กรุณาเลือกกลุ่มรายจ่ายระดับบน");
+      if (!["yes", "no", "true", "false", "1", "0", "ใช่", "ไม่ใช่"].includes(essentialText)) {
+        throw new Error("กรุณาระบุว่ารายจ่ายนี้จำเป็นหรือไม่");
+      }
+
+      let accountFrom = "";
+      let creditCard = "";
+      if (paymentMethod === "CreditCard") {
+        const missingHeaders = this.getMissingCreditCardHeaders();
+        if (missingHeaders.length) throw new Error(`ระบบบัตรเครดิตยังขาด Header: ${missingHeaders.join(", ")}`);
+        creditCard = normalizeName(this.findCreditCardByName(record?.credit_card).liability_name);
+      } else {
+        accountFrom = normalizeName(this.findAccountByName(record?.account_from).account_name);
+      }
+
+      const now = new Date().toISOString();
+      return {
+        ...(existingRecord || {}),
+        ...record,
+        recurring_id: existingRecord?.recurring_id || record?.recurring_id || `rec-${createShortId()}`,
+        name,
+        frequency,
+        amount,
+        next_due_date: nextDueDate,
+        expense_category: expenseCategory,
+        expense_group: expenseGroup,
+        is_essential: isEssential,
+        payment_method: paymentMethod,
+        account_from: accountFrom,
+        credit_card: creditCard,
+        active: record?.active === undefined || record?.active === "" || isYes(record?.active) ? "Yes" : "No",
+        note: normalizeName(record?.note),
+        last_paid_date: normalizeName(existingRecord?.last_paid_date || record?.last_paid_date),
+        created_at: existingRecord?.created_at || record?.created_at || now,
+        updated_at: now
+      };
+    }
+
+    async appendRecurringExpense(record) {
+      return this.append(this.getRecurringExpenseSheetName(), this.validateRecurringExpenseRecord(record));
+    }
+
+    async findLatestRecurringExpense(recurringId) {
+      const id = normalizeName(recurringId);
+      if (!id) throw new Error("รายการรายจ่ายประจำไม่มี recurring_id");
+      const data = {};
+      await this.loadOptionalSheet(data, "recurringExpenses", this.getRecurringExpenseSheetName(), "P", "recurringExpenseLoadError");
+      if (!this.isRecurringExpenseSheetReady()) throw new Error("RecurringExpenses ยังไม่พร้อม กรุณาตรวจ Header แล้วกดซิงก์");
+      const rows = data.recurringExpenses.filter((row) => normalizeName(row.recurring_id) === id);
+      if (rows.length !== 1) throw new Error(rows.length ? "พบ recurring_id ซ้ำ กรุณาแก้ใน Google Sheet ก่อน" : "ไม่พบรายการนี้ กรุณากดซิงก์");
+      return rows[0];
+    }
+
+    async updateRecurringExpense(recurringId, patch) {
+      const latest = await this.findLatestRecurringExpense(recurringId);
+      const record = this.validateRecurringExpenseRecord({ ...latest, ...patch }, latest);
+      return this.update(this.getRecurringExpenseSheetName(), latest._rowNumber, record);
+    }
+
+    async setRecurringExpenseActive(recurringId, active) {
+      return this.updateRecurringExpense(recurringId, { active: active ? "Yes" : "No" });
+    }
+
+    async deleteRecurringExpense(recurringId) {
+      const latest = await this.findLatestRecurringExpense(recurringId);
+      return this.delete(this.getRecurringExpenseSheetName(), latest._rowNumber);
+    }
+
+    async transactionIdExistsLatest(txId) {
+      const id = normalizeName(txId);
+      const sheetName = this.config.SHEETS.transactions;
+      const headers = this.getHeaders(sheetName);
+      const columnIndex = headers.indexOf("tx_id");
+      if (columnIndex < 0) throw new Error("ไม่พบ Header tx_id ในชีต Transactions");
+      const column = columnLetter(columnIndex + 1);
+      const response = await this.request("/values:batchGet", {
+        query: {
+          ranges: [`${quoteSheet(sheetName)}!${column}:${column}`],
+          majorDimension: "ROWS",
+          valueRenderOption: "UNFORMATTED_VALUE"
+        }
+      });
+      return (response.valueRanges?.[0]?.values || []).slice(1).some((row) => normalizeName(row[0]) === id);
+    }
+
+    async payRecurringExpense(recurringId, payment) {
+      const latest = await this.findLatestRecurringExpense(recurringId);
+      if (!global.RecurringExpenses.isActive(latest.active)) throw new Error("รายการนี้ถูกพักไว้ กรุณาเปิดใช้งานก่อนบันทึกการจ่าย");
+      const dueDate = global.RecurringExpenses.date(latest.next_due_date);
+      const paidDate = global.RecurringExpenses.date(payment?.date);
+      if (paidDate < dueDate) throw new Error("ยังไม่ถึงวันครบกำหนด หากจ่ายล่วงหน้าให้แก้วันครบกำหนดก่อน");
+      const txId = global.RecurringExpenses.paymentReference(latest.recurring_id, dueDate);
+      const existsLocally = (this.currentData?.transactions || []).some((row) => normalizeName(row.tx_id) === txId);
+      if (existsLocally || await this.transactionIdExistsLatest(txId)) {
+        const error = new Error("รอบนี้ถูกบันทึกว่าจ่ายแล้ว กรุณากดซิงก์ข้อมูล");
+        error.code = "RECURRING_PAYMENT_DUPLICATE";
+        throw error;
+      }
+      const transaction = {
+        type: "Expense",
+        date: paidDate,
+        amount: payment?.amount,
+        category: latest.expense_category,
+        item_name: latest.name,
+        expense_group: latest.expense_group,
+        is_essential: latest.is_essential,
+        payment_method: payment?.payment_method || latest.payment_method,
+        account_from: payment?.account_from || latest.account_from,
+        credit_card: payment?.credit_card || latest.credit_card,
+        account_to: "",
+        note: normalizeName(payment?.note || latest.note)
+      };
+      const paid = await this.appendTransactionWithAccountEffects(transaction, { txId });
+      const nextDueDate = global.RecurringExpenses.nextDue(dueDate, latest.frequency);
+      try {
+        await this.update(this.getRecurringExpenseSheetName(), latest._rowNumber, {
+          ...latest,
+          next_due_date: nextDueDate,
+          last_paid_date: paidDate,
+          updated_at: new Date().toISOString()
+        });
+      } catch (primaryError) {
+        try {
+          await this.deleteTransactionWithAccountEffects({ ...paid.transaction, _rowNumber: paid.rowNumber });
+        } catch (rollbackError) {
+          const error = new Error(`บันทึกรายจ่ายแล้ว แต่เลื่อนรอบถัดไปและย้อนรายการไม่สำเร็จ: ${primaryError.message}`);
+          error.code = "RECURRING_PAYMENT_ROLLBACK_FAILED";
+          error.primaryError = primaryError;
+          error.rollbackError = rollbackError;
+          throw error;
+        }
+        throw primaryError;
+      }
+      return { ...paid, nextDueDate };
     }
 
     getHabitRows() {
@@ -2331,14 +2530,22 @@
         || id.startsWith(CREDIT_CARD_PAYMENT_PREFIX);
     }
 
-    async appendTransactionWithAccountEffects(record) {
+    async appendTransactionWithAccountEffects(record, { txId = "" } = {}) {
       const rawType = normalizeTransactionType(record?.type);
       const prefix = rawType === "credit_card_payment"
         ? CREDIT_CARD_PAYMENT_PREFIX
         : rawType === "expense" && normalizePaymentMethod(record?.payment_method) === "CreditCard"
           ? CREDIT_CARD_EXPENSE_PREFIX
           : LINKED_TRANSACTION_PREFIX;
-      const transaction = this.validateTransactionAccounts({ ...record, tx_id: `${prefix}${createShortId()}` });
+      const requestedId = normalizeName(txId);
+      if (requestedId && !requestedId.startsWith(LINKED_TRANSACTION_PREFIX)) throw new Error("รหัส Transaction ที่กำหนดไม่ถูกต้อง");
+      const finalId = requestedId || `${prefix}${createShortId()}`;
+      if ((this.currentData?.transactions || []).some((row) => normalizeName(row.tx_id) === finalId)) {
+        const error = new Error("พบ Transaction รหัสซ้ำ กรุณากดซิงก์ข้อมูลก่อนลองอีกครั้ง");
+        error.code = "DUPLICATE_TRANSACTION_ID";
+        throw error;
+      }
+      const transaction = this.validateTransactionAccounts({ ...record, tx_id: finalId });
       const changes = await this.applyTransactionEffects(transaction);
       try {
         const result = await this.append(this.config.SHEETS.transactions, transaction);

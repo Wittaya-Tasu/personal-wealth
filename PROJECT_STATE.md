@@ -1,3 +1,13 @@
+# Current release: v2.19.0
+
+เพิ่มชีต `RecurringExpenses` A:P และแท็บรายจ่ายประจำในหน้ารายรับ–รายจ่าย รองรับ Monthly/Yearly, พักรายการ, แก้ไข, ลบ และปุ่ม `จ่ายแล้ว`
+การกดจ่ายใช้ Transaction engine เดิม จึงหักบัญชีหรือเพิ่มหนี้บัตรเครดิตและเข้า Cash Flow/กราฟรายจ่ายตามวันที่จ่ายจริง หลังสำเร็จจะเลื่อนกำหนดรอบถัดไป
+ใช้ `tx_id` อ้างอิงตาม recurring_id + รอบครบกำหนดเพื่อป้องกันการจ่ายรอบเดิมซ้ำ และป้องกัน Rename/Delete แหล่งจ่ายที่ถูกอ้างอิง
+
+อ่าน `RECURRING_EXPENSES_MIGRATION.md`, `UPDATE_V2.19.0.md` และ `REGRESSION_V2.19.0.md` ก่อน Deploy
+
+## Previous project state
+
 # Current release: v2.18.1
 
 แสดง MonthlyEvents เป็นตารางกระชับ 4 คอลัมน์ พร้อมรายละเอียดพับได้ แยกประเภทและสีเดิม ฐานคือ v2.18.0 ไม่มีการเปลี่ยน schema หรือ API

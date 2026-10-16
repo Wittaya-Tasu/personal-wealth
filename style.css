@@ -2556,6 +2556,97 @@ svg {
 .monthly-report-preview:focus { outline:2px solid #e7c66b; }
 .insurance-table { min-width:1400px; }
 
+/* v2.19.0: recurring expenses */
+.transactions-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 16px 0;
+}
+
+[data-transactions-panel][hidden] { display: none; }
+.recurring-summary { margin-bottom: 14px; }
+.recurring-expense-panel { display: grid; gap: 16px; }
+.recurring-heading,
+.recurring-toolbar,
+.recurring-group-heading,
+.recurring-card-top,
+.recurring-due-row,
+.recurring-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.recurring-heading,
+.recurring-group-heading,
+.recurring-card-top,
+.recurring-due-row { justify-content: space-between; }
+.recurring-toolbar { flex-wrap: wrap; justify-content: flex-end; }
+.recurring-toolbar .compact-select { min-width: 132px; }
+.recurring-expense-list { display: grid; gap: 20px; }
+.recurring-group { display: grid; gap: 10px; }
+.recurring-group + .recurring-group { padding-top: 18px; border-top: 1px solid var(--line); }
+.recurring-group-heading h3 { margin: 0; font-size: 16px; }
+.recurring-group-heading span { color: var(--muted-2); font-size: 12px; }
+.recurring-card-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.recurring-card {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+  padding: 15px;
+  background: rgba(7, 20, 16, 0.3);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
+  border-radius: 15px;
+}
+.recurring-card.status-overdue { border-left-color: var(--red); }
+.recurring-card.status-due { border-left-color: var(--gold); }
+.recurring-card.status-upcoming { border-left-color: var(--blue); }
+.recurring-card.status-paused { opacity: 0.68; }
+.recurring-card-title { display: grid; min-width: 0; gap: 3px; }
+.recurring-card-title strong { overflow-wrap: anywhere; }
+.recurring-card-title span,
+.recurring-meta { color: var(--muted-2); font-size: 12px; }
+.recurring-amount { flex: 0 0 auto; color: var(--text); font-size: 19px; font-variant-numeric: tabular-nums; }
+.recurring-due-row { color: var(--muted-2); font-size: 12px; }
+.recurring-status { padding: 4px 8px; border-radius: 999px; font-weight: 700; }
+.recurring-status.status-overdue { background: rgba(255, 112, 112, 0.12); color: var(--red); }
+.recurring-status.status-due { background: var(--gold-soft); color: var(--gold); }
+.recurring-status.status-upcoming { background: rgba(83, 168, 255, 0.12); color: var(--blue); }
+.recurring-status.status-future,
+.recurring-status.status-paused,
+.recurring-status.status-invalid { background: rgba(145, 164, 155, 0.1); color: var(--muted-2); }
+.recurring-meta { display: grid; gap: 5px; margin: 0; line-height: 1.45; overflow-wrap: anywhere; }
+.recurring-note { color: var(--text); }
+.recurring-actions { justify-content: flex-end; flex-wrap: wrap; margin-top: 2px; }
+.compact-action { min-height: 38px; padding: 7px 12px; }
+.recurring-payment-summary {
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+  background: var(--gold-soft);
+  border: 1px solid rgba(226, 196, 109, 0.28);
+  border-radius: 14px;
+}
+.recurring-payment-summary span { color: var(--gold); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; }
+.recurring-payment-summary strong { font-size: 18px; }
+.recurring-payment-summary small { color: var(--muted-2); line-height: 1.5; }
+
+@media (max-width: 760px) {
+  .recurring-card-list { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .recurring-heading { align-items: stretch; flex-direction: column; }
+  .recurring-toolbar { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .recurring-toolbar .compact-select,
+  .recurring-toolbar .primary-button { width: 100%; }
+  .recurring-card-top { align-items: flex-start; }
+  .recurring-amount { font-size: 17px; }
+  .recurring-due-row { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .recurring-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .recurring-actions > * { width: 100%; }
+}
+
 /* v2.16.0 — responsive Habit Tracker */
 .habit-tracker-controls { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin:22px 0 14px; }
 .habit-tracker-controls h2 { margin:0; font-size:24px; }

@@ -1,3 +1,9 @@
+# TasuyaWay v2.19.0 — รายจ่ายประจำรายเดือนและรายปี
+
+เพิ่มแท็บ `รายจ่ายประจำ` ในหน้ารายรับ–รายจ่าย ตั้งกำหนดแบบรายเดือนหรือรายปี และกด `จ่ายแล้ว` เพื่อสร้าง Expense จริง หักบัญชีหรือเพิ่มหนี้บัตรเครดิต พร้อมเลื่อนรอบถัดไปอัตโนมัติ
+
+ก่อน Deploy ต้องสร้างชีต `RecurringExpenses` ตาม [RECURRING_EXPENSES_MIGRATION.md](RECURRING_EXPENSES_MIGRATION.md) แล้วอ่าน [UPDATE_V2.19.0.md](UPDATE_V2.19.0.md) และ [REGRESSION_V2.19.0.md](REGRESSION_V2.19.0.md)
+
 # TasuyaWay v2.18.1 — MonthlyEvents แบบตารางกระชับ
 
 เหตุการณ์รายเดือนแสดงเป็นแถวตาราง 4 คอลัมน์ แยกงาน/ส่วนตัว ใช้สีเขียว แดง ทอง แตะหัวข้อเพื่อดูรายละเอียดเต็ม และยังเพิ่ม/แก้ไข/ลบ/เลือกเดือนได้เหมือนเดิม
@@ -231,6 +237,8 @@ v2.11.0 สร้างชีต `Budgets` และ `SinkingFunds` ตาม `W
 | `HabitLogs` | `habit_log_id`, `habit_id`, `period_key`, `completed_date`, `completed_at`, `created_at`, `updated_at` |
 | `Budgets` | `budget_id`, `month`, `expense_group`, `budget_amount`, `note`, `created_at`, `updated_at` |
 | `SinkingFunds` | `fund_id`, `fund_name`, `target_amount`, `current_amount`, `due_date`, `progress_source`, `linked_account`, `expense_group`, `status`, `note`, `created_at`, `updated_at` |
+| `MonthlyEvents` | `event_id`, `event_date`, `category`, `tone`, `title`, `detail`, `created_at`, `updated_at` |
+| `RecurringExpenses` | `recurring_id`, `name`, `frequency`, `amount`, `next_due_date`, `expense_category`, `expense_group`, `is_essential`, `payment_method`, `account_from`, `credit_card`, `active`, `note`, `last_paid_date`, `created_at`, `updated_at` |
 
 ก่อน Deploy v2.11.0 ต้องทำ [WEALTH_PLANNING_MIGRATION.md](WEALTH_PLANNING_MIGRATION.md) แล้วจึงตรวจ Migration รุ่นก่อนที่เกี่ยวข้อง
 
