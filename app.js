@@ -17,7 +17,7 @@
     recurringExpenseFilter: "active",
     todayDate: localIsoDate(),
     todayTab: "todos",
-    habitView: "week",
+    habitView: "year",
     habitBusy: false,
     loading: false,
     eventsMonth: localIsoDate().slice(0, 7),
@@ -241,7 +241,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js?v=2.19.0").catch(() => {});
+      navigator.serviceWorker.register("./sw.js?v=2.20.0").catch(() => {});
     }
   }
 
@@ -371,6 +371,9 @@
     qs("#habitPreviousPeriod").addEventListener("click", () => changeHabitPeriod(-1));
     qs("#habitNextPeriod").addEventListener("click", () => changeHabitPeriod(1));
     qs("#habitGoToday").addEventListener("click", () => { state.todayDate = localIsoDate(); renderToday(); });
+    qs("#habitYearSelect").addEventListener("change", (event) => {
+      selectHabitYear(Number(event.target.value));
+    });
     qs("#gratitudeForm").addEventListener("submit", submitGratitude);
     qs("#gratitudeForm").addEventListener("input", updateGratitudeProgressFromForm);
     qs("#gratitudeForm").addEventListener("click", (event) => {
@@ -2349,7 +2352,85 @@
     else if (Number(input.value) > Number(input.max)) input.value = input.max;
   }
 
+  function selectHabitYear(year) {
+    if (!Number.isInteger(year) || year < 1900 || year > 9998) return;
+    const parsed = global.HabitTracker.date(state.todayDate);
+    const month = parsed.getUTCMonth(), last = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    state.todayDate = new Date(Date.UTC(year, month, Math.min(parsed.getUTCDate(), last))).toISOString().slice(0, 10);
+    renderToday();
+  }
+
+  function populateHabitYears(rows, logs) {
+    const current = Number(localIsoDate().slice(0, 4)), selected = Number(state.todayDate.slice(0, 4));
+    const years = new Set([selected, ...Array.from({ length: 7 }, (_, i) => current - 5 + i)]);
+    rows.map(global.HabitTracker.startDate).concat(logs.map(global.HabitTracker.logDate)).filter(Boolean).forEach((day) => years.add(Number(day.slice(0, 4))));
+    const select = qs("#habitYearSelect"); select.replaceChildren();
+    [...years].filter((year) => year >= 1900 && year <= 9998).sort((a, b) => b - a).forEach((year) => {
+      const option = createElement("option", "", `${year + 543} (${year})`); option.value = year; select.appendChild(option);
+    });
+    select.value = String(selected);
+  }
+
+  function renderHabitYear(rows, logs, now) {
+    const year = Number(state.todayDate.slice(0, 4)), container = qs("#habitList");
+    const models = rows.map((habit) => global.HabitYear.model(habit, logs, year, now));
+    const overall = global.HabitYear.aggregate(models), metrics = qsa(".habit-metrics article");
+    setText("habitTodayLabel", "บันทึกปีที่เลือก"); setText("habitTodayMetric", `${overall.completedDays} ครั้ง`);
+    qs("small", metrics[0]).textContent = "นับแยก Habit และวันที่บันทึก";
+    qs("span", metrics[1]).textContent = "อัตราสำเร็จเฉลี่ย";
+    setText("habitWeekMetric", overall.percent === null ? "—" : `${overall.percent}%`);
+    qs("small", metrics[1]).textContent = "เฉลี่ยแต่ละ Habit ที่ถึงกำหนดแล้ว";
+    qs("span", metrics[2]).textContent = "Habit ที่ติดตาม"; setText("habitStreakMetric", String(rows.length));
+    setText("habitStreakName", `ภาพรวมปี ${year + 543}`);
+    setText("habitTrackerTitle", "ภาพรวมทั้งปี"); setText("habitSummary", `${rows.length} Habit`);
+    container.className = "habit-list habit-year-list";
+    const monthNames = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+    const weekdayNames = ["จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา."];
+    const frequencyUnits = { Weekly: "สัปดาห์", Monthly: "เดือน", Yearly: "ปี" };
+    const statusNames = { done: "ทำแล้ว", miss: "ถึงกำหนดแต่ไม่ได้ทำ", pending: "วันนี้ยังไม่ได้ทำ", off: "วันพักหรือก่อนวันเริ่ม", future: "วันในอนาคต" };
+    rows.forEach((habit, index) => {
+      const model = models[index], result = model.summary;
+      const card = createElement("article", "habit-year-card"); card.dataset.yearHabit = habit._rowNumber;
+      card.style.setProperty("--habit-color", model.color); card.style.setProperty("--year-weeks", model.columns);
+      const heading = createElement("div", "habit-year-heading"), name = createElement("div", "habit-year-name");
+      const frequency = habit.frequency === "Interval" ? `ทุก ${habit.interval_days} วัน${Number(habit.interval_days) === 2 ? " · วันเว้นวัน" : ""}` : habit.frequency === "Daily" ? "ทุกวัน" : `${global.HabitTracker.target(habit)} ครั้ง/${frequencyUnits[habit.frequency]}`;
+      name.append(createElement("h3", "", habit.habit_name), createElement("small", "", frequency));
+      const rate = createElement("div", "habit-year-rate");
+      rate.append(createElement("strong", "", result.percent === null ? "—" : `${result.percent}%`), createElement("small", "", `${result.done}/${result.goal} ${result.unit}`));
+      if (result.pending) rate.appendChild(createElement("small", "", `รอประเมิน ${result.pending} รอบ`));
+      heading.append(name, rate); card.appendChild(heading);
+      const chart = createElement("div", "habit-year-chart"), rail = createElement("div", "habit-year-weekdays"); rail.setAttribute("aria-hidden", "true");
+      weekdayNames.forEach((label) => rail.appendChild(createElement("span", "", label)));
+      const plot = createElement("div", "habit-year-plot"), months = createElement("div", "habit-year-months"); months.setAttribute("aria-hidden", "true");
+      model.months.forEach(({ month, column }, i) => {
+        const label = createElement("span", "", monthNames[month]), next = model.months[i + 1]?.column ?? model.columns;
+        label.style.gridColumn = `${column + 1} / span ${Math.max(1, next - column)}`; months.appendChild(label);
+      });
+      const matrix = createElement("div", "habit-year-matrix"); matrix.setAttribute("role", "img");
+      matrix.setAttribute("aria-label", `${habit.habit_name} ปี ${year + 543}: ${result.done}/${result.goal} ${result.unit} สำเร็จ ${result.percent ?? "ยังไม่มีข้อมูล"}${result.percent === null ? "" : " เปอร์เซ็นต์"}; แถวจันทร์ถึงอาทิตย์ ใช้ปุ่มดูและบันทึกเพื่อเปิดรายละเอียดรายวัน`);
+      model.weeks.forEach((week) => week.forEach((cell) => {
+        const tile = createElement("span", `habit-year-cell ${cell?.status || "outside"}`); tile.setAttribute("aria-hidden", "true");
+        if (cell) { tile.dataset.yearDate = cell.date; tile.title = `${habit.habit_name} · ${formatDate(new Date(`${cell.date}T12:00:00`))} · ${statusNames[cell.status]} · เปิดสัปดาห์นี้`; }
+        matrix.appendChild(tile);
+      }));
+      plot.append(months, matrix); chart.append(rail, plot); card.appendChild(chart);
+      const footer = createElement("div", "habit-year-footer");
+      footer.appendChild(createElement("small", "", model.invalidSchedule ? "ตรวจระยะห่างและวันเริ่มในชีต" : `จันทร์ → อาทิตย์ · บันทึก ${result.completedDays} วัน`));
+      const open = createElement("button", "text-button habit-year-open", "ดู / บันทึก"); open.type = "button";
+      const focusDate = year === Number(now.slice(0, 4)) ? now : state.todayDate;
+      open.dataset.yearOpen = focusDate; open.disabled = state.habitBusy;
+      open.setAttribute("aria-label", `ดูหรือบันทึกรายวัน ${habit.habit_name}`); footer.appendChild(open); card.appendChild(footer); container.appendChild(card);
+    });
+    const legend = createElement("div", "habit-year-legend");
+    [["done", "ทำแล้ว · สีประจำ Habit"], ["miss", "ถึงกำหนดแต่ไม่ได้ทำ"], ["off", "วันพัก / ยังไม่เริ่ม"], ["pending", "วันนี้ยังไม่ทำ"], ["future", "วันอนาคต"]].forEach(([status, text]) => {
+      const item = createElement("span", ""); item.append(createElement("i", `habit-year-cell ${status}`), document.createTextNode(text)); legend.appendChild(item);
+    });
+    container.appendChild(legend);
+    container.appendChild(createElement("p", "habit-tracker-note", "วันพักไม่อยู่ในตัวหาร · รายสัปดาห์/เดือน/ปีนับรอบที่สิ้นสุดในปีที่เลือก รอบปัจจุบันที่ยังไม่ครบเป้ารอประเมิน · แตะช่องเพื่อเปิดรายละเอียดสัปดาห์นั้น"));
+  }
+
   function changeHabitPeriod(delta) {
+    if (state.habitView === "year") { selectHabitYear(Number(state.todayDate.slice(0, 4)) + delta); return; }
     if (state.habitView === "week") state.todayDate = global.HabitTracker.shift(state.todayDate, 7 * delta);
     else {
       const parsed = global.HabitTracker.date(state.todayDate);
@@ -2372,6 +2453,19 @@
     });
     const logs = state.data?.habitLogs || [], dates = tracker.days(state.todayDate, state.habitView);
     const month = state.habitView === "month";
+    const year = state.habitView === "year";
+    if (year) populateHabitYears(rows, logs);
+    qs("#habitPeriodLabel").hidden = year;
+    qs("#habitYearSelect").hidden = !year;
+    qs(".habit-tracker-scroll").classList.toggle("is-year", year);
+    const metricCards = qsa(".habit-metrics article");
+    qs("span", metricCards[1]).textContent = "อัตราสำเร็จสัปดาห์ที่เลือก";
+    qs("small", metricCards[0]).textContent = "Habit ที่บันทึกในวันนั้น";
+    qs("small", metricCards[1]).textContent = "รายวัน/ทุก N วันถึงวันนี้ + เป้ารายสัปดาห์";
+    qs("span", metricCards[2]).textContent = "ต่อเนื่องสูงสุด · รายวัน";
+    qs(".habit-tracker-heading p").textContent = year ? "1 ช่อง = 1 วัน · 1 คอลัมน์ = 1 สัปดาห์ · เรียงซ้ายไปขวาตลอดปี" : "แตะช่องเพื่อบันทึกหรือยกเลิกในแต่ละวัน";
+    qs(".habit-legend").hidden = year;
+    qs(".habit-tracker-panel > .habit-tracker-note").hidden = year;
     const summary = tracker.weekSummary(rows, logs, state.todayDate, now);
     const selectedRows = rows.filter((h) => h.frequency === "Interval" ? tracker.isDue(h, state.todayDate) : !tracker.startDate(h) || tracker.startDate(h) <= state.todayDate);
     setText("habitTodayLabel", state.todayDate === now ? "ทำสำเร็จวันนี้" : "ทำสำเร็จวันที่เลือก");
@@ -2383,7 +2477,7 @@
     setText("habitStreakName", dailyRuns[0]?.streak ? dailyRuns[0].habit.habit_name : "เริ่มต้นทีละวัน");
     const displayDate = (key) => formatDate(new Date(`${key}T12:00:00`), { day: "numeric", month: "short" });
     setText("habitPeriodLabel", month ? formatDate(new Date(`${state.todayDate}T12:00:00`), { month: "long", year: "numeric" }) : `${displayDate(dates[0])} – ${displayDate(dates.at(-1))}`);
-    setText("habitTrackerTitle", month ? "ภาพรวมเดือน" : "ภาพรวม 7 วัน");
+    setText("habitTrackerTitle", year ? "ภาพรวมทั้งปี" : month ? "ภาพรวมเดือน" : "ภาพรวม 7 วัน");
     qsa("[data-habit-view]").forEach((button) => {
       const active = button.dataset.habitView === state.habitView;
       button.classList.toggle("is-active", active); button.setAttribute("aria-selected", String(active));
@@ -2394,8 +2488,10 @@
       const empty = emptyState();
       qs("strong", empty).textContent = ready ? "ยังไม่มี Habit" : "Habit ยังไม่พร้อม";
       qs("p", empty).textContent = ready ? "เพิ่มกิจวัตรที่ต้องการทำเป็นประจำด้านบน" : "ตรวจ Header ตาม HABIT_TRACKER_MIGRATION.md แล้วกดซิงก์อีกครั้ง";
+      if (year) { renderHabitYear([], [], now); container.replaceChildren(); }
       container.appendChild(empty); return;
     }
+    if (year) { renderHabitYear(rows, logs, now); return; }
     const header = createElement("div", "habit-tracker-row habit-tracker-header");
     header.appendChild(createElement("div", "habit-tracker-name", "Habit"));
     const weekdays = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
@@ -2455,6 +2551,16 @@
   }
 
   async function handleHabitAction(event) {
+    const yearDay = event.target.closest("[data-year-date], [data-year-open]");
+    if (yearDay && !state.habitBusy) {
+      state.todayDate = yearDay.dataset.yearDate || yearDay.dataset.yearOpen;
+      state.habitView = "week";
+      const habitRow = yearDay.closest("[data-year-habit]")?.dataset.yearHabit;
+      renderToday();
+      const target = Array.from(qsa("[data-habit-row]", qs("#habitList"))).find((item) => item.dataset.habitRow === habitRow && item.dataset.habitDate === state.todayDate);
+      if (target) { target.scrollIntoView({ block: "center", behavior: "smooth" }); if (!target.disabled) target.focus({ preventScroll: true }); }
+      return;
+    }
     const button = event.target.closest("[data-habit-row], [data-habit-archive-row]");
     if (!button || button.disabled || state.habitBusy || !ensureCanWrite()) return;
     const rowNumber = Number(button.dataset.habitRow || button.dataset.habitArchiveRow);

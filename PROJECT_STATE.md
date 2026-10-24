@@ -1,3 +1,19 @@
+# Current release: v2.20.0
+
+ฐาน GitHub main: d395ddde54c73037304dc5935cd1f36f16ce403d (v2.19.0)
+
+เพิ่ม habit-year.js และหน้าสรุป Habit รายปีตามภาพอ้างอิง 7 แถวจันทร์–อาทิตย์ คอลัมน์รายสัปดาห์ครบทุกวันในปี สีประจำ Habit และเปอร์เซ็นต์ตามความถี่
+
+ปีเป็นมุมมองเริ่มต้น พร้อมเลือกปี แตะช่องเปิดสัปดาห์นั้น และปุ่ม ดู / บันทึก ตัวเลือก 7 วันและเดือนเดิมยังอยู่
+
+ไม่มี schema migration เพิ่ม ไม่มีการเปลี่ยน config.js, API, สูตรการเงิน, MonthlyEvents, RecurringExpenses, Monthly Report หรือ Apps Script
+
+ผ่านสูตร/ปฏิทิน 26 checks, ปฏิทินทุกปี 1900–2400, Browser QA 14 ขนาดจอ 320–1440 px และตรวจภาพ Desktop/iPad/iPhone ด้วยข้อมูลจำลอง
+
+อ่าน UPDATE_V2.20.0.md สำหรับกติกาสรุปรายสัปดาห์/เดือน/ปีที่นับตามรอบ และข้อจำกัดการตรวจ Google Sheet / Safari จริง
+
+## Previous project state
+
 # Current release: v2.19.0
 
 เพิ่มชีต `RecurringExpenses` A:P และแท็บรายจ่ายประจำในหน้ารายรับ–รายจ่าย รองรับ Monthly/Yearly, พักรายการ, แก้ไข, ลบ และปุ่ม `จ่ายแล้ว`

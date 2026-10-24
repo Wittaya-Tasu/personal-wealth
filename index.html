@@ -12,13 +12,13 @@
   <meta name="description" content="TasuyaWay — ระบบส่วนตัวสำหรับการเงิน เป้าหมาย BuyWish Todo Habit และบันทึกขอบคุณวันนี้">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://sheets.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; img-src 'self' data: blob:; manifest-src 'self'; worker-src 'self'">
   <title>TasuyaWay</title>
-  <link rel="manifest" href="manifest.json?v=2.19.0">
+  <link rel="manifest" href="manifest.json?v=2.20.0">
   <link rel="icon" href="icons/wealth-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.19.0">
+  <link rel="stylesheet" href="style.css?v=2.20.0">
 </head>
 <body>
   <svg class="svg-sprite" aria-hidden="true">
@@ -437,6 +437,7 @@
             <div class="habit-period-nav">
               <button id="habitPreviousPeriod" class="icon-button" type="button" aria-label="รอบก่อนหน้า">‹</button>
               <strong id="habitPeriodLabel"></strong>
+              <select id="habitYearSelect" class="compact-select" aria-label="เลือกปี Habit" hidden></select>
               <button id="habitNextPeriod" class="icon-button" type="button" aria-label="รอบถัดไป">›</button>
               <button id="habitGoToday" class="text-button" type="button">วันนี้</button>
             </div>
@@ -449,7 +450,8 @@
           <section class="panel today-list-panel habit-tracker-panel">
             <div class="section-heading habit-tracker-heading"><div><h2 id="habitTrackerTitle">ภาพรวม 7 วัน</h2><p>แตะช่องเพื่อบันทึกหรือยกเลิกในแต่ละวัน</p></div><span id="habitSummary" class="today-summary">0/0</span></div>
             <div class="segmented-control habit-view-tabs" role="tablist" aria-label="รูปแบบตาราง Habit">
-              <button type="button" data-habit-view="week" class="is-active" role="tab" aria-selected="true">7 วัน</button>
+              <button type="button" data-habit-view="year" role="tab" aria-selected="true" class="is-active">ปี</button>
+              <button type="button" data-habit-view="week" role="tab" aria-selected="false">7 วัน</button>
               <button type="button" data-habit-view="month" role="tab" aria-selected="false">เดือน</button>
             </div>
             <div class="habit-tracker-scroll" tabindex="0" aria-label="ตาราง Habit"><div id="habitList" class="habit-list"></div></div>
@@ -619,13 +621,14 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="config.js?v=2.19.0"></script>
-  <script src="analytics.js?v=2.19.0"></script>
-  <script src="habit-tracker.js?v=2.19.0"></script>
-  <script src="monthly-events.js?v=2.19.0"></script>
-  <script src="recurring-expenses.js?v=2.19.0"></script>
-  <script src="api.js?v=2.19.0"></script>
-  <script src="report.js?v=2.19.0"></script>
-  <script src="app.js?v=2.19.0"></script>
+  <script src="config.js?v=2.20.0"></script>
+  <script src="analytics.js?v=2.20.0"></script>
+  <script src="habit-tracker.js?v=2.20.0"></script>
+  <script src="habit-year.js?v=2.20.0"></script>
+  <script src="monthly-events.js?v=2.20.0"></script>
+  <script src="recurring-expenses.js?v=2.20.0"></script>
+  <script src="api.js?v=2.20.0"></script>
+  <script src="report.js?v=2.20.0"></script>
+  <script src="app.js?v=2.20.0"></script>
 </body>
 </html>
