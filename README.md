@@ -1,3 +1,11 @@
+# TasuyaWay v2.20.1 — Investment Account Selection Hotfix
+
+แก้ฟอร์มเพิ่มเงินลงทุนให้เลือกบัญชีต้นทางได้ทุกครั้ง แม้เป็นสินทรัพย์เดิม และเก็บยอดที่หักแยกตามบัญชีเพื่อให้การคืนเงินเมื่อลบ Investment ยังถูกต้อง
+
+ก่อน Deploy ให้เพิ่ม `funding_by_account` ต่อท้ายชีต `Investments` ตาม [INVESTMENTS_MIGRATION.md](INVESTMENTS_MIGRATION.md) แล้วอ่าน [UPDATE_V2.20.1.md](UPDATE_V2.20.1.md)
+
+## คู่มือรุ่นก่อนหน้า
+
 # TasuyaWay v2.20.0 — Habit Year Overview
 
 เพิ่มภาพรวม Habit รายปี: 1 ช่อง = 1 วัน, 1 คอลัมน์ = 1 สัปดาห์ พร้อมสีประจำ Habit เปอร์เซ็นต์ตามกำหนด และเลือกปีได้ สลับกลับ 7 วัน/เดือนได้

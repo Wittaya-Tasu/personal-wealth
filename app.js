@@ -3367,7 +3367,9 @@
         <label class="field"><span>สินทรัพย์ลงทุน</span><select name="investment_target" required>${investmentTargetOptions(record)}</select></label>
         <label class="field" data-new-investment-field ${initialTarget === "new" ? "" : "hidden"}><span>ชื่อสินทรัพย์ลงทุนใหม่</span><input name="asset_name" placeholder="เช่น RMF, ETF, หุ้นไทย" ${initialTarget === "new" ? "required" : "disabled"}></label>
         <p class="security-note" data-investment-current>${record ? `มูลค่าปัจจุบัน ${formatCurrency(analytics.getInvestmentValue(record))}` : "เลือกสินทรัพย์เดิมเพื่อเพิ่มยอด หรือเพิ่มชื่อใหม่"}</p>
-        <label class="field"><span>ใช้เงินจากบัญชี</span><select name="account_from" required>${accountOptions(record?.account_from, "เลือกบัญชีที่ใช้ลงทุน")}</select></label>
+        <label class="field"><span>ใช้เงินจากบัญชี</span><select name="account_from" required>${accountOptions(record?.account_from, "เลือกบัญชีที่ใช้ลงทุน")}</select>
+          <small>เลือกบัญชีต้นทางสำหรับเงินลงทุนครั้งนี้ เปลี่ยนจากครั้งก่อนได้</small>
+        </label>
         <label class="field"><span>ยอดเงินที่ลงทุนเพิ่ม (บาท)</span><input name="funded_amount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="เช่น 5000" required></label>
         <p class="security-note">ระบบจะหักเฉพาะยอดเงินรอบนี้จากบัญชี และเพิ่มเข้ามูลค่าสินทรัพย์เดิม โดยไม่นับเป็นรายจ่ายใน Cash Flow</p>
         ${investmentPlanningFields(record)}
@@ -3659,16 +3661,13 @@
         form.elements.principal_amount.required = !isNew;
         form._syncRisk();
 
-        if (accountSelect.dataset.locked === "true") accountSelect.value = "";
         accountSelect.disabled = false;
-        accountSelect.dataset.locked = "false";
-        if (selectedRecord?.account_from) {
-          accountSelect.value = selectedRecord.account_from;
-          accountSelect.disabled = true;
-          accountSelect.dataset.locked = "true";
-        }
+        accountSelect.value = selectedRecord?.account_from || "";
+        const fundingAccounts = selectedRecord
+          ? store.getInvestmentFundingEntries(selectedRecord).map((entry) => entry.account_from)
+          : [];
         currentText.textContent = selectedRecord
-          ? `มูลค่าปัจจุบัน ${formatCurrency(analytics.getInvestmentValue(selectedRecord))}${selectedRecord.account_from ? ` · ใช้บัญชี ${selectedRecord.account_from}` : " · เลือกบัญชีต้นทางสำหรับเงินรอบแรก"}`
+          ? `มูลค่าปัจจุบัน ${formatCurrency(analytics.getInvestmentValue(selectedRecord))}${fundingAccounts.length ? ` · เคยใช้เงินจาก ${fundingAccounts.join(", ")}` : " · ยังไม่มีบัญชีต้นทางเดิม"}`
           : isNew
             ? "ชื่อใหม่จะถูกเพิ่มเป็นแถวใหม่ในชีต Investments"
             : "เลือกสินทรัพย์เดิมเพื่อเพิ่มยอด หรือเพิ่มชื่อใหม่";

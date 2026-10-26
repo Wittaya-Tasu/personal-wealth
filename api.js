@@ -8,7 +8,7 @@
   const CREDIT_CARD_PAYMENT_PREFIX = "v25-pay-";
   const MONEY_PRECISION = 100;
   const GOAL_METADATA_HEADERS = ["goal_type", "progress_source", "linked_account", "status"];
-  const INVESTMENT_FUNDING_HEADERS = ["account_from", "funded_amount"];
+  const INVESTMENT_FUNDING_HEADERS = ["account_from", "funded_amount", "funding_by_account"];
   const INVESTMENT_PLANNING_HEADERS = ["investment_purpose", "asset_class", "risk_source", "risk_level", "time_horizon_years", "income_received", "principal_amount", "valuation_mode", "valuation_date"];
   const TRANSACTION_ITEM_HEADERS = ["item_name"];
   const CREDIT_CARD_TRANSACTION_HEADERS = ["payment_method", "credit_card"];
@@ -98,6 +98,45 @@
 
   function roundMoney(value) {
     return Math.round((toMoney(value) + Number.EPSILON) * MONEY_PRECISION) / MONEY_PRECISION;
+  }
+
+  function investmentFundingEntries(record) {
+    const merged = new Map();
+    const add = (accountValue, amountValue) => {
+      const accountName = normalizeName(accountValue);
+      const amount = roundMoney(amountValue);
+      if (!accountName || !(amount > 0)) return;
+      const key = accountKey(accountName);
+      const previous = merged.get(key);
+      merged.set(key, {
+        account_from: previous?.account_from || accountName,
+        funded_amount: roundMoney((previous?.funded_amount || 0) + amount)
+      });
+    };
+
+    const rawLedger = normalizeName(record?.funding_by_account);
+    if (rawLedger) {
+      try {
+        const parsed = JSON.parse(rawLedger);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((entry) => add(entry?.account_from ?? entry?.account, entry?.funded_amount ?? entry?.amount));
+        } else if (parsed && typeof parsed === "object") {
+          Object.entries(parsed).forEach(([accountName, amount]) => add(accountName, amount));
+        }
+      } catch (_) {
+        // Fall back to the legacy single-account columns below.
+      }
+    }
+
+    if (!merged.size) add(record?.account_from, record?.funded_amount);
+    return [...merged.values()];
+  }
+
+  function serializeInvestmentFunding(entries) {
+    return JSON.stringify((entries || []).map((entry) => ({
+      account_from: normalizeName(entry.account_from),
+      funded_amount: roundMoney(entry.funded_amount)
+    })).filter((entry) => entry.account_from && entry.funded_amount > 0));
   }
 
   function normalizeTransactionType(value) {
@@ -843,8 +882,8 @@
     isAccountReferencedByInvestment(name) {
       const key = accountKey(name);
       return (this.currentData?.investments || []).some((investment) => {
-        return this.isAccountLinkedInvestment(investment)
-          && accountKey(investment.account_from) === key;
+        return this.getInvestmentFundingEntries(investment)
+          .some((entry) => accountKey(entry.account_from) === key);
       });
     }
 
@@ -1976,7 +2015,11 @@
     }
 
     isAccountLinkedInvestment(record) {
-      return Boolean(normalizeName(record?.account_from) && roundMoney(record?.funded_amount) > 0);
+      return this.getInvestmentFundingEntries(record).length > 0;
+    }
+
+    getInvestmentFundingEntries(record) {
+      return investmentFundingEntries(record);
     }
 
     validateInvestmentRecord(record, existingRecord = null) {
@@ -2020,21 +2063,29 @@
       }
 
       const account = this.findAccountByName(accountFrom);
+      const fundingEntries = investmentFundingEntries(record);
+      if (!fundingEntries.length) {
+        fundingEntries.push({
+          account_from: normalizeName(account.account_name),
+          funded_amount: fundedAmount
+        });
+      }
+      const fundingTotal = fundingEntries.reduce((total, entry) => total + roundMoney(entry.funded_amount), 0);
       return {
         ...record,
         ...planning,
         asset_name: assetName,
-        account_from: normalizeName(account.account_name),
-        funded_amount: fundedAmount
+        account_from: fundingEntries.length === 1 ? fundingEntries[0].account_from : "",
+        funded_amount: roundMoney(fundingTotal),
+        funding_by_account: serializeInvestmentFunding(fundingEntries)
       };
     }
 
     getInvestmentEffects(record, multiplier = 1) {
-      if (!this.isAccountLinkedInvestment(record)) return [];
-      return [{
-        accountName: normalizeName(record.account_from),
-        delta: roundMoney(-roundMoney(record.funded_amount) * multiplier)
-      }];
+      return this.getInvestmentFundingEntries(record).map((entry) => ({
+        accountName: entry.account_from,
+        delta: roundMoney(-roundMoney(entry.funded_amount) * multiplier)
+      }));
     }
 
     async appendInvestmentWithAccountEffects(record) {
@@ -2110,22 +2161,19 @@
       let action;
       let actionLabel;
       if (existing) {
-        const existingAccount = normalizeName(existing.account_from);
-        if (existingAccount && accountKey(existingAccount) !== accountKey(accountName)) {
-          const error = new Error(
-            `“${existing.asset_name || "สินทรัพย์นี้"}” ใช้บัญชีต้นทาง “${existingAccount}” อยู่แล้ว `
-            + "กรุณาใช้บัญชีเดิมเพื่อให้ยอดย้อนหลังถูกต้อง"
-          );
-          error.code = "INVESTMENT_ACCOUNT_MISMATCH";
-          throw error;
-        }
+        const fundingEntries = this.getInvestmentFundingEntries(existing);
+        const matchedFunding = fundingEntries.find((entry) => accountKey(entry.account_from) === accountKey(accountName));
+        if (matchedFunding) matchedFunding.funded_amount = roundMoney(matchedFunding.funded_amount + amount);
+        else fundingEntries.push({ account_from: accountName, funded_amount: amount });
+        const fundingTotal = fundingEntries.reduce((total, entry) => total + roundMoney(entry.funded_amount), 0);
         const planning = validateInvestmentPlanning({ ...existing, ...record, current_value: existing.current_value }, { requireFields: true });
         const updated = {
           ...existing,
           ...planning,
-          account_from: existingAccount || accountName,
+          account_from: fundingEntries.length === 1 ? fundingEntries[0].account_from : "",
           principal_amount: roundMoney(planning.principal_amount + amount),
-          funded_amount: roundMoney((existingAccount ? toMoney(existing.funded_amount) : 0) + amount),
+          funded_amount: roundMoney(fundingTotal),
+          funding_by_account: serializeInvestmentFunding(fundingEntries),
           current_value: hasCellValue(existing.current_value)
             ? roundMoney(toMoney(existing.current_value) + amount)
             : ""
@@ -2155,6 +2203,7 @@
           note: "",
           account_from: accountName,
           funded_amount: amount,
+          funding_by_account: serializeInvestmentFunding([{ account_from: accountName, funded_amount: amount }]),
           ...planning
         };
         action = () => this.append(this.config.SHEETS.investments, investment);

@@ -1,3 +1,17 @@
+# Current release: v2.20.1
+
+ฐาน GitHub main: 2107dbcec412ed95f722f3855f9dccca7f114a53 (v2.20.0)
+
+แก้ช่อง “ใช้เงินจากบัญชี” ในฟอร์มลงทุนให้เลือกได้ทุกครั้ง ไม่ล็อกกับบัญชีที่ใช้ครั้งแรก เงินลงทุนยังรวมใน Investment แถวเดิมและไม่เข้า Cash Flow
+
+เพิ่ม `Investments.funding_by_account` เพื่อเก็บยอดที่หักแยกตามบัญชี ระบบใช้ข้อมูลนี้ป้องกัน Rename/Delete บัญชีและคืนยอดเข้าบัญชีแต่ละแห่งเมื่อผู้ใช้ลบ Investment ส่วนข้อมูล v2.20.0 และเก่าที่ยังไม่มีค่าในช่องนี้จะอ่าน `account_from` + `funded_amount` เดิมเป็นค่าเริ่มต้น
+
+Static asset / Service Worker version: 2.20.1 ไม่มีการเปลี่ยน config.js, Apps Script, สูตร Wealth, Habit, MonthlyEvents หรือ RecurringExpenses
+
+อ่าน UPDATE_V2.20.1.md และ INVESTMENTS_MIGRATION.md ก่อน Deploy
+
+## Previous project state
+
 # Current release: v2.20.0
 
 ฐาน GitHub main: d395ddde54c73037304dc5935cd1f36f16ce403d (v2.19.0)
